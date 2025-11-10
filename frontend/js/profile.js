@@ -27,14 +27,17 @@ async function initializeProfile() {
     
     // Hacer las funciones disponibles globalmente
     makeFunctionsGlobal();
+    makeOptionsFunctionsGlobal(); // ← AGREGAR ESTA LÍNEA
     
     initializeSidebar();
     initializeEventListeners();
+    initializeFriendMenuEvents(); // ← AGREGAR ESTA LÍNEA
     await loadUserProfile();
     
-    // Forzar eventos después de cargar
-    setTimeout(initializeModalEvents, 1000);
+    // Inicializar eventos de modales después de cargar
+    setTimeout(initializeModalEvents, 500);
 }
+
 
 // ===== HACER FUNCIONES GLOBALES =====
 // ===== HACER FUNCIONES GLOBALES - VERSIÓN CORREGIDA =====
@@ -152,76 +155,534 @@ function makeFunctionsGlobal() {
     window.createNewCollection = function() {
         showToast('🔧 Creando nueva colección...', 'info');
     };
+
+      window.executeFriendBlock = function(userId, userName) {
+        console.log('🚨 BLOQUEAR AMIGO ejecutado:', userId, userName);
+        
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Bloqueando usuario...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Usuario bloqueado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                if (!currentUser.usuarios_bloqueados) currentUser.usuarios_bloqueados = [];
+                if (!currentUser.usuarios_bloqueados.includes(userId)) {
+                    currentUser.usuarios_bloqueados.push(userId);
+                }
+                
+                // Remover de seguidores y seguidos
+                currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
+                currentUser.seguidos = currentUser.seguidos?.filter(id => id !== userId) || [];
+                
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Recargar la sección de amigos
+                setTimeout(() => {
+                    if (userProfileData && userProfileData.usuario) {
+                        loadFriendsSection(userProfileData.usuario);
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error bloqueando usuario:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    };
+
+    window.executeFriendUnblock = function(userId) {
+        console.log('🔄 DESBLOQUEAR AMIGO ejecutado:', userId);
+        
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Desbloqueando usuario...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/unblock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Usuario desbloqueado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                currentUser.usuarios_bloqueados = currentUser.usuarios_bloqueados?.filter(id => id !== userId) || [];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Recargar la sección de amigos
+                setTimeout(() => {
+                    if (userProfileData && userProfileData.usuario) {
+                        loadFriendsSection(userProfileData.usuario);
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error desbloqueando usuario:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    };
+
+    window.executeFriendRemoveFollower = function(userId) {
+        console.log('🗑️ ELIMINAR SEGUIDOR AMIGO ejecutado:', userId);
+        
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Eliminando seguidor...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/remove-follower`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Seguidor eliminado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Actualizar contadores
+                updateSidebarCounters();
+                updateProfileCounters();
+                
+                // Recargar la sección de amigos
+                setTimeout(() => {
+                    if (userProfileData && userProfileData.usuario) {
+                        loadFriendsSection(userProfileData.usuario);
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error eliminando seguidor:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    };
+
+    // ===== FUNCIONES PARA BLOQUEAR/ELIMINAR AMIGOS =====
+window.showFriendBlockConfirmModal = function(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.id = 'friendBlockConfirmModal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon block">
+                <i class="fas fa-ban"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Bloquear amigo?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al bloquear a ${userName}:
+                <br><br>
+                • No podrá ver tu perfil ni publicaciones<br>
+                • No podrá seguirte ni enviarte mensajes<br>
+                • Se eliminará de tus amigos y seguidores<br>
+                • No podrá interactuar contigo de ninguna forma
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" id="cancelFriendBlockBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm" id="confirmFriendBlockBtn">
+                    <i class="fas fa-ban"></i> Sí, Bloquear
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    setTimeout(() => {
+        modal.classList.add('show');
+        
+        document.getElementById('cancelFriendBlockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeFriendConfirmModal('friendBlock');
+        });
+        
+        document.getElementById('confirmFriendBlockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmFriendBlock(userId, userName);
+        });
+        
+    }, 10);
+};
+
+window.showFriendUnblockConfirmModal = function(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.id = 'friendUnblockConfirmModal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon unblock">
+                <i class="fas fa-lock-open"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Desbloquear amigo?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al desbloquear a ${userName}:
+                <br><br>
+                • Podrá ver tu perfil y publicaciones nuevamente<br>
+                • Podrá seguirte e interactuar contigo<br>
+                • Podrá enviarte mensajes<br>
+                • Volverá a aparecer en tu lista de amigos
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" id="cancelFriendUnblockBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm unblock" id="confirmFriendUnblockBtn">
+                    <i class="fas fa-lock-open"></i> Sí, Desbloquear
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    setTimeout(() => {
+        modal.classList.add('show');
+        
+        document.getElementById('cancelFriendUnblockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeFriendConfirmModal('friendUnblock');
+        });
+        
+        document.getElementById('confirmFriendUnblockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmFriendUnblock(userId, userName);
+        });
+        
+    }, 10);
+};
+
+window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.id = 'friendRemoveFollowerConfirmModal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon remove">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Eliminar seguidor?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al eliminar a ${userName} de tus seguidores:
+                <br><br>
+                • Ya no podrá ver tus publicaciones privadas<br>
+                • Seguirá pudiendo ver tus publicaciones públicas<br>
+                • No se le notificará sobre esta acción<br>
+                • Podrá volver a seguirte en el futuro
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" data-action="cancel">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm remove" data-action="confirm">
+                    <i class="fas fa-user-times"></i> Sí, Eliminar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', function(e) {
+        const target = e.target.closest('button');
+        if (!target) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const action = target.dataset.action;
+        
+        if (action === 'cancel') {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        } 
+        else if (action === 'confirm') {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                executeFriendRemoveFollower(userId);
+            }, 300);
+        }
+    });
+    
+    setTimeout(() => modal.classList.add('show'), 10);
+};
+
+    window.closeFriendConfirmModal = function(type) {
+        const modal = document.getElementById(`${type}ConfirmModal`);
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+            }, 300);
+        }
+    };
+
+    window.confirmFriendBlock = function(userId, userName) {
+        console.log('✅ Confirmado bloqueo de amigo:', userId, userName);
+        closeFriendConfirmModal('friendBlock');
+        executeFriendBlock(userId, userName);
+    };
+
+    window.confirmFriendUnblock = function(userId, userName) {
+        console.log('✅ Confirmado desbloqueo de amigo:', userId, userName);
+        closeFriendConfirmModal('friendUnblock');
+        executeFriendUnblock(userId, userName);
+    };
+
+    window.confirmFriendRemoveFollower = function(userId, userName) {
+        console.log('✅ Confirmada eliminación de seguidor amigo:', userId, userName);
+        closeFriendConfirmModal('friendRemoveFollower');
+        executeFriendRemoveFollower(userId);
+    };
     
     console.log('✅ Funciones globales creadas');
 }
 
+// ===== FUNCIONES PARA MENÚS DE AMIGOS - AGREGAR ESTO =====
+function makeOptionsFunctionsGlobal() {
+    console.log('🌍 Haciendo funciones de opciones globales...');
+    
+    window.toggleFriendOptionsMenu = function(userId, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        console.log('🎯 Abriendo menú de amigo para usuario:', userId);
+        
+        const menu = document.getElementById(`friendOptionsMenu-${userId}`);
+        if (!menu) {
+            console.error('❌ Menú de amigo no encontrado:', `friendOptionsMenu-${userId}`);
+            return;
+        }
+        
+        // Cerrar otros menús primero
+        closeAllFriendOptionsMenus();
+        
+        // Mostrar este menú
+        menu.style.display = 'block';
+        menu.classList.add('show');
+        
+        // POSICIONAMIENTO CORREGIDO
+        const button = event.target.closest('.btn-options');
+        if (button) {
+            const rect = button.getBoundingClientRect();
+            
+            // Posicionar el menú justo debajo del botón
+            menu.style.position = 'fixed';
+            menu.style.top = `${rect.bottom + 5}px`;
+            menu.style.left = `${rect.left - 150}px`;
+            menu.style.zIndex = '10000';
+        }
+    };
+    
+    window.closeAllFriendOptionsMenus = function() {
+        console.log('🔒 Cerrando todos los menús de amigos...');
+        document.querySelectorAll('.options-menu').forEach(menu => {
+            menu.style.display = 'none';
+            menu.classList.remove('show');
+        });
+    };
+    
+    console.log('✅ Funciones de opciones globales creadas');
+}
 
+function initializeFriendMenuEvents() {
+    console.log('🎯 Inicializando eventos de menús de amigos...');
+    
+    // Event delegation simple para cerrar menús al hacer click fuera
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.options-menu') && !event.target.closest('.btn-options')) {
+            closeAllFriendOptionsMenus();
+        }
+    });
+    
+    // Event delegation para las opciones del menú
+    document.addEventListener('click', function(event) {
+        const target = event.target;
+        
+        // BLOQUEAR
+        if (target.closest('.block-option')) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const button = target.closest('.block-option');
+            const card = button.closest('.friend-card');
+            
+            if (card) {
+                const userId = card.dataset.userId;
+                const userName = card.dataset.userName || card.querySelector('h4')?.textContent || 'Usuario';
+                const userUsername = card.querySelector('.friend-username')?.textContent?.replace('@', '') || '';
+                
+                console.log('🔄 Mostrando modal de bloqueo para:', userId, userName);
+                closeAllFriendOptionsMenus();
+                showFriendBlockConfirmModal(userId, userName, userUsername);
+            }
+        }
+        
+        // ELIMINAR SEGUIDOR
+        if (target.closest('.remove-follower-option')) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const button = target.closest('.remove-follower-option');
+            const card = button.closest('.friend-card');
+            
+            if (card) {
+                const userId = card.dataset.userId;
+                const userName = card.dataset.userName || card.querySelector('h4')?.textContent || 'Usuario';
+                const userUsername = card.querySelector('.friend-username')?.textContent?.replace('@', '') || '';
+                
+                console.log('🔄 Mostrando modal de eliminar seguidor para:', userId, userName);
+                closeAllFriendOptionsMenus();
+                showFriendRemoveFollowerConfirmModal(userId, userName, userUsername);
+            }
+        }
+        
+        // DESBLOQUEAR
+        if (target.closest('.unblock-option')) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const button = target.closest('.unblock-option');
+            const card = button.closest('.friend-card');
+            
+            if (card) {
+                const userId = card.dataset.userId;
+                const userName = card.dataset.userName || card.querySelector('h4')?.textContent || 'Usuario';
+                const userUsername = card.querySelector('.friend-username')?.textContent?.replace('@', '') || '';
+                
+                console.log('🔄 Mostrando modal de desbloqueo para:', userId, userName);
+                closeAllFriendOptionsMenus();
+                showFriendUnblockConfirmModal(userId, userName, userUsername);
+            }
+        }
+    });
+    
+    console.log('✅ Eventos de menús de amigos inicializados');
+}
 
 // ===== EVENTOS DE MODALES =====
 function initializeModalEvents() {
     console.log('🎯 Inicializando eventos de modales...');
     
-    // Eventos para cerrar modales
-    document.querySelectorAll('.close-modal').forEach(closeBtn => {
-        closeBtn.addEventListener('click', function() {
-            const modal = this.closest('.modal');
+    // LIMPIAR event listeners anteriores
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.replaceWith(btn.cloneNode(true));
+    });
+    
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.replaceWith(modal.cloneNode(true));
+    });
+
+    // Eventos para cerrar modales - USANDO DELEGACIÓN
+    document.addEventListener('click', function(e) {
+        // Cerrar con botón X
+        if (e.target.classList.contains('close-modal')) {
+            const modal = e.target.closest('.modal');
             if (modal) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
+                console.log('✅ Modal cerrado con botón X');
             }
-        });
-    });
-    
-    // Cerrar modal al hacer click fuera
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.style.display = 'none';
-                document.body.classList.remove('modal-open');
-            }
-        });
-    });
-    
-    // Eventos para botones dentro de modales
-    document.getElementById('coverPhotoInput')?.addEventListener('change', handleCoverPhotoSelect);
-    document.getElementById('profilePhotoInput')?.addEventListener('change', handleProfilePhotoSelect);
-    
-    // Eventos para botones de upload
-    document.addEventListener('click', function(e) {
-        // Botón "Seleccionar Imagen" en modal de perfil
-        if (e.target.closest('#profileUploadArea') && e.target.type === 'button') {
-            document.getElementById('profilePhotoInput').click();
             return;
         }
         
-        // Botón "Seleccionar Imagen" en modal de portada
-        if (e.target.closest('#coverUploadArea') && e.target.type === 'button') {
-            document.getElementById('coverPhotoInput').click();
+        // Cerrar haciendo click fuera del contenido
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            console.log('✅ Modal cerrado con click fuera');
             return;
         }
         
-        // Botón "Usar esta Foto" en perfil
-        if (e.target.closest('#profileUploadPreview') && e.target.textContent.includes('Usar esta Foto')) {
-            uploadProfilePhoto();
-            return;
-        }
-        
-        // Botón "Subir Foto" en portada
-        if (e.target.closest('#coverUploadPreview') && e.target.textContent.includes('Subir Foto')) {
-            uploadCoverPhoto();
-            return;
-        }
-        
-        // Botones "Cancelar"
+        // Botones Cancelar en uploads
         if (e.target.textContent === 'Cancelar' || e.target.textContent.includes('Cancelar')) {
             if (e.target.closest('#profileUploadPreview')) {
                 cancelProfileUpload();
             } else if (e.target.closest('#coverUploadPreview')) {
                 cancelCoverUpload();
             }
+            return;
+        }
+        
+        // Botones de subida
+        if (e.target.closest('#profileUploadArea') && e.target.type === 'button') {
+            document.getElementById('profilePhotoInput').click();
+            return;
+        }
+        
+        if (e.target.closest('#coverUploadArea') && e.target.type === 'button') {
+            document.getElementById('coverPhotoInput').click();
+            return;
+        }
+        
+        // Botones "Usar esta Foto"
+        if (e.target.closest('#profileUploadPreview') && e.target.textContent.includes('Usar esta Foto')) {
+            uploadProfilePhoto();
+            return;
+        }
+        
+        if (e.target.closest('#coverUploadPreview') && e.target.textContent.includes('Subir Foto')) {
+            uploadCoverPhoto();
+            return;
         }
     });
+
+    // Eventos para inputs de archivos
+    document.getElementById('coverPhotoInput')?.addEventListener('change', handleCoverPhotoSelect);
+    document.getElementById('profilePhotoInput')?.addEventListener('change', handleProfilePhotoSelect);
     
     console.log('✅ Eventos de modales inicializados');
 }
@@ -776,9 +1237,41 @@ function createFriendCardHTML(user, tipo) {
     const currentUser = JSON.parse(localStorage.getItem('currentUser'));
     const isCurrentUser = currentUser._id === user._id;
     const isFollowing = currentUser.seguidos?.includes(user._id);
+    const isFollower = currentUser.seguidores?.includes(user._id);
+    const isBlocked = currentUser.usuarios_bloqueados?.includes(user._id);
     
     return `
-        <div class="friend-card" data-user-id="${user._id}">
+        <div class="friend-card" data-user-id="${user._id}" data-user-name="${user.nombre}">
+            <!-- Menú de opciones -->
+            <div class="friend-card-options">
+                ${!isCurrentUser ? `
+                    <button class="btn-options" onclick="toggleFriendOptionsMenu('${user._id}', event)">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                    <div class="options-menu" id="friendOptionsMenu-${user._id}">
+                        ${isBlocked ? `
+                            <button class="option-item unblock-option" data-user-id="${user._id}">
+                                <i class="fas fa-lock-open"></i>
+                                <span>Desbloquear</span>
+                            </button>
+                        ` : `
+                            <button class="option-item block-option" data-user-id="${user._id}" data-user-name="${user.nombre}">
+                                <i class="fas fa-ban"></i>
+                                <span>Bloquear usuario</span>
+                            </button>
+                            ${isFollower ? `
+                                <button class="option-item remove-follower-option" data-user-id="${user._id}">
+                                    <i class="fas fa-user-times"></i>
+                                    <span>Eliminar seguidor</span>
+                                </button>
+                            ` : ''}
+                        `}
+                    </div>
+                ` : ''}
+            </div>
+
+            ${isBlocked ? `<div class="blocked-indicator">BLOQUEADO</div>` : ''}
+
             <div class="friend-avatar">
                 ${user.foto_perfil ? 
                     `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
@@ -794,7 +1287,7 @@ function createFriendCardHTML(user, tipo) {
                         <strong>${user.seguidores?.length || 0}</strong> seguidores
                     </span>
                 </div>
-                ${user.biografia ? `<p class="friend-bio" title="${user.biografia}">${user.biografia}</p>` : ''}
+                ${user.biografia ? `<p class="friend-bio">${user.biografia}</p>` : ''}
             </div>
             
             <div class="friend-actions">
@@ -1923,3 +2416,4 @@ function getTimeAgo(date) {
     
     return date.toLocaleDateString();
 }
+

@@ -97,6 +97,22 @@ router.post('/:id/follow', async (req, res) => {
             });
         }
 
+        // VERIFICAR SI EL USUARIO ESTÁ BLOQUEADO - NUEVA VERIFICACIÓN
+        if (targetUser.usuarios_bloqueados.includes(currentUserId)) {
+            return res.status(403).json({
+                success: false,
+                error: 'No puedes seguir a este usuario porque te tiene bloqueado'
+            });
+        }
+
+        // VERIFICAR SI TÚ TIENES BLOQUEADO AL USUARIO - NUEVA VERIFICACIÓN
+        if (currentUser.usuarios_bloqueados.includes(targetUserId)) {
+            return res.status(403).json({
+                success: false,
+                error: 'No puedes seguir a un usuario que tienes bloqueado'
+            });
+        }
+
         // Verificar si ya lo sigue
         if (currentUser.seguidos.includes(targetUserId)) {
             return res.status(400).json({
@@ -189,6 +205,70 @@ router.post('/:id/unfollow', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error al dejar de seguir:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// ELIMINAR SEGUIDOR (remover a alguien de tu lista de seguidores)
+router.post('/:id/remove-follower', async (req, res) => {
+    try {
+        const currentUserId = req.body.currentUserId;
+        const followerId = req.params.id; // ID del seguidor que quieres eliminar
+
+        if (!currentUserId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere ID del usuario actual'
+            });
+        }
+
+        const currentUser = await User.findById(currentUserId);
+        const followerUser = await User.findById(followerId);
+
+        if (!currentUser || !followerUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar si realmente te sigue
+        if (!currentUser.seguidores.includes(followerId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este usuario no te sigue'
+            });
+        }
+
+        // Remover de MIS seguidores
+        currentUser.seguidores = currentUser.seguidores.filter(
+            id => id.toString() !== followerId
+        );
+        
+        // Remover de SUS seguidos (opcional, dependiendo de cómo quieras el comportamiento)
+        followerUser.seguidos = followerUser.seguidos.filter(
+            id => id.toString() !== currentUserId
+        );
+
+        await currentUser.save();
+        await followerUser.save();
+
+        console.log(`🗑️ ${currentUser.username} eliminó a ${followerUser.username} de sus seguidores`);
+
+        res.json({
+            success: true,
+            message: `Has eliminado a ${followerUser.nombre} de tus seguidores`,
+            data: {
+                seguidores: currentUser.seguidores.length,
+                seguidos: followerUser.seguidos.length
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error eliminando seguidor:', error);
         res.status(500).json({
             success: false,
             error: error.message

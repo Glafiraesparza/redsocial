@@ -1273,7 +1273,6 @@ function createUserCardHTML(user) {
                 ` : ''}
             </div>
 
-            ${isBlocked ? `<div class="blocked-indicator">BLOQUEADO</div>` : ''}
 
             <div class="user-card-header">
                 <div class="user-avatar-medium">
@@ -1283,8 +1282,8 @@ function createUserCardHTML(user) {
                     }
                 </div>
                 <div class="user-info">
-                    <h4>${user.nombre}</h4>
-                    <p class="user-username">@${user.username}</p>
+                    <h4>${user.nombre} </h4>
+                    <p class="user-username">@${user.username} ${isBlocked ? `<span class="blocked-indicator">BLOQUEADO</span>` : ''}</p>
                     ${user.biografia ? `<p class="user-bio">${user.biografia}</p>` : ''}
                 </div>
             </div>
@@ -1559,8 +1558,58 @@ async function viewUserProfile(userId) {
 }
 
 async function toggleFollowModal(userId) {
-    await toggleFollow(userId);
-    closeUserProfileModal();
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser) return;
+
+        const isFollowing = currentUser.seguidos?.includes(userId);
+        const endpoint = isFollowing ? 'unfollow' : 'follow';
+        
+        const response = await fetch(`${API_URL}/users/${userId}/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            
+            // Actualizar localStorage
+            if (isFollowing) {
+                currentUser.seguidos = currentUser.seguidos.filter(id => id !== userId);
+            } else {
+                if (!currentUser.seguidos) currentUser.seguidos = [];
+                currentUser.seguidos.push(userId);
+            }
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Cerrar modal y recargar
+            closeUserProfileModal();
+            setTimeout(() => {
+                if (document.getElementById('usersSection').classList.contains('active')) {
+                    loadUsers();
+                }
+            }, 500);
+            
+        } else {
+            if (response.status === 403) {
+                showToast(`❌ ${result.error}`, 'error');
+                closeUserProfileModal();
+                setTimeout(() => {
+                    if (document.getElementById('usersSection').classList.contains('active')) {
+                        loadUsers();
+                    }
+                }, 1000);
+            } else {
+                showToast(`❌ ${result.error}`, 'error');
+            }
+        }
+    } catch (error) {
+        console.error('Error en follow/unfollow modal:', error);
+        showToast('❌ Error de conexión', 'error');
+    }
 }
 
 function closeUserProfileModal() {
@@ -1613,7 +1662,18 @@ async function toggleFollow(userId) {
             updateSidebarCounters();
             
         } else {
-            showToast(`❌ ${result.error}`, 'error');
+            // Manejar error específico de bloqueo
+            if (response.status === 403) {
+                showToast(`❌ ${result.error}`, 'error');
+                // Si el usuario está bloqueado, recargar la lista para reflejar el estado actual
+                setTimeout(() => {
+                    if (document.getElementById('usersSection').classList.contains('active')) {
+                        loadUsers();
+                    }
+                }, 1000);
+            } else {
+                showToast(`❌ ${result.error}`, 'error');
+            }
         }
     } catch (error) {
         console.error('Error en follow/unfollow:', error);
@@ -1788,6 +1848,343 @@ function makeOptionsFunctionsGlobal() {
         
         console.log('✅ Menú mostrado correctamente');
     };
+
+    // ========== FUNCIONES DE MODALES DE CONFIRMACIÓN ==========
+
+function showBlockConfirmModal(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.id = 'blockConfirmModal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon block">
+                <i class="fas fa-ban"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Bloquear usuario?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al bloquear a ${userName}:
+                <br><br>
+                • No podrá ver tu perfil ni publicaciones<br>
+                • No podrá seguirte ni enviarte mensajes<br>
+                • Se eliminará de tus seguidores y seguidos<br>
+                • No podrá interactuar contigo de ninguna forma
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" id="cancelBlockBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm" id="confirmBlockBtn">
+                    <i class="fas fa-ban"></i> Sí, Bloquear
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Agregar event listeners después de crear el modal
+    setTimeout(() => {
+        modal.classList.add('show');
+        
+        // Botón Cancelar
+        document.getElementById('cancelBlockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('❌ Cancelar bloqueo');
+            closeConfirmModal('block');
+        });
+        
+        // Botón Confirmar
+        document.getElementById('confirmBlockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Confirmar bloqueo');
+            confirmBlock(userId, userName);
+        });
+        
+    }, 10);
+}
+
+function showUnblockConfirmModal(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.id = 'unblockConfirmModal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon unblock">
+                <i class="fas fa-lock-open"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Desbloquear usuario?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al desbloquear a ${userName}:
+                <br><br>
+                • Podrá ver tu perfil y publicaciones nuevamente<br>
+                • Podrá seguirte e interactuar contigo<br>
+                • Podrá enviarte mensajes<br>
+                • Volverá a aparecer en búsquedas
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" id="cancelUnblockBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm unblock" id="confirmUnblockBtn">
+                    <i class="fas fa-lock-open"></i> Sí, Desbloquear
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    setTimeout(() => {
+        modal.classList.add('show');
+        
+        document.getElementById('cancelUnblockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('❌ Cancelar desbloqueo');
+            closeConfirmModal('unblock');
+        });
+        
+        document.getElementById('confirmUnblockBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Confirmar desbloqueo');
+            confirmUnblock(userId, userName);
+        });
+        
+    }, 10);
+}
+
+// Aplica este mismo patrón a showBlockConfirmModal y showUnblockConfirmModal
+function showRemoveFollowerConfirmModal(userId, userName, userUsername = '') {
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.innerHTML = `
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-icon remove">
+                <i class="fas fa-user-times"></i>
+            </div>
+            <h3 class="confirm-modal-title">¿Eliminar seguidor?</h3>
+            
+            <div class="confirm-modal-user">
+                <div class="confirm-modal-user-name">${userName}</div>
+                ${userUsername ? `<div class="confirm-modal-user-username">@${userUsername}</div>` : ''}
+            </div>
+            
+            <p class="confirm-modal-message">
+                Al eliminar a ${userName} de tus seguidores:
+                <br><br>
+                • Ya no podrá ver tus publicaciones privadas<br>
+                • Seguirá pudiendo ver tus publicaciones públicas<br>
+                • No se le notificará sobre esta acción<br>
+                • Podrá volver a seguirte en el futuro
+            </p>
+            
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-btn-cancel" data-action="cancel">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="confirm-modal-btn confirm-modal-btn-confirm remove" data-action="confirm">
+                    <i class="fas fa-user-times"></i> Sí, Eliminar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // SINGLE event listener para todo el modal
+    modal.addEventListener('click', function(e) {
+        const target = e.target.closest('button');
+        if (!target) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const action = target.dataset.action;
+        
+        if (action === 'cancel') {
+            console.log('❌ Cancelar eliminación de seguidor');
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        } 
+        else if (action === 'confirm') {
+            console.log('✅ Confirmar eliminación de seguidor');
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                executeRemoveFollower(userId);
+            }, 300);
+        }
+    });
+    
+    setTimeout(() => modal.classList.add('show'), 10);
+}
+
+window.closeConfirmModal = function(type) {
+    const modal = document.getElementById(`${type}ConfirmModal`);
+    if (modal) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.remove();
+            console.log(`✅ Modal ${type} cerrado y removido`);
+        }, 300);
+    }
+}
+
+    // FUNCIONES DE CONFIRMACIÓN (hacerlas globales)
+    window.confirmBlock = function(userId, userName) {
+        console.log('✅ Confirmado bloqueo para:', userId, userName);
+        closeConfirmModal('block');
+        executeBlock(userId, userName);
+    }
+
+    window.confirmUnblock = function(userId, userName) {
+        console.log('✅ Confirmado desbloqueo para:', userId, userName);
+        closeConfirmModal('unblock');
+        executeUnblock(userId, userName);
+    }
+
+    window.confirmRemoveFollower = function(userId, userName) {
+        console.log('✅ Confirmada eliminación de seguidor para:', userId, userName);
+        closeConfirmModal('remove');
+        executeRemoveFollower(userId);
+    }
+
+    // FUNCIONES DE EJECUCIÓN
+    function executeBlock(userId, userName) {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Bloqueando usuario...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Usuario bloqueado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                if (!currentUser.usuarios_bloqueados) currentUser.usuarios_bloqueados = [];
+                if (!currentUser.usuarios_bloqueados.includes(userId)) {
+                    currentUser.usuarios_bloqueados.push(userId);
+                }
+                
+                // Remover de seguidores y seguidos
+                currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
+                currentUser.seguidos = currentUser.seguidos?.filter(id => id !== userId) || [];
+                
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Recargar la lista de usuarios
+                setTimeout(() => {
+                    if (document.getElementById('usersSection').classList.contains('active')) {
+                        loadUsers();
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error bloqueando usuario:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    }
+
+    function executeUnblock(userId, userName) {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Desbloqueando usuario...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/unblock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Usuario desbloqueado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                currentUser.usuarios_bloqueados = currentUser.usuarios_bloqueados?.filter(id => id !== userId) || [];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // Recargar la lista de usuarios
+                setTimeout(() => {
+                    if (document.getElementById('usersSection').classList.contains('active')) {
+                        loadUsers();
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error desbloqueando usuario:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    }
+
+    function executeRemoveFollower(userId) {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Eliminando seguidor...', 'info');
+        
+        fetch(`${API_URL}/users/${userId}/remove-follower`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('✅ Seguidor eliminado exitosamente', 'success');
+                
+                // Actualizar localStorage
+                currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                updateSidebarCounters();
+                
+                // Recargar la lista de usuarios
+                setTimeout(() => {
+                    if (document.getElementById('usersSection').classList.contains('active')) {
+                        loadUsers();
+                    }
+                }, 1000);
+                
+            } else {
+                showToast('❌ Error: ' + result.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error eliminando seguidor:', error);
+            showToast('❌ Error de conexión', 'error');
+        });
+    }
+    
+    // ========== FIN FUNCIONES DE MODALES ==========
     
     // SOLUCIÓN RADICAL: Event listeners DIRECTOS en cada botón
     function initializeRadicalEventListeners() {
@@ -1815,13 +2212,14 @@ function makeOptionsFunctionsGlobal() {
                 if (card && button) {
                     const userId = card.dataset.userId;
                     const userName = card.dataset.userName || card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
                     
-                    console.log('🔄 Ejecutando bloqueo radical para:', userId, userName);
+                    console.log('🔄 Mostrando modal de bloqueo para:', userId, userName);
                     closeAllOptionsMenus();
                     
                     // Pequeño delay para asegurar que el menú se cierre
                     setTimeout(() => {
-                        emergencyBlock(userId, userName);
+                        showBlockConfirmModal(userId, userName, userUsername);
                     }, 100);
                 }
                 return false;
@@ -1838,11 +2236,14 @@ function makeOptionsFunctionsGlobal() {
                 
                 if (card && button) {
                     const userId = card.dataset.userId;
-                    console.log('🔄 Ejecutando eliminación radical de seguidor para:', userId);
+                    const userName = card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
+                    
+                    console.log('🔄 Mostrando modal de eliminar seguidor para:', userId, userName);
                     closeAllOptionsMenus();
                     
                     setTimeout(() => {
-                        emergencyRemoveFollower(userId);
+                        showRemoveFollowerConfirmModal(userId, userName, userUsername);
                     }, 100);
                 }
                 return false;
@@ -1859,11 +2260,14 @@ function makeOptionsFunctionsGlobal() {
                 
                 if (card && button) {
                     const userId = card.dataset.userId;
-                    console.log('🔄 Ejecutando desbloqueo radical para:', userId);
+                    const userName = card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
+                    
+                    console.log('🔄 Mostrando modal de desbloqueo para:', userId, userName);
                     closeAllOptionsMenus();
                     
                     setTimeout(() => {
-                        toggleBlock(userId);
+                        showUnblockConfirmModal(userId, userName, userUsername);
                     }, 100);
                 }
                 return false;
@@ -1887,9 +2291,10 @@ function makeOptionsFunctionsGlobal() {
                 if (card) {
                     const userId = card.dataset.userId;
                     const userName = card.dataset.userName || card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
                     
                     closeAllOptionsMenus();
-                    setTimeout(() => emergencyBlock(userId, userName), 100);
+                    setTimeout(() => showBlockConfirmModal(userId, userName, userUsername), 100);
                 }
                 return false;
             }, true);
@@ -1905,8 +2310,11 @@ function makeOptionsFunctionsGlobal() {
                 const card = this.closest('[data-user-id]');
                 if (card) {
                     const userId = card.dataset.userId;
+                    const userName = card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
+                    
                     closeAllOptionsMenus();
-                    setTimeout(() => emergencyRemoveFollower(userId), 100);
+                    setTimeout(() => showRemoveFollowerConfirmModal(userId, userName, userUsername), 100);
                 }
                 return false;
             }, true);
@@ -1922,144 +2330,19 @@ function makeOptionsFunctionsGlobal() {
                 const card = this.closest('[data-user-id]');
                 if (card) {
                     const userId = card.dataset.userId;
+                    const userName = card.querySelector('h4')?.textContent || 'Usuario';
+                    const userUsername = card.querySelector('.user-username')?.textContent?.replace('@', '') || '';
+                    
                     closeAllOptionsMenus();
-                    setTimeout(() => toggleBlock(userId), 100);
+                    setTimeout(() => showUnblockConfirmModal(userId, userName, userUsername), 100);
                 }
                 return false;
             }, true);
         });
     }
     
-    // MANTENER LAS FUNCIONES DE ACCIÓN ORIGINALES
-    window.emergencyBlock = function(userId, userName) {
-        console.log('🚨 EMERGENCY BLOCK ejecutado:', userId, userName);
-        
-        if (confirm(`¿Estás seguro de que quieres BLOQUEAR a ${userName}?\n\nNo podrá ver tu perfil, publicaciones ni interactuar contigo.`)) {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            
-            fetch(`${API_URL}/users/${userId}/block`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ currentUserId: currentUser._id })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showToast('✅ Usuario bloqueado exitosamente', 'success');
-                    
-                    // Actualizar localStorage
-                    if (!currentUser.usuarios_bloqueados) currentUser.usuarios_bloqueados = [];
-                    if (!currentUser.usuarios_bloqueados.includes(userId)) {
-                        currentUser.usuarios_bloqueados.push(userId);
-                    }
-                    
-                    // Remover de seguidores y seguidos
-                    currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
-                    currentUser.seguidos = currentUser.seguidos?.filter(id => id !== userId) || [];
-                    
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    
-                    // Recargar la lista de usuarios
-                    setTimeout(() => {
-                        if (document.getElementById('usersSection').classList.contains('active')) {
-                            loadUsers();
-                        }
-                    }, 500);
-                    
-                } else {
-                    showToast('❌ Error: ' + result.error, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error bloqueando usuario:', error);
-                showToast('❌ Error de conexión', 'error');
-            });
-        }
-    };
-
-    window.emergencyRemoveFollower = function(userId) {
-        console.log('🚨 EMERGENCY REMOVE FOLLOWER ejecutado:', userId);
-        
-        if (confirm('¿Estás seguro de que quieres ELIMINAR este seguidor?\n\nEsta persona ya no podrá ver tus publicaciones privadas.')) {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            
-            fetch(`${API_URL}/users/${userId}/remove-follower`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ currentUserId: currentUser._id })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showToast('✅ Seguidor eliminado exitosamente', 'success');
-                    
-                    // Actualizar localStorage
-                    currentUser.seguidores = currentUser.seguidores?.filter(id => id !== userId) || [];
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    updateSidebarCounters();
-                    
-                    // Recargar la lista de usuarios
-                    setTimeout(() => {
-                        if (document.getElementById('usersSection').classList.contains('active')) {
-                            loadUsers();
-                        }
-                    }, 500);
-                    
-                } else {
-                    showToast('❌ Error: ' + result.error, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error eliminando seguidor:', error);
-                showToast('❌ Error de conexión', 'error');
-            });
-        }
-    };
-
-    window.toggleBlock = function(userId) {
-        console.log('🔄 TOGGLE BLOCK ejecutado:', userId);
-        
-        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        const isBlocked = currentUser.usuarios_bloqueados?.includes(userId);
-        
-        if (isBlocked) {
-            // Desbloquear
-            if (confirm('¿Estás seguro de que quieres DESBLOQUEAR a este usuario?')) {
-                fetch(`${API_URL}/users/${userId}/unblock`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ currentUserId: currentUser._id })
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        showToast('✅ Usuario desbloqueado exitosamente', 'success');
-                        
-                        // Actualizar localStorage
-                        currentUser.usuarios_bloqueados = currentUser.usuarios_bloqueados?.filter(id => id !== userId) || [];
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                        
-                        // Recargar la lista de usuarios
-                        setTimeout(() => {
-                            if (document.getElementById('usersSection').classList.contains('active')) {
-                                loadUsers();
-                            }
-                        }, 500);
-                        
-                    } else {
-                        showToast('❌ Error: ' + result.error, 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error desbloqueando usuario:', error);
-                    showToast('❌ Error de conexión', 'error');
-                });
-            }
-        }
-    };
-
     // Inicializar después de un delay
     setTimeout(initializeRadicalEventListeners, 500);
     
-    console.log('✅ Solución radical cargada');
+    console.log('✅ Solución radical con modales cargada');
 }
