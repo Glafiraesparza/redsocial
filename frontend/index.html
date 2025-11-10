@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kion-D - Red Social Temática</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+</head>
+<body>
+    <!-- Fondo animado -->
+    <div class="animated-background">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+        <div class="circle circle-4"></div>
+        <div class="circle circle-5"></div>
+        <div class="circle circle-6"></div>
+        <div class="circle circle-7"></div>
+        <div class="circle circle-8"></div>
+        <div class="circle circle-9"></div>
+        <div class="circle circle-10"></div>
+        
+        <div class="parallax-circle parallax-1"></div>
+        <div class="parallax-circle parallax-2"></div>
+        <div class="parallax-circle parallax-3"></div>
+        <div class="parallax-circle parallax-4"></div>
+        
+        <div class="particles">
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-share-alt"></i>
+                Kion-D
+            </div>
+            <div class="dropdown">
+                <button class="dropbtn">
+                    Menú <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="dropdown-content">
+                    <a href="#"><i class="fas fa-info-circle"></i> Acerca de</a>
+                    <a href="#"><i class="fas fa-question-circle"></i> Ayuda</a>
+                    <a href="#"><i class="fas fa-envelope"></i> Contacto</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <div class="main-content">
+        <div class="page-header">
+            <div class="header-container">
+
+            </div>
+        </div>
+
+        <div class="content-split">
+            <!-- Lado izquierdo - Imagen representativa -->
+            <div class="hero-section">
+                <div class="hero-content">
+                    <div class="hero-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h2>Únete a nuestra comunidad</h2>
+                    <p>Comparte tus experiencias, conecta con amigos y descubre nuevos intereses en un espacio diseñado para ti.</p>
+                    <div class="hero-features">
+                        <div class="feature">
+                            <i class="fas fa-share-alt"></i>
+                            <span>Comparte publicaciones</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-images"></i>
+                            <span>Crea colecciones temáticas</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-heart"></i>
+                            <span>Conecta con intereses similares</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lado derecho - Botones de acción -->
+            <div class="action-section">
+                <div class="action-container">
+                    <h3>¿Listo para comenzar?</h3>
+                    <p>Elige cómo quieres unirte a nuestra comunidad</p>
+                    
+                    <div class="action-buttons">
+                        <button class="btn-primary btn-large" onclick="openModal('register')">
+                            <i class="fas fa-user-plus"></i>
+                            Crear Cuenta
+                        </button>
+                        <button class="btn-secondary btn-large" onclick="openModal('login')">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Iniciar Sesión
+                        </button>
+                    </div>
+
+                    <div class="action-info">
+                        <div class="info-card">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Tu privacidad está protegida</span>
+                        </div>
+                        <div class="info-card">
+                            <i class="fas fa-bolt"></i>
+                            <span>Registro rápido y sencillo</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registro -->
+<div id="registerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> Crear Cuenta</h3>
+            <span class="close-modal" onclick="closeModal('register')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="registerForm">
+                <!-- Información Personal -->
+                <div class="form-section">
+                    <h4 style="color: #2c3e50; margin-bottom: 1.5rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-user-circle"></i> Información Personal
+                    </h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="regNombre"><i class="fas fa-id-card"></i> Nombre Completo</label>
+                            <input type="text" id="regNombre" placeholder="Tu nombre completo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regUsername"><i class="fas fa-user"></i> Usuario</label>
+                            <input type="text" id="regUsername" placeholder="nombre.usuario" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regEmail"><i class="fas fa-envelope"></i> Correo Electrónico</label>
+                        <input type="email" id="regEmail" placeholder="tu@email.com" required>
+                    </div>
+                </div>
+
+                <!-- Detalles Adicionales -->
+                <div class="form-section" style="margin-top: 2rem;">
+                    <h4 style="color: #2c3e50; margin-bottom: 1.5rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-info-circle"></i> Detalles Adicionales
+                    </h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="regFechaNacimiento"><i class="fas fa-birthday-cake"></i> Fecha de Nacimiento</label>
+                            <input type="date" id="regFechaNacimiento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regGenero"><i class="fas fa-venus-mars"></i> Género</label>
+                            <select id="regGenero" required>
+                                <option value="">Selecciona una opción</option>
+                                <option value="masculino">Masculino</option>
+                                <option value="femenino">Femenino</option>
+                                <option value="otro">Otro</option>
+                                <option value="prefiero_no_decir">Prefiero no decir</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seguridad -->
+                <div class="form-section" style="margin-top: 2rem;">
+                    <h4 style="color: #2c3e50; margin-bottom: 1.5rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-shield-alt"></i> Seguridad
+                    </h4>
+                    
+                    <div class="form-group">
+                        <label for="regPassword"><i class="fas fa-lock"></i> Contraseña</label>
+                        <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regConfirmPassword"><i class="fas fa-lock"></i> Confirmar Contraseña</label>
+                        <input type="password" id="regConfirmPassword" placeholder="Repite tu contraseña" required>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-check"></i> Crear Cuenta
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="closeModal('register')">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</h3>
+                <span class="close-modal" onclick="closeModal('login')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginUsername"><i class="fas fa-user"></i> Usuario o Email</label>
+                        <input type="text" id="loginUsername" placeholder="Tu usuario o email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword"><i class="fas fa-lock"></i> Contraseña</label>
+                        <input type="password" id="loginPassword" placeholder="Tu contraseña" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Ingresar
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="closeModal('login')">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast para mensajes -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="fas fa-check-circle toast-icon"></i>
+            <span id="toastMessage">Operación completada</span>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+</body>
+</html>

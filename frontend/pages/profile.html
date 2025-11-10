@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil - Kion-D</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar del Dashboard -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-share-alt"></i>
+                Kion-D
+            </div>
+            <div class="nav-user">
+                <span id="userGreeting">Hola, Usuario</span>
+                <button id="backToDashboard" class="btn-secondary btn-small">
+                    <i class="fas fa-arrow-left"></i> Volver al Inicio
+                </button>
+                <button id="logoutBtn" class="btn-secondary btn-small">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="dashboard-sidebar">
+            <div class="user-card">
+                <div class="user-avatar" id="sidebarAvatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h3 id="sidebarUserName">Nombre Usuario</h3>
+                <p id="sidebarUserUsername">@usuario</p>
+                <div class="user-stats">
+                    <div class="stat">
+                        <strong id="sidebarSeguidoresCount">0</strong>
+                        <span>Seguidores</span>
+                    </div>
+                    <div class="stat">
+                        <strong id="sidebarSeguidosCount">0</strong>
+                        <span>Siguiendo</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item" onclick="window.location.href='dashboard.html'">
+                    <i class="fas fa-home"></i>
+                    <span>Inicio</span>
+                </button>
+                <button class="nav-item active">
+                    <i class="fas fa-user"></i>
+                    <span>Mi Perfil</span>
+                </button>
+                <button class="nav-item" onclick="window.location.href='dashboard.html?section=explore'">
+                    <i class="fas fa-search"></i>
+                    <span>Explorar</span>
+                </button>
+                <button class="nav-item" onclick="window.location.href='dashboard.html?section=users'">
+                    <i class="fas fa-users"></i>
+                    <span>Usuarios</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Contenido Principal del Perfil -->
+        <div class="dashboard-main">
+            <!-- Header del Perfil -->
+            <div class="profile-header-container">
+                <!-- Foto de Portada con Carrusel -->
+                <!-- Reemplaza todo el cover-photo-section con esto: -->
+                <div class="cover-photo-section">
+                    <div class="cover-photo-container" id="coverPhotoContainer">
+                        <div class="cover-photo-carousel" id="coverPhotoCarousel">
+                            <!-- Las fotos del carrusel se cargarán aquí dinámicamente -->
+                        </div>
+                        
+                        <!-- Controles del carrusel -->
+                        <button class="carousel-control prev" onclick="prevCoverPhoto()">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="carousel-control next" onclick="nextCoverPhoto()">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        
+                        <!-- Indicadores del carrusel -->
+                        <div class="carousel-indicators" id="carouselIndicators">
+                            <!-- Los indicadores se generarán dinámicamente -->
+                        </div>
+                        
+                        <!-- NUEVO BOTÓN - SIEMPRE VISIBLE -->
+                        <button class="btn-edit-cover-fixed" onclick="openCoverPhotoModal()">
+                            <i class="fas fa-camera"></i> Gestionar portada
+                        </button>
+                        
+                        <!-- Overlay (sin el botón de portada) -->
+                        <div class="cover-overlay">
+                            <div class="cover-actions">
+                                <button class="btn-cover-info" onclick="showCoverInfo()">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información del Perfil -->
+                <div class="profile-info-section">
+                    <div class="profile-avatar-container">
+                        <div class="profile-avatar-large">
+                            <img src="" alt="Foto de perfil" id="profileAvatarImg" class="profile-avatar-img">
+                            <button class="btn-edit-avatar" onclick="editProfilePhoto()">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    
+
+                    <!-- En profile.html - CORRIGE desde la línea del div class="info" -->
+            <div class="info">
+                <div class="profile-main-info">
+                    <h1 id="profileUserName">Nombre Usuario</h1>
+                    <p class="profile-username" id="profileUserUsername">@usuario</p>
+                    <p class="profile-bio" id="profileUserBio">Biografía del usuario...</p>
+                </div>
+
+                <div class="configstats">
+                    <!-- Stats y botones en una sola fila -->
+                    <div class="profile-stats-overview">
+                        <div class="stat-item">
+                            <strong id="postsCount">0</strong>
+                            <span>Publicaciones</span>
+                        </div>
+                        <div class="stat-item clickable" onclick="showProfileSection('friends'); setFriendsTab('seguidores')">
+                            <strong id="seguidoresProfileCount">0</strong>
+                            <span>Seguidores</span>
+                        </div>
+                        <div class="stat-item clickable" onclick="showProfileSection('friends'); setFriendsTab('siguiendo')">
+                            <strong id="seguidosProfileCount">0</strong>
+                            <span>Siguiendo</span>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-actions">
+                        <button class="btn-edit-profile" onclick="editProfile()">
+                            <i class="fas fa-edit"></i> Editar Perfil
+                        </button>
+                        <button class="btn-config" onclick="editProfile()">
+                            <i class="fas fa-gears"></i> Configuración
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navegación del Perfil -->
+            <div class="profile-navigation">
+                <nav class="profile-nav">
+                    <button class="profile-nav-item active" onclick="showProfileSection('posts')">
+                        <i class="fas fa-newspaper"></i> Publicaciones
+                    </button>
+                    <button class="profile-nav-item" onclick="showProfileSection('about')">
+                        <i class="fas fa-info-circle"></i> Información
+                    </button>
+                    <button class="profile-nav-item" onclick="showProfileSection('friends')">
+                        <i class="fas fa-users"></i> Amigos
+                    </button>
+                    <button class="profile-nav-item" onclick="showProfileSection('photos')">
+                        <i class="fas fa-images"></i> Fotos
+                    </button>
+                    <button class="profile-nav-item" onclick="showProfileSection('collections')">
+                        <i class="fas fa-folder"></i> Colecciones
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Contenido del Perfil -->
+            <div class="profile-content">
+                <!-- Sección de Publicaciones -->
+                <div id="postsSection" class="profile-section active">
+                    <div class="posts-feed" id="profilePostsFeed">
+                        <!-- Las publicaciones se cargarán aquí -->
+                    </div>
+                </div>
+
+                <!-- Sección de Información -->
+                <div id="aboutSection" class="profile-section">
+                    <div class="about-container">
+                        <div class="about-card">
+                            <h3><i class="fas fa-user"></i> Acerca de mí</h3>
+                            <div class="about-content" id="aboutContent">
+                                <!-- La información se cargará aquí -->
+                            </div>
+                        </div>
+
+                        <div class="about-card">
+                            <h3><i class="fas fa-heart"></i> Intereses</h3>
+                            <div class="interests-container" id="interestsContainer">
+                                <!-- Los intereses se cargarán aquí -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Amigos -->
+                <div id="friendsSection" class="profile-section">
+                    <div class="friends-container">
+                        <h3>Amigos</h3>
+                        <div class="friends-grid" id="friendsGrid">
+                            <!-- Los amigos se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Fotos -->
+                <div id="photosSection" class="profile-section">
+                    <div class="photos-container">
+                        <h3>Fotos</h3>
+                        <div class="photos-grid" id="photosGrid">
+                            <!-- Las fotos se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Colecciones -->
+                <div id="collectionsSection" class="profile-section">
+                    <div class="collections-container">
+                        <div class="collections-header">
+                            <h3>Mis Colecciones</h3>
+                            <button class="btn-primary" onclick="createNewCollection()">
+                                <i class="fas fa-plus"></i> Nueva Colección
+                            </button>
+                        </div>
+                        
+                        <div class="collections-preview">
+                            <h4>Colecciones Principales</h4>
+                            <div class="collections-grid" id="collectionsGrid">
+                                <!-- Las colecciones se cargarán aquí -->
+                            </div>
+                        </div>
+
+                        <div class="all-collections" id="allCollections">
+                            <!-- Todas las colecciones se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar perfil -->
+    <div id="editProfileModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Perfil</h3>
+                <span class="close-modal" onclick="closeEditProfileModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="edit-profile-form" id="editProfileForm">
+                    <!-- El formulario se cargará aquí -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para gestionar fotos de portada -->
+    <div id="coverPhotoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-images"></i> Gestionar Fotos de Portada</h3>
+                <span class="close-modal" onclick="closeCoverPhotoModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="cover-management">
+                    <!-- Subir nueva foto -->
+                    <div class="upload-section">
+                        <h4>Agregar Nueva Foto de Portada</h4>
+                        <div class="upload-area" id="coverUploadArea">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Arrastra una imagen aquí o haz click para seleccionar</p>
+                            <input type="file" id="coverPhotoInput" accept="image/*" style="display: none;">
+                            <button class="btn-primary" onclick="document.getElementById('coverPhotoInput').click()">
+                                <i class="fas fa-plus"></i> Seleccionar Imagen
+                            </button>
+                        </div>
+                        <div class="upload-preview" id="coverUploadPreview" style="display: none;">
+                            <img id="coverPreviewImage" src="" alt="Vista previa">
+                            <div class="preview-actions">
+                                <button class="btn-primary" onclick="uploadCoverPhoto()">
+                                    <i class="fas fa-upload"></i> Subir Foto
+                                </button>
+                                <button class="btn-secondary" onclick="cancelCoverUpload()">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fotos existentes -->
+                    <div class="existing-covers-section">
+                        <h4>Mis Fotos de Portada</h4>
+                        <div class="covers-grid" id="coversGrid">
+                            <!-- Las fotos existentes se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para foto de perfil -->
+    <div id="profilePhotoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle"></i> Cambiar Foto de Perfil</h3>
+                <span class="close-modal" onclick="closeProfilePhotoModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="profile-photo-upload">
+                    <div class="current-photo">
+                        <h4>Foto Actual</h4>
+                        <div class="current-photo-preview">
+                            <img id="currentProfilePhoto" src="" alt="Foto actual">
+                        </div>
+                    </div>
+                    
+                    <div class="upload-new-photo">
+                        <h4>Subir Nueva Foto</h4>
+                        <div class="upload-area" id="profileUploadArea">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Selecciona una imagen para tu perfil</p>
+                            <input type="file" id="profilePhotoInput" accept="image/*" style="display: none;">
+                            <button class="btn-primary" onclick="document.getElementById('profilePhotoInput').click()">
+                                <i class="fas fa-plus"></i> Seleccionar Imagen
+                            </button>
+                        </div>
+                        <div class="upload-preview" id="profileUploadPreview" style="display: none;">
+                            <img id="profilePreviewImage" src="" alt="Vista previa">
+                            <div class="preview-actions">
+                                <button class="btn-primary" onclick="uploadProfilePhoto()">
+                                    <i class="fas fa-upload"></i> Usar esta Foto
+                                </button>
+                                <button class="btn-secondary" onclick="cancelProfileUpload()">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast para mensajes -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="fas fa-check-circle toast-icon"></i>
+            <span id="toastMessage">Operación completada</span>
+        </div>
+    </div>
+
+    <script src="../js/profile.js"></script>
+</body>
+</html>
