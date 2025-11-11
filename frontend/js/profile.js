@@ -117,7 +117,19 @@ function makeFunctionsGlobal() {
     };
     
     window.editProfile = function() {
-        showToast('🔧 Editando perfil...', 'info');
+    console.log('🎯 Botón Editar Perfil clickeado');
+    openEditProfileModal();
+};
+
+    // Función para abrir el modal de edición de perfil
+    window.openEditProfileModal = function() {
+        console.log('🎯 Abriendo modal de edición de perfil...');
+        const modal = document.getElementById('editProfileModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.classList.add('modal-open');
+            loadEditProfileForm();
+        }
     };
     
     window.shareProfile = function() {
@@ -494,46 +506,81 @@ function makeOptionsFunctionsGlobal() {
     console.log('🌍 Haciendo funciones de opciones globales...');
     
     window.toggleFriendOptionsMenu = function(userId, event) {
-        if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-        
-        console.log('🎯 Abriendo menú de amigo para usuario:', userId);
-        
-        const menu = document.getElementById(`friendOptionsMenu-${userId}`);
-        if (!menu) {
-            console.error('❌ Menú de amigo no encontrado:', `friendOptionsMenu-${userId}`);
-            return;
-        }
-        
-        // Cerrar otros menús primero
-        closeAllFriendOptionsMenus();
-        
-        // Mostrar este menú
-        menu.style.display = 'block';
-        menu.classList.add('show');
-        
-        // POSICIONAMIENTO CORREGIDO
-        const button = event.target.closest('.btn-options');
-        if (button) {
-            const rect = button.getBoundingClientRect();
-            
-            // Posicionar el menú justo debajo del botón
-            menu.style.position = 'fixed';
-            menu.style.top = `${rect.bottom + 5}px`;
-            menu.style.left = `${rect.left - 150}px`;
-            menu.style.zIndex = '10000';
-        }
-    };
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     
-    window.closeAllFriendOptionsMenus = function() {
-        console.log('🔒 Cerrando todos los menús de amigos...');
-        document.querySelectorAll('.options-menu').forEach(menu => {
-            menu.style.display = 'none';
-            menu.classList.remove('show');
-        });
-    };
+    console.log('🎯 Abriendo menú de amigo para usuario:', userId);
+    
+    const menu = document.getElementById(`friendOptionsMenu-${userId}`);
+    if (!menu) {
+        console.error('❌ Menú de amigo no encontrado:', `friendOptionsMenu-${userId}`);
+        return;
+    }
+    
+    // Si el menú ya está abierto, cerrarlo
+    if (menu.classList.contains('show')) {
+        closeAllFriendOptionsMenus();
+        return;
+    }
+    
+    // Cerrar otros menús primero
+    closeAllFriendOptionsMenus();
+    
+    // Mostrar este menú
+    menu.style.display = 'block';
+    setTimeout(() => {
+        menu.classList.add('show');
+    }, 10);
+    
+    // POSICIONAMIENTO FIJO MEJORADO
+    const button = event.target.closest('.btn-options');
+    if (button) {
+        const rect = button.getBoundingClientRect();
+        
+        menu.style.position = 'fixed';
+        menu.style.top = `${rect.bottom + 5}px`;
+        menu.style.left = `${rect.left}px`;
+        menu.style.right = 'auto';
+        menu.style.zIndex = '10000';
+        menu.style.transform = 'translateX(-60%)'; // Centrar relativamente al botón
+    }
+    
+    // Agregar evento para cerrar con delay
+    setTimeout(() => {
+        const closeMenuHandler = function(e) {
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                menu.classList.remove('show');
+                setTimeout(() => {
+                    if (!menu.classList.contains('show')) {
+                        menu.style.display = 'none';
+                    }
+                }, 300);
+                document.removeEventListener('click', closeMenuHandler);
+            }
+        };
+        
+        // Usar setTimeout para evitar que se cierre inmediatamente
+        setTimeout(() => {
+            document.addEventListener('click', closeMenuHandler);
+        }, 100);
+    }, 50);
+};
+
+window.closeAllFriendOptionsMenus = function() {
+    console.log('🔒 Cerrando todos los menús de amigos...');
+    document.querySelectorAll('.options-menu').forEach(menu => {
+        menu.classList.remove('show');
+        setTimeout(() => {
+            if (!menu.classList.contains('show')) {
+                menu.style.display = 'none';
+            }
+        }, 300);
+    });
+};
+
+    
     
     console.log('✅ Funciones de opciones globales creadas');
 }
@@ -541,10 +588,30 @@ function makeOptionsFunctionsGlobal() {
 function initializeFriendMenuEvents() {
     console.log('🎯 Inicializando eventos de menús de amigos...');
     
-    // Event delegation simple para cerrar menús al hacer click fuera
+    // Event delegation mejorado con delay
+    let closeTimeout;
+    
     document.addEventListener('click', function(event) {
-        if (!event.target.closest('.options-menu') && !event.target.closest('.btn-options')) {
-            closeAllFriendOptionsMenus();
+        const isMenuButton = event.target.closest('.btn-options');
+        const isMenu = event.target.closest('.options-menu');
+        const isMenuItem = event.target.closest('.option-item');
+        
+        if (!isMenuButton && !isMenu && !isMenuItem) {
+            // Pequeño delay para permitir clicks en el menú
+            clearTimeout(closeTimeout);
+            closeTimeout = setTimeout(() => {
+                closeAllFriendOptionsMenus();
+            }, 150);
+        }
+    });
+    
+    // Prevenir cierre cuando el mouse está sobre el menú
+    document.addEventListener('mouseover', function(event) {
+        const isMenu = event.target.closest('.options-menu');
+        const isMenuButton = event.target.closest('.btn-options');
+        
+        if (isMenu || isMenuButton) {
+            clearTimeout(closeTimeout);
         }
     });
     
@@ -556,6 +623,7 @@ function initializeFriendMenuEvents() {
         if (target.closest('.block-option')) {
             event.preventDefault();
             event.stopPropagation();
+            clearTimeout(closeTimeout);
             
             const button = target.closest('.block-option');
             const card = button.closest('.friend-card');
@@ -567,7 +635,9 @@ function initializeFriendMenuEvents() {
                 
                 console.log('🔄 Mostrando modal de bloqueo para:', userId, userName);
                 closeAllFriendOptionsMenus();
-                showFriendBlockConfirmModal(userId, userName, userUsername);
+                setTimeout(() => {
+                    showFriendBlockConfirmModal(userId, userName, userUsername);
+                }, 200);
             }
         }
         
@@ -575,6 +645,7 @@ function initializeFriendMenuEvents() {
         if (target.closest('.remove-follower-option')) {
             event.preventDefault();
             event.stopPropagation();
+            clearTimeout(closeTimeout);
             
             const button = target.closest('.remove-follower-option');
             const card = button.closest('.friend-card');
@@ -586,7 +657,9 @@ function initializeFriendMenuEvents() {
                 
                 console.log('🔄 Mostrando modal de eliminar seguidor para:', userId, userName);
                 closeAllFriendOptionsMenus();
-                showFriendRemoveFollowerConfirmModal(userId, userName, userUsername);
+                setTimeout(() => {
+                    showFriendRemoveFollowerConfirmModal(userId, userName, userUsername);
+                }, 200);
             }
         }
         
@@ -594,6 +667,7 @@ function initializeFriendMenuEvents() {
         if (target.closest('.unblock-option')) {
             event.preventDefault();
             event.stopPropagation();
+            clearTimeout(closeTimeout);
             
             const button = target.closest('.unblock-option');
             const card = button.closest('.friend-card');
@@ -605,13 +679,16 @@ function initializeFriendMenuEvents() {
                 
                 console.log('🔄 Mostrando modal de desbloqueo para:', userId, userName);
                 closeAllFriendOptionsMenus();
-                showFriendUnblockConfirmModal(userId, userName, userUsername);
+                setTimeout(() => {
+                    showFriendUnblockConfirmModal(userId, userName, userUsername);
+                }, 200);
             }
         }
     });
     
     console.log('✅ Eventos de menús de amigos inicializados');
 }
+
 
 // ===== EVENTOS DE MODALES =====
 function initializeModalEvents() {
@@ -824,6 +901,242 @@ function cancelCoverUpload() {
     document.getElementById('coverUploadPreview').style.display = 'none';
     document.getElementById('coverUploadArea').style.display = 'block';
     document.getElementById('coverPhotoInput').value = '';
+}
+
+// Función para cargar el formulario de edición
+async function loadEditProfileForm() {
+    try {
+        const formContainer = document.getElementById('editProfileForm');
+        if (!formContainer) return;
+
+        // Obtener lista de intereses disponibles
+        const interesesResponse = await fetch(`${API_URL}/profile/intereses/lista`);
+        const interesesResult = await interesesResponse.json();
+        const interesesDisponibles = interesesResult.success ? interesesResult.data : [];
+
+        const user = userProfileData?.usuario || currentUser;
+
+        formContainer.innerHTML = `
+            <form id="profileEditForm" class="profile-edit-form">
+                <!-- Información Básica -->
+                <div class="form-section">
+                    <h4><i class="fas fa-user"></i> Información Básica</h4>
+                    
+                    <div class="form-group">
+                        <label for="editNombre">Nombre completo *</label>
+                        <input 
+                            type="text" 
+                            id="editNombre" 
+                            name="nombre" 
+                            value="${user.nombre || ''}" 
+                            required
+                            maxlength="50"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editBiografia">Biografía</label>
+                        <textarea 
+                            id="editBiografia" 
+                            name="biografia" 
+                            placeholder="Cuéntanos sobre ti..." 
+                            maxlength="500"
+                            rows="3"
+                        >${user.biografia || ''}</textarea>
+                        <div class="char-count">
+                            <span id="bioCharCount">${user.biografia?.length || 0}/500</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información Personal -->
+                <div class="form-section">
+                    <h4><i class="fas fa-info-circle"></i> Información Personal</h4>
+                    
+                    <div class="form-group">
+                        <label for="editUbicacion">Ubicación</label>
+                        <input 
+                            type="text" 
+                            id="editUbicacion" 
+                            name="ubicacion" 
+                            value="${user.ubicacion || ''}" 
+                            placeholder="Ciudad, País"
+                            maxlength="100"
+                        >
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editFechaNacimiento">Fecha de nacimiento</label>
+                            <input 
+                                type="date" 
+                                id="editFechaNacimiento" 
+                                name="fecha_nacimiento" 
+                                value="${user.fecha_nacimiento ? new Date(user.fecha_nacimiento).toISOString().split('T')[0] : ''}"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editGenero">Género</label>
+                            <select id="editGenero" name="genero">
+                                <option value="prefiero_no_decir" ${user.genero === 'prefiero_no_decir' ? 'selected' : ''}>Prefiero no decir</option>
+                                <option value="masculino" ${user.genero === 'masculino' ? 'selected' : ''}>Masculino</option>
+                                <option value="femenino" ${user.genero === 'femenino' ? 'selected' : ''}>Femenino</option>
+                                <option value="otro" ${user.genero === 'otro' ? 'selected' : ''}>Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+
+<!-- Intereses -->
+<div class="form-section">
+    <h4><i class="fas fa-heart"></i> Intereses</h4>
+    <p class="form-help">Haz clic en los intereses para seleccionarlos (máximo 10)</p>
+    
+    <div class="intereses-selector">
+        <div class="intereses-grid" id="interesesGrid">
+            ${interesesDisponibles.map(interes => {
+                const isSelected = user.intereses?.includes(interes);
+                return `
+                    <div class="interes-item ${isSelected ? 'selected' : ''}" 
+                         data-interes="${interes}"
+                         onclick="toggleInteres(this, '${interes}')">
+                        <span class="interes-badge">
+                            ${interes}
+                            ${isSelected ? '<i class="fas fa-check"></i>' : ''}
+                        </span>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        
+        <div class="intereses-seleccionados">
+            <h5>
+                <i class="fas fa-check-circle"></i> 
+                Tus intereses seleccionados: 
+                <span class="interests-count" id="interestsCount">
+                    (${user.intereses?.length || 0}/10)
+                </span>
+            </h5>
+            <div class="selected-interests-grid" id="selectedInterests">
+                ${user.intereses?.map(interes => `
+                    <div class="selected-interes-item" data-interes="${interes}">
+                        <span class="interes-badge selected">
+                            ${interes}
+                            <i class="fas fa-times" onclick="removeInteres('${interes}')"></i>
+                        </span>
+                    </div>
+                `).join('') || '<p class="no-interests">Aún no has seleccionado intereses</p>'}
+            </div>
+        </div>
+    </div>
+</div>
+
+                <!-- Acciones del Formulario -->
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeEditProfileModal()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        `;
+
+        // Inicializar eventos del formulario
+        initializeEditFormEvents();
+
+    } catch (error) {
+        console.error('Error cargando formulario de edición:', error);
+        showToast('❌ Error al cargar el formulario', 'error');
+    }
+}
+
+// Array global para trackear intereses seleccionados
+let selectedInterests = [];
+
+// Función para toggle de intereses
+window.toggleInteres = function(element, interes) {
+    const index = selectedInterests.indexOf(interes);
+    
+    if (index === -1) {
+        // Agregar interés si no ha alcanzado el límite
+        if (selectedInterests.length >= 10) {
+            showToast('❌ Máximo 10 intereses permitidos', 'error', 2000);
+            return;
+        }
+        selectedInterests.push(interes);
+        element.classList.add('selected');
+    } else {
+        // Remover interés
+        selectedInterests.splice(index, 1);
+        element.classList.remove('selected');
+    }
+    
+    updateSelectedInterestsDisplay();
+    updateInterestsCount();
+};
+
+// Función para remover interés desde la sección de seleccionados
+window.removeInteres = function(interes) {
+    const index = selectedInterests.indexOf(interes);
+    if (index !== -1) {
+        selectedInterests.splice(index, 1);
+        
+        // Actualizar el grid principal
+        const interesElement = document.querySelector(`.interes-item[data-interes="${interes}"]`);
+        if (interesElement) {
+            interesElement.classList.remove('selected');
+        }
+        
+        updateSelectedInterestsDisplay();
+        updateInterestsCount();
+    }
+};
+
+// Función para actualizar la visualización de intereses seleccionados
+function updateSelectedInterestsDisplay() {
+    const selectedContainer = document.getElementById('selectedInterests');
+    
+    if (!selectedContainer) return;
+    
+    if (selectedInterests.length === 0) {
+        selectedContainer.innerHTML = '<p class="no-interests">Aún no has seleccionado intereses</p>';
+    } else {
+        selectedContainer.innerHTML = selectedInterests.map(interes => `
+            <div class="selected-interes-item" data-interes="${interes}">
+                <span class="interes-badge selected">
+                    ${interes}
+                    <i class="fas fa-times" onclick="removeInteres('${interes}')"></i>
+                </span>
+            </div>
+        `).join('');
+    }
+}
+
+// Función para actualizar el contador
+function updateInterestsCount() {
+    const countElement = document.getElementById('interestsCount');
+    if (countElement) {
+        countElement.textContent = `(${selectedInterests.length}/10)`;
+        
+        // Cambiar color si está cerca del límite
+        if (selectedInterests.length >= 8) {
+            countElement.style.color = '#e74c3c';
+        } else if (selectedInterests.length >= 5) {
+            countElement.style.color = '#f39c12';
+        } else {
+            countElement.style.color = '#27ae60';
+        }
+    }
+}
+
+// Función para inicializar los intereses seleccionados al cargar el formulario
+function initializeSelectedInterests(user) {
+    selectedInterests = user.intereses ? [...user.intereses] : [];
+    updateInterestsCount();
 }
 
 // ===== SUBIDA AL SERVIDOR =====
@@ -2148,6 +2461,199 @@ function editPost(postId) {
     openModal('edit');
 }
 
+// Función para inicializar eventos del formulario de edición
+// Función para inicializar eventos del formulario de edición
+function initializeEditFormEvents() {
+    const form = document.getElementById('profileEditForm');
+    const bioTextarea = document.getElementById('editBiografia');
+    const bioCharCount = document.getElementById('bioCharCount');
+
+    // Inicializar intereses del usuario
+    const user = userProfileData?.usuario || currentUser;
+    initializeSelectedInterests(user);
+
+    // Contador de caracteres para biografía
+    if (bioTextarea && bioCharCount) {
+        bioTextarea.addEventListener('input', function() {
+            const length = this.value.length;
+            bioCharCount.textContent = `${length}/500`;
+            bioCharCount.style.color = length > 450 ? '#e74c3c' : length > 400 ? '#f39c12' : '#7f8c8d';
+        });
+    }
+
+    // Envío del formulario
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveProfileChanges();
+        });
+    }
+}
+
+// Función para actualizar la visualización de intereses seleccionados
+function updateSelectedInterests() {
+    const selectedInterestsContainer = document.getElementById('selectedInterests');
+    const selectedCheckboxes = document.querySelectorAll('input[name="intereses"]:checked');
+    
+    if (!selectedInterestsContainer) return;
+
+    if (selectedCheckboxes.length === 0) {
+        selectedInterestsContainer.innerHTML = '<p class="no-interests">Aún no has seleccionado intereses</p>';
+    } else {
+        selectedInterestsContainer.innerHTML = Array.from(selectedCheckboxes)
+            .map(checkbox => `<span class="interest-tag selected">${checkbox.value}</span>`)
+            .join('');
+    }
+
+    // Actualizar clases de los checkboxes
+    document.querySelectorAll('.interes-checkbox').forEach(label => {
+        const checkbox = label.querySelector('input');
+        if (checkbox.checked) {
+            label.classList.add('selected');
+        } else {
+            label.classList.remove('selected');
+        }
+    });
+}
+
+// Función para validar límite de intereses
+function validateInterestsLimit() {
+    const selectedCheckboxes = document.querySelectorAll('input[name="intereses"]:checked');
+    const remainingCheckboxes = document.querySelectorAll('input[name="intereses"]:not(:checked)');
+    
+    if (selectedCheckboxes.length >= 10) {
+        remainingCheckboxes.forEach(checkbox => {
+            checkbox.disabled = true;
+            checkbox.parentElement.classList.add('disabled');
+        });
+        
+        showToast('ℹ️ Has alcanzado el límite de 10 intereses', 'info', 2000);
+    } else {
+        remainingCheckboxes.forEach(checkbox => {
+            checkbox.disabled = false;
+            checkbox.parentElement.classList.remove('disabled');
+        });
+    }
+}
+
+// Función para guardar los cambios del perfil
+// Función para guardar los cambios del perfil - VERSIÓN CORREGIDA
+async function saveProfileChanges() {
+    console.log('💾 Intentando guardar cambios del perfil...');
+    
+    const form = document.getElementById('profileEditForm');
+    if (!form) {
+        console.error('❌ Formulario no encontrado');
+        showToast('❌ Error: Formulario no encontrado', 'error');
+        return;
+    }
+
+    // Ejecutar diagnóstico primero
+    diagnoseFormData();
+
+    // Obtener valores directamente de los inputs (más confiable que FormData)
+    const nombreInput = document.getElementById('editNombre');
+    const biografiaInput = document.getElementById('editBiografia');
+    const ubicacionInput = document.getElementById('editUbicacion');
+    const fechaNacimientoInput = document.getElementById('editFechaNacimiento');
+    const generoSelect = document.getElementById('editGenero');
+
+    // Validar que los elementos existen
+    if (!nombreInput) {
+        console.error('❌ Campo nombre no encontrado');
+        showToast('❌ Error: Campo nombre no encontrado', 'error');
+        return;
+    }
+
+    const profileData = {
+        nombre: nombreInput ? nombreInput.value.trim() : '',
+        biografia: biografiaInput ? biografiaInput.value.trim() : '',
+        ubicacion: ubicacionInput ? ubicacionInput.value.trim() : '',
+        fecha_nacimiento: fechaNacimientoInput ? fechaNacimientoInput.value : '',
+        genero: generoSelect ? generoSelect.value : 'prefiero_no_decir',
+        intereses: selectedInterests || []
+    };
+
+    console.log('📦 Datos a enviar:', profileData);
+
+    // Validaciones básicas MEJORADAS
+    if (!profileData.nombre) {
+        showToast('❌ El nombre es obligatorio', 'error');
+        
+        // Resaltar el campo con error
+        if (nombreInput) {
+            nombreInput.style.borderColor = '#e74c3c';
+            nombreInput.focus();
+        }
+        return;
+    }
+
+    if (profileData.nombre.length < 2) {
+        showToast('❌ El nombre debe tener al menos 2 caracteres', 'error');
+        nombreInput.style.borderColor = '#e74c3c';
+        nombreInput.focus();
+        return;
+    }
+
+    try {
+        showToast('⏳ Guardando cambios...', 'info');
+
+        const response = await fetch(`${API_URL}/profile/${currentUser._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(profileData)
+        });
+
+        const result = await response.json();
+        console.log('📨 Respuesta del servidor:', result);
+
+        if (result.success) {
+            showToast('✅ Perfil actualizado exitosamente', 'success');
+            
+            // Actualizar datos locales
+            if (userProfileData && userProfileData.usuario) {
+                Object.assign(userProfileData.usuario, result.data);
+            }
+            
+            // Actualizar currentUser en localStorage
+            Object.assign(currentUser, result.data);
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Actualizar la interfaz
+            updateProfileHeader(userProfileData.usuario);
+            loadAboutSection(userProfileData.usuario);
+            initializeSidebar();
+            
+            closeEditProfileModal();
+            
+        } else {
+            console.error('❌ Error del servidor:', result.error);
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        console.error('❌ Error guardando cambios del perfil:', error);
+        showToast('❌ Error al guardar los cambios', 'error');
+    }
+}
+
+// Función para cerrar el modal de edición de perfil
+window.closeEditProfileModal = function() {
+    const modal = document.getElementById('editProfileModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+};
+
+// Actualizar la función editProfile existente para usar el nuevo modal
+window.editProfile = function() {
+    openEditProfileModal();
+};
+
+
 // Función para inicializar eventos del modal de edición
 function initializeEditModalEvents(postId) {
     const editContent = document.getElementById('editPostContent');
@@ -2417,3 +2923,29 @@ function getTimeAgo(date) {
     return date.toLocaleDateString();
 }
 
+// Función de diagnóstico temporal
+function diagnoseFormData() {
+    const form = document.getElementById('profileEditForm');
+    if (!form) {
+        console.error('❌ Formulario no encontrado');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    console.log('🔍 DIAGNÓSTICO FORM DATA:');
+    
+    // Verificar todos los campos del formulario
+    for (let [key, value] of formData.entries()) {
+        console.log(`📋 ${key}:`, value);
+    }
+    
+    // Verificar campos específicos
+    const nombreInput = document.getElementById('editNombre');
+    console.log('✅ Campo nombre existe:', !!nombreInput);
+    if (nombreInput) {
+        console.log('📝 Valor del nombre:', nombreInput.value);
+    }
+    
+    // Verificar intereses seleccionados
+    console.log('🎯 Intereses seleccionados:', selectedInterests);
+}
