@@ -4,20 +4,88 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const router = express.Router();
 
-// CREATE - Crear publicación
+// CREATE - Crear publicación (VERSIÓN ACTUALIZADA PARA MULTIMEDIA)
 router.post('/', async (req, res) => {
   try {
-    const post = new Post(req.body);
+    const { 
+      autor, 
+      contenido, 
+      tipoContenido, 
+      imagen, 
+      audio, 
+      video, 
+      duracion,
+      imagenFilename,
+      audioFilename, 
+      videoFilename 
+    } = req.body;
+
+    // Validar que el contenido no esté vacío si no hay multimedia
+    if (!contenido && !imagen && !audio && !video) {
+      return res.status(400).json({
+        success: false,
+        error: 'El contenido no puede estar vacío si no hay archivo multimedia'
+      });
+    }
+
+    // Crear el objeto del post con todos los campos posibles
+    const postData = {
+      autor,
+      contenido: contenido || '', // Permitir contenido vacío si hay multimedia
+      tipoContenido: tipoContenido || 'texto',
+      duracion: duracion || 0
+    };
+
+    // Agregar campos específicos según el tipo de contenido
+    if (imagen) {
+      postData.imagen = imagen;
+      postData.imagenFilename = imagenFilename || '';
+      postData.tipoContenido = 'imagen';
+    }
+
+    if (audio) {
+      postData.audio = audio;
+      postData.audioFilename = audioFilename || '';
+      postData.tipoContenido = 'audio';
+    }
+
+    if (video) {
+      postData.video = video;
+      postData.videoFilename = videoFilename || '';
+      postData.tipoContenido = 'video';
+    }
+
+    console.log('📝 Creando post con datos:', {
+      autor: postData.autor,
+      tipoContenido: postData.tipoContenido,
+      tieneImagen: !!postData.imagen,
+      tieneAudio: !!postData.audio,
+      tieneVideo: !!postData.video,
+      duracion: postData.duracion
+    });
+
+    const post = new Post(postData);
     await post.save();
     
     // Popular el autor para la respuesta
     await post.populate('autor', 'username nombre foto_perfil');
     
+    console.log('✅ Post creado exitosamente:', {
+      id: post._id,
+      tipoContenido: post.tipoContenido,
+      multimedia: {
+        imagen: post.imagen,
+        audio: post.audio,
+        video: post.video
+      }
+    });
+
     res.status(201).json({
       success: true,
       data: post
     });
   } catch (error) {
+    console.error('❌ Error creando publicación:', error);
     res.status(400).json({
       success: false,
       error: error.message
@@ -39,6 +107,20 @@ router.get('/', async (req, res) => {
       .sort({ fecha_publicacion: -1 })
       .skip(skip)
       .limit(limit);
+
+    // Log de depuración
+    console.log('📥 Posts obtenidos:', posts.length);
+    posts.forEach((post, index) => {
+      console.log(`📝 Post ${index}:`, {
+        id: post._id,
+        tipoContenido: post.tipoContenido,
+        imagen: post.imagen ? 'SÍ' : 'NO',
+        audio: post.audio ? 'SÍ' : 'NO', 
+        video: post.video ? 'SÍ' : 'NO',
+        contenido: post.contenido?.substring(0, 50) + '...'
+      });
+    });
+    
 
     // Popular posts originales en los shares
     const populatedPosts = await Promise.all(
@@ -102,7 +184,6 @@ router.get('/user/:userId', async (req, res) => {
 });
 
 // READ - Obtener publicaciones de usuarios seguidos (FEED MEJORADO)
-// READ - Obtener publicaciones de usuarios seguidos (FEED MEJORADO)
 router.get('/feed/:userId', async (req, res) => {
   try {
     console.log('📥 Solicitando feed para usuario:', req.params.userId);
@@ -116,22 +197,15 @@ router.get('/feed/:userId', async (req, res) => {
       });
     }
 
-    console.log('✅ Usuario encontrado:', user.nombre);
-    
-    // Verificar qué campos tiene el usuario
-    console.log('📋 Campos del usuario:', Object.keys(user._doc));
-    
-    // Usar el campo correcto para usuarios seguidos
-    // Si no existe 'seguidos', usar un array vacío
-    const usersSeguidos = user.seguidos || user.following || user.siguiendo || [];
+    const usersSeguidos = user.seguidos || [];
     console.log('👥 Usuarios seguidos:', usersSeguidos.length);
 
     const posts = await Post.find({
       $or: [
-        { autor: { $in: [...usersSeguidos, user._id] } }, // Posts originales de seguidos + propios
+        { autor: { $in: [...usersSeguidos, user._id] } },
         { 
           tipo: 'share', 
-          autor: { $in: [...usersSeguidos, user._id] } // Shares de seguidos + propios
+          autor: { $in: [...usersSeguidos, user._id] }
         }
       ]
     })
@@ -140,6 +214,17 @@ router.get('/feed/:userId', async (req, res) => {
       .populate('postOriginal')
       .sort({ fecha_publicacion: -1 })
       .limit(20);
+
+    // LOGS DE DEPURACIÓN PARA MULTIMEDIA
+    console.log('📝 Posts en feed:', posts.length);
+    posts.forEach((post, index) => {
+      console.log(`🎵 Post ${index} multimedia:`, {
+        tipoContenido: post.tipoContenido,
+        audio: post.audio || 'NO',
+        video: post.video || 'NO',
+        imagen: post.imagen || 'NO'
+      });
+    });
 
     console.log('📝 Posts encontrados:', posts.length);
 
@@ -489,11 +574,19 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// UPDATE - Editar publicación (solo el autor puede editar)
+// UPDATE - Editar publicación (VERSIÓN ACTUALIZADA PARA MULTIMEDIA)
 router.put('/:id', async (req, res) => {
   try {
     const postId = req.params.id;
-    const { userId, contenido, imagen } = req.body;
+    const { 
+      userId, 
+      contenido, 
+      imagen, 
+      audio, 
+      video, 
+      duracion,
+      tipoContenido 
+    } = req.body;
 
     const post = await Post.findById(postId);
     
@@ -520,9 +613,27 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Actualizar el post
-    post.contenido = contenido || post.contenido;
-    post.imagen = imagen !== undefined ? imagen : post.imagen;
+    // Actualizar el post con todos los campos posibles
+    post.contenido = contenido !== undefined ? contenido : post.contenido;
+    post.tipoContenido = tipoContenido || post.tipoContenido;
+    post.duracion = duracion || post.duracion;
+
+    // Manejar campos de multimedia (permitir eliminación estableciendo null o '')
+    if (imagen !== undefined) {
+      post.imagen = imagen;
+      post.imagenFilename = imagen ? (req.body.imagenFilename || '') : '';
+    }
+
+    if (audio !== undefined) {
+      post.audio = audio;
+      post.audioFilename = audio ? (req.body.audioFilename || '') : '';
+    }
+
+    if (video !== undefined) {
+      post.video = video;
+      post.videoFilename = video ? (req.body.videoFilename || '') : '';
+    }
+
     post.fecha_publicacion = new Date(); // Actualizar fecha de modificación
 
     await post.save();
@@ -530,6 +641,16 @@ router.put('/:id', async (req, res) => {
     // Popular el autor para la respuesta
     await post.populate('autor', 'username nombre foto_perfil');
     await post.populate('likes', 'username nombre');
+
+    console.log('✅ Post actualizado:', {
+      id: post._id,
+      tipoContenido: post.tipoContenido,
+      multimedia: {
+        imagen: post.imagen,
+        audio: post.audio,
+        video: post.video
+      }
+    });
 
     res.json({
       success: true,

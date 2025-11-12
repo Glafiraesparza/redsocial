@@ -13,23 +13,26 @@ const app = express();
 // Configuración CORS más permisiva
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Servir archivos estáticos para TODOS los tipos de archivos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Ruta de prueba
 app.get('/', (req, res) => {
     res.json({ 
         message: '🚀 API de Red Social Kion-D funcionando!',
         version: '1.0.0',
-        database: 'MongoDB Local'
+        database: 'MongoDB Local',
+        features: 'Texto, Imágenes, Audio y Video'
     });
 });
 
-// Rutas - TODAS JUNTAS de la misma manera
+// Rutas
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/upload', require('./routes/upload')); 
 app.use('/api/profile', require('./routes/profile'));
+app.use('/api/messages', require('./routes/messages'));
 
 // Manejo de errores 404
 app.use((req, res) => {
@@ -39,10 +42,10 @@ app.use((req, res) => {
     });
 });
 
-// ✅ FORZAR PUERTO 3001
 const PORT = 3001;
 app.listen(PORT, () => {
     console.log(`🎯 Servidor ejecutándose en puerto ${PORT}`);
     console.log(`📡 URL: http://localhost:${PORT}`);
     console.log(`🗄️  Base de datos: MongoDB Local`);
+    console.log(`🎵 Serviendo: Imágenes, Audio y Video`);
 });

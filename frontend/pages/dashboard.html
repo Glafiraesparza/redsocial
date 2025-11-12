@@ -62,6 +62,10 @@
                     <i class="fas fa-users"></i>
                     <span>Usuarios</span>
                 </button>
+                <button class="nav-item" onclick="showSection('messages')">
+                    <i class="fas fa-comments"></i>
+                    <span>Mensajes</span>
+                </button>
             </nav>
         </div>
 
@@ -81,19 +85,55 @@
                             </button>
                         </div>
                         <div class="post-submit">
-                            <span id="charCount">0/1000</span>
+                            <span id="charCount">0/500</span>
                             <button id="submitPost" class="btn-primary">
                                 <i class="fas fa-paper-plane"></i> Publicar
                             </button>
                         </div>
                     </div>
-                    <div id="imageUpload" class="image-upload-container" style="display: none;">
-                        <input type="file" id="postImage" accept="image/*" style="display: none;">
-                        <label for="postImage" class="btn-secondary">
+
+            
+
+                    <!-- Después del textarea del contenido -->
+                    <div class="media-type-selector">
+                        <button type="button" class="media-type-btn active" onclick="changeMediaType('imagen')">
+                            <i class="fas fa-image"></i> Imagen
+                        </button>
+                        <button type="button" class="media-type-btn" onclick="changeMediaType('audio')">
+                            <i class="fas fa-music"></i> Audio
+                        </button>
+                        <button type="button" class="media-type-btn" onclick="changeMediaType('video')">
+                            <i class="fas fa-video"></i> Video
+                        </button>
+                    </div>
+
+                    <!-- Contenedor para imagen (existente) -->
+                    <div id="imageUpload" style="display: block;">
+                        <input type="file" id="postImage" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                        <label for="postImage" class="btn-secondary btn-image-upload">
                             <i class="fas fa-upload"></i> Seleccionar Imagen
                         </label>
                         <div id="imagePreview" class="image-preview"></div>
                     </div>
+
+                    <!-- Nuevo contenedor para audio -->
+                    <div id="audioUpload" style="display: none;">
+                        <input type="file" id="postAudio" accept="audio/*" style="display: none;" onchange="handleAudioUpload(event)">
+                        <label for="postAudio" class="btn-secondary btn-audio-upload">
+                            <i class="fas fa-upload"></i> Seleccionar Audio
+                        </label>
+                        <div id="audioPreview" class="audio-preview"></div>
+                    </div>
+
+                    <!-- Nuevo contenedor para video -->
+                    <div id="videoUpload" style="display: none;">
+                        <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
+                        <label for="postVideo" class="btn-secondary btn-video-upload">
+                            <i class="fas fa-upload"></i> Seleccionar Video
+                        </label>
+                        <div id="videoPreview" class="video-preview"></div>
+                    </div>
+
                 </div>
             </div>
 
@@ -139,8 +179,71 @@
                     <!-- Lista de usuarios se cargará aquí -->
                 </div>
             </div>
+
+            <!-- Mensajes -->
+<div id="messagesSection" class="content-section">
+    <div class="messages-container">
+        <!-- Sidebar de conversaciones -->
+        <div class="conversations-sidebar">
+            <div class="conversations-header">
+                <h3><i class="fas fa-comments"></i> Mensajes</h3>
+                <button class="btn-new-chat" onclick="openNewChatModal()">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </div>
+            <div class="conversations-search">
+                <input type="text" id="searchConversations" placeholder="Buscar conversaciones...">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="conversations-list" id="conversationsList">
+                <!-- Las conversaciones se cargarán aquí -->
+            </div>
+        </div>
+
+        <!-- Área de chat -->
+        <div class="chat-area">
+            <div class="chat-header" id="chatHeader">
+                <div class="chat-user-info">
+                    <div class="chat-user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="chat-user-details">
+                        <h4 id="currentChatUser">Selecciona una conversación</h4>
+                        <p id="currentChatUsername">Para comenzar a chatear</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="messages-area">
+                <div class="messages-container-inner" id="messagesContainer">
+                    <div class="empty-chat">
+                        <i class="fas fa-comments"></i>
+                        <h3>Selecciona una conversación</h3>
+                        <p>Elige una conversación existente o inicia una nueva</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="message-input-area">
+                <div class="message-input-container">
+                    <textarea 
+                        id="newMessageInput" 
+                        placeholder="Escribe un mensaje... (máx. 150 caracteres)" 
+                        maxlength="150"
+                        rows="1"
+                        disabled
+                    ></textarea>
+                    <div class="message-input-actions">
+                        <span id="charCounter">0/150</span>
+                        <button id="sendMessageBtn" class="btn-send-message" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
     <!-- Modal para ver publicación completa  -->
 <div id="postModal" class="modal">
@@ -215,6 +318,18 @@
         </div>
     </div>
 
+
+    <script>
+    console.log("🔴 Antes de cualquier script - currentUser:", window.currentUser);
+    </script>
     <script src="../js/dashboard.js"></script>
+    <script>
+        console.log("🟡 Después de dashboard.js - currentUser:", window.currentUser);
+        console.log("🟡 localStorage currentUser:", localStorage.getItem('currentUser'));
+    </script>
+    <script src="../js/messages.js"></script>
+    <script>
+        console.log("🔵 Después de messages.js - currentUser:", window.currentUser);
+    </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// backend/routes/upload.js - VERSIÓN CORREGIDA
+// backend/routes/upload.js - VERSIÓN SIMPLIFICADA Y CORREGIDA
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -7,12 +7,14 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-// ========== CONFIGURACIÓN PARA TODOS LOS UPLOADS ==========
+// ========== CONFIGURACIÓN SIMPLIFICADA ==========
 const createDirectories = () => {
     const directories = {
         posts: path.join(__dirname, '../uploads/images/posts'),
         profiles: path.join(__dirname, '../uploads/images/profiles'),
-        covers: path.join(__dirname, '../uploads/images/covers')
+        covers: path.join(__dirname, '../uploads/images/covers'),
+        audio: path.join(__dirname, '../uploads/audio'),
+        video: path.join(__dirname, '../uploads/video')
     };
 
     Object.values(directories).forEach(dir => {
@@ -27,16 +29,22 @@ const createDirectories = () => {
 
 const directories = createDirectories();
 
-// Configuración única de multer
+// SOLO UNA CONFIGURACIÓN MULTER - SIMPLIFICADA
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        let uploadDir = directories.posts; // Por defecto
+        let uploadDir = directories.posts; // Por defecto para imágenes de posts
         
+        // Determinar directorio basado en el campo del formulario
         if (file.fieldname === 'profilePicture') {
             uploadDir = directories.profiles;
         } else if (file.fieldname === 'coverPicture') {
             uploadDir = directories.covers;
+        } else if (file.fieldname === 'audio') {
+            uploadDir = directories.audio;
+        } else if (file.fieldname === 'video') {
+            uploadDir = directories.video;
         }
+        // 'image' field va a posts por defecto
         
         console.log(`📂 Campo: ${file.fieldname} -> Destino: ${uploadDir}`);
         cb(null, uploadDir);
@@ -48,21 +56,37 @@ const storage = multer.diskStorage({
     }
 });
 
-// Configuración de multer
+// FILTRO DE ARCHIVOS MEJORADO
+const fileFilter = (req, file, cb) => {
+    console.log(`🔍 Validando archivo: ${file.originalname} (${file.mimetype})`);
+    
+    // Permitir imágenes
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    }
+    // Permitir audio
+    else if (file.mimetype.startsWith('audio/')) {
+        cb(null, true);
+    }
+    // Permitir video
+    else if (file.mimetype.startsWith('video/')) {
+        cb(null, true);
+    }
+    // Rechazar otros tipos
+    else {
+        console.log('❌ Tipo de archivo rechazado:', file.mimetype);
+        cb(new Error('Tipo de archivo no soportado. Solo se permiten imágenes, audio y video.'), false);
+    }
+};
+
+// CONFIGURACIÓN MULTER ÚNICA
 const upload = multer({
     storage: storage,
-    limits: { 
-        fileSize: 5 * 1024 * 1024 // 5MB
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB máximo general
+        files: 1 // Solo un archivo por vez
     },
-    fileFilter: (req, file, cb) => {
-        console.log(`🔍 Validando: ${file.originalname} (${file.mimetype})`);
-        
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Solo se permiten archivos de imagen'), false);
-        }
-    }
+    fileFilter: fileFilter
 });
 
 // Middleware de errores mejorado
@@ -73,86 +97,194 @@ const handleUploadErrors = (err, req, res, next) => {
         if (err.code === 'LIMIT_FILE_SIZE') {
             return res.status(400).json({
                 success: false,
-                error: 'La imagen es demasiado grande (máximo 5MB)'
+                error: 'El archivo es demasiado grande. Máximo 50MB.'
+            });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+            return res.status(400).json({
+                success: false,
+                error: 'Demasiados archivos. Solo se permite uno por vez.'
+            });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+            return res.status(400).json({
+                success: false,
+                error: 'Campo de archivo no esperado.'
             });
         }
     }
     
-    if (err.message.includes('Solo se permiten archivos de imagen')) {
+    if (err.message) {
         return res.status(400).json({
             success: false,
-            error: 'Solo se permiten archivos de imagen'
+            error: err.message
         });
     }
     
+    console.error('❌ Error interno en upload:', err);
     return res.status(500).json({
         success: false,
-        error: 'Error al subir el archivo'
+        error: 'Error interno del servidor al subir el archivo'
     });
 };
 
-// ========== RUTAS PARA POSTS ==========
-router.post('/image', upload.single('image'), (req, res, next) => {
+// ========== RUTAS DE UPLOAD ==========
+
+// SUBIR IMAGEN PARA POST
+router.post('/image', upload.fields([
+    { name: 'imagen', maxCount: 1 },
+    { name: 'image', maxCount: 1 }
+]), (req, res) => {
     try {
         console.log('📝 Subiendo imagen para post...');
         
-        if (!req.file) {
+        // Verificar qué campo se usó
+        let file = null;
+        let fieldUsed = '';
+        
+        if (req.files['imagen'] && req.files['imagen'][0]) {
+            file = req.files['imagen'][0];
+            fieldUsed = 'imagen';
+        } else if (req.files['image'] && req.files['image'][0]) {
+            file = req.files['image'][0];
+            fieldUsed = 'image';
+        }
+        
+        if (!file) {
             console.log('❌ No se recibió archivo');
             return res.status(400).json({
                 success: false,
-                error: 'No se proporcionó ninguna imagen'
+                error: 'No se proporcionó ninguna imagen. Use el campo "imagen" o "image".'
             });
         }
 
-        const imageUrl = `http://localhost:3001/uploads/images/posts/${req.file.filename}`;
-        console.log('✅ Imagen de post subida:', imageUrl);
+        console.log('✅ Archivo recibido en campo:', fieldUsed, {
+            originalname: file.originalname,
+            filename: file.filename,
+            size: file.size,
+            mimetype: file.mimetype
+        });
+
+        const imageUrl = `http://localhost:3001/uploads/images/posts/${file.filename}`;
+        console.log('✅ Imagen subida:', imageUrl);
 
         res.json({
             success: true,
             data: {
                 url: imageUrl,
-                filename: req.file.filename
+                filename: file.filename,
+                tipo: 'imagen',
+                size: file.size,
+                fieldUsed: fieldUsed
             }
         });
 
     } catch (error) {
-        next(error);
+        console.error('❌ Error en upload de imagen:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno al subir la imagen'
+        });
     }
 });
 
-// ========== RUTAS PARA PERFIL Y PORTADA ==========
-
-// Subir foto de perfil
-// Subir foto de perfil - VERSIÓN CORREGIDA
-router.post('/profile-picture/:userId', upload.single('profilePicture'), async (req, res, next) => {
-    let fileDeleted = false;
-    
+// SUBIR AUDIO
+router.post('/audio', upload.single('audio'), (req, res) => {
     try {
-        console.log('📸 INICIANDO UPLOAD DE FOTO DE PERFIL');
-        console.log('👤 User ID:', req.params.userId);
+        console.log('🎵 Subiendo audio...');
         
         if (!req.file) {
-            console.log('❌ No se recibió archivo de perfil');
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó ningún archivo de audio'
+            });
+        }
+
+        const audioUrl = `http://localhost:3001/uploads/audio/${req.file.filename}`;
+        console.log('✅ Audio subido:', audioUrl);
+
+        res.json({
+            success: true,
+            data: {
+                url: audioUrl,
+                filename: req.file.filename,
+                tipo: 'audio',
+                size: req.file.size
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error en upload de audio:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno al subir el audio'
+        });
+    }
+});
+
+// SUBIR VIDEO
+// En upload.js - Ruta para video
+router.post('/video', upload.single('video'), (req, res) => {
+    try {
+        console.log('🎬 Subiendo video...');
+        
+        if (!req.file) {
+            console.log('❌ No se recibió archivo de video');
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó ningún archivo de video'
+            });
+        }
+
+        console.log('✅ Archivo de video recibido:', {
+            fieldname: req.file.fieldname, // Debe decir 'video'
+            originalname: req.file.originalname,
+            filename: req.file.filename,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+
+        const videoUrl = `http://localhost:3001/uploads/video/${req.file.filename}`;
+        console.log('✅ Video subido:', videoUrl);
+
+        res.json({
+            success: true,
+            data: {
+                url: videoUrl,
+                filename: req.file.filename,
+                tipo: 'video',
+                size: req.file.size
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error en upload de video:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno al subir el video'
+        });
+    }
+});
+
+// SUBIR FOTO DE PERFIL
+router.post('/profile-picture/:userId', upload.single('profilePicture'), async (req, res) => {
+    try {
+        console.log('📸 Subiendo foto de perfil...');
+        
+        if (!req.file) {
             return res.status(400).json({
                 success: false,
                 error: 'No se proporcionó ninguna imagen'
             });
         }
 
-        console.log('📊 Detalles del archivo:', {
-            originalname: req.file.originalname,
-            filename: req.file.filename,
-            size: req.file.size
-        });
-
-        // Usar findByIdAndUpdate en lugar de save() para evitar conflictos de versión
         const imageUrl = `http://localhost:3001/uploads/images/profiles/${req.file.filename}`;
         
         const user = await User.findByIdAndUpdate(
             req.params.userId,
             { 
                 foto_perfil: imageUrl,
-                $inc: { __v: 1 } // Incrementar versión manualmente
+                $inc: { __v: 1 }
             },
             { 
                 new: true,
@@ -161,16 +293,15 @@ router.post('/profile-picture/:userId', upload.single('profilePicture'), async (
         );
 
         if (!user) {
-            console.log('❌ Usuario no encontrado:', req.params.userId);
+            // Eliminar archivo subido
             fs.unlinkSync(req.file.path);
-            fileDeleted = true;
             return res.status(404).json({
                 success: false,
                 error: 'Usuario no encontrado'
             });
         }
 
-        console.log('✅ Foto de perfil actualizada en BD:', imageUrl);
+        console.log('✅ Foto de perfil actualizada');
 
         res.json({
             success: true,
@@ -182,10 +313,9 @@ router.post('/profile-picture/:userId', upload.single('profilePicture'), async (
         console.error('❌ Error subiendo foto de perfil:', error);
         
         // Eliminar archivo en caso de error
-        if (req.file && req.file.path && !fileDeleted) {
+        if (req.file && req.file.path) {
             try {
                 fs.unlinkSync(req.file.path);
-                console.log('🗑️ Archivo eliminado por error');
             } catch (unlinkError) {
                 console.log('⚠️ No se pudo eliminar el archivo:', unlinkError.message);
             }
@@ -198,83 +328,58 @@ router.post('/profile-picture/:userId', upload.single('profilePicture'), async (
     }
 });
 
-// Subir foto de portada
-router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req, res, next) => {
+// SUBIR FOTO DE PORTADA
+router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req, res) => {
     try {
-        console.log('🏞️ INICIANDO UPLOAD DE FOTO DE PORTADA');
-        console.log('👤 User ID:', req.params.userId);
-        console.log('📁 Archivo recibido:', req.file ? 'SÍ' : 'NO');
+        console.log('🏞️ Subiendo foto de portada...');
         
         if (!req.file) {
-            console.log('❌ No se recibió archivo de portada');
             return res.status(400).json({
                 success: false,
                 error: 'No se proporcionó ninguna imagen'
             });
         }
 
-        console.log('📊 Detalles del archivo:', {
-            originalname: req.file.originalname,
-            filename: req.file.filename,
-            size: req.file.size,
-            path: req.file.path
-        });
-
         const user = await User.findById(req.params.userId);
         if (!user) {
-            console.log('❌ Usuario no encontrado:', req.params.userId);
-            if (req.file) {
-                fs.unlinkSync(req.file.path);
-                console.log('🗑️ Archivo eliminado por usuario no encontrado');
-            }
+            fs.unlinkSync(req.file.path);
             return res.status(404).json({
                 success: false,
                 error: 'Usuario no encontrado'
             });
         }
 
-        console.log('✅ Usuario encontrado:', user.username);
-
         // Inicializar array si no existe
         if (!user.fotos_portada) {
             user.fotos_portada = [];
         }
 
-        console.log(`📊 Fotos de portada actuales: ${user.fotos_portada.length}`);
-
-        // Verificar límite máximo (4 fotos)
+        // Verificar límite máximo
         if (user.fotos_portada.length >= 4) {
-            console.log('❌ Límite máximo alcanzado (4 fotos)');
-            if (req.file) {
-                fs.unlinkSync(req.file.path);
-            }
+            fs.unlinkSync(req.file.path);
             return res.status(400).json({
                 success: false,
-                error: 'Máximo 4 fotos de portada permitidas. Elimina alguna antes de agregar una nueva.'
+                error: 'Máximo 4 fotos de portada permitidas'
             });
         }
 
-        // Agregar a la lista de fotos de portada
         const newCoverPhoto = `http://localhost:3001/uploads/images/covers/${req.file.filename}`;
         user.fotos_portada.push(newCoverPhoto);
         
-        // Si es la primera foto de portada, establecerla como principal
+        // Si es la primera foto, establecer como principal
         if (user.fotos_portada.length === 1) {
             user.foto_portada = newCoverPhoto;
         }
 
         await user.save();
 
-        console.log('✅ Foto de portada agregada:', newCoverPhoto);
-        console.log('📊 Total de fotos de portada:', user.fotos_portada.length);
+        console.log('✅ Foto de portada agregada');
 
         res.json({
             success: true,
             message: 'Foto de portada agregada exitosamente',
             imageUrl: newCoverPhoto,
-            coverPhotos: user.fotos_portada,
-            currentCount: user.fotos_portada.length,
-            maxAllowed: 4
+            coverPhotos: user.fotos_portada
         });
 
     } catch (error) {
@@ -282,20 +387,73 @@ router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req,
         if (req.file && req.file.path) {
             try {
                 fs.unlinkSync(req.file.path);
-                console.log('🗑️ Archivo eliminado por error');
             } catch (unlinkError) {
                 console.log('⚠️ No se pudo eliminar el archivo:', unlinkError.message);
             }
         }
-        next(error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
     }
 });
 
-// Eliminar foto de portada
+// En upload.js - Agrega esta ruta
+router.put('/cover-picture/reorder/:userId', async (req, res) => {
+    try {
+        const { fromIndex, toIndex } = req.body;
+        const user = await User.findById(req.params.userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        if (!user.fotos_portada || user.fotos_portada.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No hay fotos de portada para reordenar'
+            });
+        }
+
+        // Validar índices
+        if (fromIndex < 0 || fromIndex >= user.fotos_portada.length || 
+            toIndex < 0 || toIndex >= user.fotos_portada.length) {
+            return res.status(400).json({
+                success: false,
+                error: 'Índices inválidos'
+            });
+        }
+
+        // Reordenar array
+        const [movedItem] = user.fotos_portada.splice(fromIndex, 1);
+        user.fotos_portada.splice(toIndex, 0, movedItem);
+
+        // Si la foto principal cambió de posición, actualizar referencia si es necesario
+        // (opcional, dependiendo de cómo manejes la foto principal)
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Fotos reordenadas exitosamente',
+            coverPhotos: user.fotos_portada
+        });
+
+    } catch (error) {
+        console.error('Error reordenando fotos:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
+    }
+});
+
+// ELIMINAR FOTO DE PORTADA
 router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
     try {
-        console.log('🗑️ Eliminando foto de portada:', req.params.photoIndex);
-        
         const user = await User.findById(req.params.userId);
         if (!user) {
             return res.status(404).json({
@@ -312,11 +470,11 @@ router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
             });
         }
 
-        // Verificar límite mínimo (2 fotos)
+        // Verificar límite mínimo
         if (user.fotos_portada.length <= 2) {
             return res.status(400).json({
                 success: false,
-                error: 'Mínimo 2 fotos de portada requeridas. Agrega más fotos antes de eliminar esta.'
+                error: 'Mínimo 2 fotos de portada requeridas'
             });
         }
 
@@ -325,28 +483,22 @@ router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
         const imagePath = path.join(directories.covers, path.basename(photoToDelete));
         if (fs.existsSync(imagePath)) {
             fs.unlinkSync(imagePath);
-            console.log('🗑️ Archivo físico de portada eliminado');
         }
 
         // Eliminar de la lista
         user.fotos_portada.splice(photoIndex, 1);
 
-        // Actualizar foto de portada principal si era la que se eliminó
+        // Actualizar foto principal si era la que se eliminó
         if (user.foto_portada === photoToDelete) {
             user.foto_portada = user.fotos_portada.length > 0 ? user.fotos_portada[0] : '';
         }
 
         await user.save();
 
-        console.log('✅ Foto de portada eliminada. Total restante:', user.fotos_portada.length);
-
         res.json({
             success: true,
             message: 'Foto de portada eliminada exitosamente',
-            coverPhotos: user.fotos_portada,
-            mainCoverPhoto: user.foto_portada,
-            currentCount: user.fotos_portada.length,
-            minRequired: 2
+            coverPhotos: user.fotos_portada
         });
 
     } catch (error) {
@@ -358,11 +510,9 @@ router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
     }
 });
 
-// Establecer foto de portada principal
+// ESTABLECER FOTO DE PORTADA PRINCIPAL
 router.put('/cover-picture/main/:userId/:photoIndex', async (req, res) => {
     try {
-        console.log('⭐ Estableciendo foto principal:', req.params.photoIndex);
-        
         const user = await User.findById(req.params.userId);
         if (!user) {
             return res.status(404).json({
@@ -382,8 +532,6 @@ router.put('/cover-picture/main/:userId/:photoIndex', async (req, res) => {
         user.foto_portada = user.fotos_portada[photoIndex];
         await user.save();
 
-        console.log('✅ Foto principal establecida:', user.foto_portada);
-
         res.json({
             success: true,
             message: 'Foto de portada principal actualizada',
@@ -399,7 +547,7 @@ router.put('/cover-picture/main/:userId/:photoIndex', async (req, res) => {
     }
 });
 
-// Aplicar middleware de errores a todas las rutas
+// Aplicar middleware de errores
 router.use(handleUploadErrors);
 
 module.exports = router;

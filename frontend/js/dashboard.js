@@ -5,6 +5,7 @@ const API_URL = 'http://localhost:3001/api';
 let currentUser = null;
 let currentPosts = [];
 let currentPostId = null;
+let currentMediaType = 'imagen'; // 'imagen', 'audio', 'video'
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
@@ -15,6 +16,7 @@ function initializeDashboard() {
     console.log('🚀 Inicializando Dashboard...');
     
     currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    window.currentUser = currentUser;
     
     if (!currentUser) {
         window.location.href = '../index.html';
@@ -30,6 +32,11 @@ function initializeDashboard() {
     } else {
         // Comportamiento normal - mostrar feed por defecto
         showSection('feed');
+    }
+
+    // Inicializar mensajes si es necesario
+    if (window.initializeMessages) {
+        window.initializeMessages();
     }
     
     initializeUserInfo();
@@ -81,38 +88,66 @@ function initializeEventListeners() {
         }
     });
     
-    const postImage = document.getElementById('postImage');
-    postImage.addEventListener('change', handleImageUpload);
+    // Event listeners para multimedia
+    document.getElementById('postImage').addEventListener('change', handleImageUpload);
+    document.getElementById('postAudio').addEventListener('change', handleAudioUpload);
+    document.getElementById('postVideo').addEventListener('change', handleVideoUpload);
 }
 
 // ========== PUBLICACIONES ==========
+// En dashboard.js - CORRIGE handleCreatePost para videos
 async function handleCreatePost() {
     const content = document.getElementById('postContent').value.trim();
-    const imageFile = document.getElementById('postImage').files[0];
     
-    if (!content && !imageFile) {
-        showToast('❌ Escribe algo o selecciona una imagen para publicar', 'error');
+    let mediaFile = null;
+    let mediaType = currentMediaType;
+    
+    if (mediaType === 'imagen') {
+        mediaFile = document.getElementById('postImage').files[0];
+    } else if (mediaType === 'audio') {
+        mediaFile = document.getElementById('postAudio').files[0];
+    } else if (mediaType === 'video') {
+        mediaFile = document.getElementById('postVideo').files[0];
+    }
+    
+    if (!content && !mediaFile) {
+        showToast('❌ Escribe algo o selecciona un archivo para publicar', 'error');
         return;
     }
     
     try {
-        let imageUrl = '';
-        let imageFilename = '';
+        let mediaUrl = '';
+        let mediaFilename = '';
+        let duracion = 0;
         
-        // Si hay una imagen, subirla primero
-        if (imageFile) {
-            showToast('📤 Subiendo imagen...', 'info');
-            const uploadResult = await uploadImageToServer(imageFile);
-            imageUrl = uploadResult.url;
-            imageFilename = uploadResult.filename;
+        if (mediaFile) {
+            showToast(`📤 Subiendo ${mediaType}...`, 'info');
+            
+            // CORRECIÓN: Para video usar 'video' como fieldName
+            const fieldName = mediaType === 'imagen' ? 'image' : mediaType;
+            const uploadResult = await uploadMediaFile(mediaFile, fieldName);
+            mediaUrl = uploadResult.url;
+            mediaFilename = uploadResult.filename;
+            duracion = uploadResult.duracion || 0;
         }
         
         const postData = {
             autor: currentUser._id,
             contenido: content,
-            imagen: imageUrl,
-            imagenFilename: imageFilename
+            duracion: duracion,
+            tipoContenido: mediaFile ? mediaType : 'texto'
         };
+        
+        if (mediaType === 'imagen' && mediaUrl) {
+            postData.imagen = mediaUrl;
+            postData.imagenFilename = mediaFilename;
+        } else if (mediaType === 'audio' && mediaUrl) {
+            postData.audio = mediaUrl;
+            postData.audioFilename = mediaFilename;
+        } else if (mediaType === 'video' && mediaUrl) {
+            postData.video = mediaUrl;
+            postData.videoFilename = mediaFilename;
+        }
         
         const response = await fetch(`${API_URL}/posts`, {
             method: 'POST',
@@ -135,6 +170,7 @@ async function handleCreatePost() {
     }
 }
 
+
 async function loadFeed() {
     try {
         const response = await fetch(`${API_URL}/posts/feed/${currentUser._id}`);
@@ -150,6 +186,31 @@ async function loadFeed() {
         console.error('Error cargando feed:', error);
         showToast('❌ Error de conexión', 'error');
     }
+}
+
+// Función para cambiar el tipo de contenido
+function changeMediaType(type) {
+    currentMediaType = type;
+    
+    // Ocultar todos los inputs primero
+    document.getElementById('imageUpload').style.display = 'none';
+    document.getElementById('audioUpload').style.display = 'none';
+    document.getElementById('videoUpload').style.display = 'none';
+    
+    // Mostrar solo el input correspondiente
+    if (type === 'imagen') {
+        document.getElementById('imageUpload').style.display = 'block';
+    } else if (type === 'audio') {
+        document.getElementById('audioUpload').style.display = 'block';
+    } else if (type === 'video') {
+        document.getElementById('videoUpload').style.display = 'block';
+    }
+    
+    // Actualizar botones activos
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[onclick="changeMediaType('${type}')"]`).classList.add('active');
 }
 
 function displayPosts(posts) {
@@ -266,8 +327,41 @@ function createPostHTML(post) {
                 </div>
             ` : ''}
             
-            ${post.imagen && !isSharedPost ? `
-                <img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">
+            // ========== MOSTRAR MULTIMEDIA ==========
+            ${!isSharedPost ? `
+                ${post.imagen ? `
+                    <div class="post-media">
+                        <img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">
+                    </div>
+                ` : ''}
+                
+                ${post.audio ? `
+                    <div class="post-media">
+                        <div class="audio-player-container">
+                            <audio controls class="audio-player" id="audio-${post._id}">
+                                <source src="${post.audio}" type="audio/mpeg">
+                                <source src="${post.audio}" type="audio/wav">
+                                <source src="${post.audio}" type="audio/ogg">
+                                Tu navegador no soporta el elemento de audio.
+                            </audio>
+                            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${post.video ? `
+                    <div class="post-media">
+                        <div class="video-player-container">
+                            <video controls class="video-player" id="video-${post._id}" poster="${post.videoThumbnail || ''}">
+                                <source src="${post.video}" type="video/mp4">
+                                <source src="${post.video}" type="video/webm">
+                                <source src="${post.video}" type="video/ogg">
+                                Tu navegador no soporta el elemento de video.
+                            </video>
+                            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
             ` : ''}
             
             <div class="post-actions-bar">
@@ -286,6 +380,91 @@ function createPostHTML(post) {
             </div>
         </div>
     `;
+}
+
+
+// ========== FUNCIONES DE MULTIMEDIA ==========
+function formatDuracion(segundos) {
+    if (!segundos) return '0:00';
+    const minutos = Math.floor(segundos / 60);
+    const segs = Math.floor(segundos % 60);
+    return `${minutos}:${segs.toString().padStart(2, '0')}`;
+}
+
+// Función para manejar la vista previa de audio
+function handleAudioUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('audio/')) {
+            showToast('❌ Por favor selecciona un archivo de audio válido', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('❌ El audio no debe superar los 10MB', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        document.getElementById('audioPreview').innerHTML = `
+            <div class="audio-preview-item">
+                <i class="fas fa-music"></i>
+                <div class="audio-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeAudioPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Función para manejar la vista previa de video
+function handleVideoUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('video/')) {
+            showToast('❌ Por favor selecciona un archivo de video válido', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        if (file.size > 50 * 1024 * 1024) {
+            showToast('❌ El video no debe superar los 50MB', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        const url = URL.createObjectURL(file);
+        document.getElementById('videoPreview').innerHTML = `
+            <div class="video-preview-item">
+                <video controls class="preview-video">
+                    <source src="${url}" type="${file.type}">
+                    Tu navegador no soporta el elemento video.
+                </video>
+                <div class="video-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeVideoPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function removeAudioPreview() {
+    document.getElementById('audioPreview').innerHTML = '';
+    document.getElementById('postAudio').value = '';
+}
+
+function removeVideoPreview() {
+    document.getElementById('videoPreview').innerHTML = '';
+    document.getElementById('postVideo').value = '';
 }
 
 // ========== FUNCIONALIDAD DE EDICIÓN ==========
@@ -771,9 +950,84 @@ function showPostModal(post) {
             ${formatPostContent(post.contenido)}
         </div>
         
-        ${post.imagen ? `
-            <img src="${post.imagen}" alt="Imagen de publicación" class="post-image">
+        // Dentro de showPostModal, después del contenido del post:
+        // En showPostModal, después del contenido del post, reemplaza la sección de multimedia:
+${post.imagen ? `
+    <img src="${post.imagen}" alt="Imagen de publicación" class="post-image">
+` : ''}
+
+${post.audio ? `
+    <div class="post-media">
+        <div class="audio-player-container">
+            <audio controls class="audio-player">
+                <source src="${post.audio}" type="audio/mpeg">
+                <source src="${post.audio}" type="audio/wav">
+                Tu navegador no soporta el elemento de audio.
+            </audio>
+            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+        </div>
+    </div>
+` : ''}
+
+${post.video ? `
+    <div class="post-media">
+        <div class="video-player-container">
+            <video controls class="video-player">
+                <source src="${post.video}" type="video/mp4">
+                <source src="${post.video}" type="video/webm">
+                Tu navegador no soporta el elemento de video.
+            </video>
+            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+        </div>
+    </div>
+` : ''}
+
+${isSharedPost && post.postOriginal ? `
+    <div class="original-post-preview">
+        <div class="original-post-header">
+            <div class="original-post-avatar">
+                ${post.postOriginal.autor.foto_perfil ? 
+                    `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}">` : 
+                    `<i class="fas fa-user"></i>`
+                }
+            </div>
+            <div class="original-post-info">
+                <strong>${post.postOriginal.autor.nombre}</strong>
+                <span>@${post.postOriginal.autor.username}</span>
+            </div>
+        </div>
+        <div class="original-post-content">
+            ${formatPostContent(post.postOriginal.contenido)}
+        </div>
+        ${post.postOriginal.imagen ? `
+            <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
         ` : ''}
+        ${post.postOriginal.audio ? `
+            <div class="post-media">
+                <div class="audio-player-container">
+                    <audio controls class="audio-player">
+                        <source src="${post.postOriginal.audio}" type="audio/mpeg">
+                        <source src="${post.postOriginal.audio}" type="audio/wav">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                </div>
+            </div>
+        ` : ''}
+        ${post.postOriginal.video ? `
+            <div class="post-media">
+                <div class="video-player-container">
+                    <video controls class="video-player">
+                        <source src="${post.postOriginal.video}" type="video/mp4">
+                        <source src="${post.postOriginal.video}" type="video/webm">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                </div>
+            </div>
+        ` : ''}
+    </div>
+` : ''}
     `;
     
     document.getElementById('likesCountModal').textContent = post.likes.length;
@@ -1046,22 +1300,38 @@ async function handleNuevoComentario() {
 }
 
 // ========== NAVEGACIÓN ==========
-// ========== NAVEGACIÓN ==========
 function showSection(sectionId) {
+    // Limpiar mensajes si estamos saliendo de esa sección
+    const currentActive = document.querySelector('.content-section.active');
+    if (currentActive && currentActive.id === 'messagesSection' && sectionId !== 'messages') {
+        if (typeof cleanupMessages === 'function') {
+            cleanupMessages();
+        }
+    }
+    
+    // Ocultar todas las secciones
     document.querySelectorAll('.content-section').forEach(section => {
         section.classList.remove('active');
     });
     
+    // Remover clase active de todos los botones de navegación
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
     
+    // Mostrar la sección seleccionada
     document.getElementById(sectionId + 'Section').classList.add('active');
     
-    // Buscar el botón que tiene esta sección en su onclick
+    // Activar el botón de navegación correspondiente
     const activeButton = document.querySelector(`.nav-item[onclick*="${sectionId}"]`);
     if (activeButton) {
         activeButton.classList.add('active');
+    }
+    
+    // MOSTRAR/OCULTAR FORMULARIO DE CREAR PUBLICACIÓN
+    const createPostCard = document.querySelector('.create-post-card');
+    if (createPostCard) {
+        createPostCard.style.display = sectionId === 'feed' ? 'block' : 'none';
     }
     
     // CARGAR LOS DATOS DE LA SECCIÓN
@@ -1077,6 +1347,14 @@ function showSection(sectionId) {
             break;
         case 'users': 
             loadUsers(); 
+            break;
+        case 'messages':
+            // Pequeño delay para asegurar que el DOM esté listo
+            setTimeout(() => {
+                if (typeof initializeMessages === 'function') {
+                    initializeMessages();
+                }
+            }, 100);
             break;
     }
 }
@@ -2345,4 +2623,398 @@ window.closeConfirmModal = function(type) {
     setTimeout(initializeRadicalEventListeners, 500);
     
     console.log('✅ Solución radical con modales cargada');
+}
+
+// Función para subir archivo al servidor según el tipo
+async function uploadMediaFile(file, fieldName) {
+    const formData = new FormData();
+    formData.append(fieldName, file); // 'image', 'audio', 'video'
+    
+    let endpoint = fieldName; // Ahora son iguales
+    
+    console.log(`📤 Subiendo ${fieldName} a /upload/${endpoint}`);
+    
+    const response = await fetch(`${API_URL}/upload/${endpoint}`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+        throw new Error(result.error || 'Error al subir el archivo');
+    }
+    
+    return result.data;
+}
+
+
+// Función para manejar la creación de post con cualquier tipo de medio
+// En dashboard.js - ACTUALIZA handleCreatePost también
+async function handleCreatePost() {
+    const content = document.getElementById('postContent').value.trim();
+    
+    let mediaFile = null;
+    let mediaType = currentMediaType;
+    
+    if (mediaType === 'imagen') {
+        mediaFile = document.getElementById('postImage').files[0];
+    } else if (mediaType === 'audio') {
+        mediaFile = document.getElementById('postAudio').files[0];
+    } else if (mediaType === 'video') {
+        mediaFile = document.getElementById('postVideo').files[0];
+    }
+    
+    if (!content && !mediaFile) {
+        showToast('❌ Escribe algo o selecciona un archivo para publicar', 'error');
+        return;
+    }
+    
+    try {
+        let mediaUrl = '';
+        let mediaFilename = '';
+        let duracion = 0;
+        
+        if (mediaFile) {
+            showToast(`📤 Subiendo ${mediaType}...`, 'info');
+            
+            // USAR 'image' para imágenes en lugar de 'imagen'
+            const fieldName = mediaType === 'imagen' ? 'image' : mediaType;
+            const uploadResult = await uploadMediaFile(mediaFile, fieldName);
+            mediaUrl = uploadResult.url;
+            mediaFilename = uploadResult.filename;
+            duracion = uploadResult.duracion || 0;
+        }
+        
+        const postData = {
+            autor: currentUser._id,
+            contenido: content,
+            duracion: duracion,
+            tipoContenido: mediaFile ? mediaType : 'texto'
+        };
+        
+        if (mediaType === 'imagen' && mediaUrl) {
+            postData.imagen = mediaUrl;
+            postData.imagenFilename = mediaFilename;
+        } else if (mediaType === 'audio' && mediaUrl) {
+            postData.audio = mediaUrl;
+            postData.audioFilename = mediaFilename;
+        } else if (mediaType === 'video' && mediaUrl) {
+            postData.video = mediaUrl;
+            postData.videoFilename = mediaFilename;
+        }
+        
+        const response = await fetch(`${API_URL}/posts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(postData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Publicación creada exitosamente', 'success');
+            resetPostForm();
+            loadFeed();
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error creando publicación:', error);
+        showToast('❌ Error al crear la publicación', 'error');
+    }
+}
+
+// Función uploadMediaFile simplificada
+async function uploadMediaFile(file, fieldName) {
+    const formData = new FormData();
+    formData.append(fieldName, file); // 'image', 'audio', 'video'
+    
+    let endpoint = fieldName; // Ahora son iguales: 'image', 'audio', 'video'
+    
+    console.log(`📤 Subiendo a /upload/${endpoint} con campo: ${fieldName}`);
+    
+    const response = await fetch(`${API_URL}/upload/${endpoint}`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+        throw new Error(result.error || 'Error al subir el archivo');
+    }
+    
+    return result.data;
+}
+// Función para resetear el formulario completamente
+function resetPostForm() {
+    document.getElementById('postContent').value = '';
+    document.getElementById('charCount').textContent = '0/1000';
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('audioPreview').innerHTML = '';
+    document.getElementById('videoPreview').innerHTML = '';
+    document.getElementById('imageUpload').style.display = 'none';
+    document.getElementById('audioUpload').style.display = 'none';
+    document.getElementById('videoUpload').style.display = 'none';
+    document.getElementById('postImage').value = '';
+    document.getElementById('postAudio').value = '';
+    document.getElementById('postVideo').value = '';
+    currentMediaType = 'imagen';
+    
+    // Resetear botones activos
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector('[onclick="changeMediaType(\'imagen\')"]').classList.add('active');
+}
+
+// Funciones para manejar la vista previa de audio y video
+function handleAudioUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('audio/')) {
+            showToast('❌ Por favor selecciona un archivo de audio válido', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('❌ El audio no debe superar los 10MB', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        document.getElementById('audioPreview').innerHTML = `
+            <div class="audio-preview-item">
+                <i class="fas fa-music"></i>
+                <div class="audio-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeAudioPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function handleVideoUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('video/')) {
+            showToast('❌ Por favor selecciona un archivo de video válido', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        if (file.size > 50 * 1024 * 1024) {
+            showToast('❌ El video no debe superar los 50MB', 'error');
+            event.target.value = '';
+            return;
+        }
+        
+        const url = URL.createObjectURL(file);
+        document.getElementById('videoPreview').innerHTML = `
+            <div class="video-preview-item">
+                <video controls>
+                    <source src="${url}" type="${file.type}">
+                    Tu navegador no soporta el elemento video.
+                </video>
+                <div class="video-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeVideoPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function removeAudioPreview() {
+    document.getElementById('audioPreview').innerHTML = '';
+    document.getElementById('postAudio').value = '';
+}
+
+function removeVideoPreview() {
+    document.getElementById('videoPreview').innerHTML = '';
+    document.getElementById('postVideo').value = '';
+}
+
+// Modificar la función createPostHTML para mostrar audio y video
+function createPostHTML(post) {
+    const isLiked = post.likes.some(like => 
+        typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
+    );
+    
+    const likeCount = post.likes.length;
+    const shareCount = post.shares ? post.shares.length : 0;
+    const timeAgo = getTimeAgo(new Date(post.fecha_publicacion));
+    
+    const isSharedPost = post.tipo === 'share';
+    const hasOriginalPost = isSharedPost && post.postOriginal;
+    const isAuthor = post.autor._id === currentUser._id;
+    
+    // Determinar qué medio mostrar para POSTS NORMALES
+    let mediaHTML = '';
+    if (!isSharedPost) {
+        if (post.tipoContenido === 'audio' && post.audio) {
+            mediaHTML = `
+                <div class="post-audio">
+                    <audio controls class="audio-player">
+                        <source src="${post.audio}" type="audio/mpeg">
+                        <source src="${post.audio}" type="audio/wav">
+                        <source src="${post.audio}" type="audio/ogg">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    ${post.duracion ? `<div class="audio-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (post.tipoContenido === 'video' && post.video) {
+            mediaHTML = `
+                <div class="post-video">
+                    <video controls class="video-player">
+                        <source src="${post.video}" type="video/mp4">
+                        <source src="${post.video}" type="video/webm">
+                        <source src="${post.video}" type="video/ogg">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    ${post.duracion ? `<div class="video-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (post.imagen) {
+            mediaHTML = `<img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">`;
+        }
+    }
+    
+    // Determinar qué medio mostrar para POSTS COMPARTIDOS (del post original)
+    let originalMediaHTML = '';
+    if (hasOriginalPost && post.postOriginal) {
+        const originalPost = post.postOriginal;
+        
+        if (originalPost.tipoContenido === 'audio' && originalPost.audio) {
+            originalMediaHTML = `
+                <div class="post-audio">
+                    <audio controls class="audio-player">
+                        <source src="${originalPost.audio}" type="audio/mpeg">
+                        <source src="${originalPost.audio}" type="audio/wav">
+                        <source src="${originalPost.audio}" type="audio/ogg">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    ${originalPost.duracion ? `<div class="audio-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (originalPost.tipoContenido === 'video' && originalPost.video) {
+            originalMediaHTML = `
+                <div class="post-video">
+                    <video controls class="video-player">
+                        <source src="${originalPost.video}" type="video/mp4">
+                        <source src="${originalPost.video}" type="video/webm">
+                        <source src="${originalPost.video}" type="video/ogg">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    ${originalPost.duracion ? `<div class="video-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (originalPost.imagen) {
+            originalMediaHTML = `<img src="${originalPost.imagen}" alt="Imagen de publicación" class="original-post-image">`;
+        }
+    }
+    
+    return `
+        <div class="post-card" id="post-${post._id}" data-content-type="${post.tipoContenido}">
+            <div class="post-header">
+                <div class="post-avatar">
+                    ${post.autor.foto_perfil ? 
+                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <div class="post-user-info">
+                    <h4>${post.autor.nombre}</h4>
+                    <p>@${post.autor.username}</p>
+                    <span class="content-type-badge ${post.tipoContenido}">${post.tipoContenido}</span>
+                </div>
+                <div class="post-time">${timeAgo}</div>
+                
+                ${isAuthor ? `
+                    <div class="post-options">
+                        <button class="btn-icon post-options-btn" id="optionsBtn-${post._id}">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </button>
+                        <div class="post-options-menu" id="optionsMenu-${post._id}">
+                            <button class="option-item edit-option" onclick="editPost('${post._id}')">
+                                <i class="fas fa-edit"></i>
+                                <span>Editar publicación</span>
+                            </button>
+                            <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}')">
+                                <i class="fas fa-trash"></i>
+                                <span>Eliminar publicación</span>
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+            
+            ${isSharedPost ? `
+                <div class="post-share-header">
+                    <i class="fas fa-share"></i>
+                    <span>${post.autor.nombre} compartió esto</span>
+                </div>
+            ` : ''}
+            
+            <div class="post-content" id="postContent-${post._id}">
+                ${formatPostContent(post.contenido)}
+            </div>
+            
+            ${hasOriginalPost ? `
+                <div class="original-post-preview">
+                    <div class="original-post-header">
+                        <div class="original-post-avatar">
+                            ${post.postOriginal.autor.foto_perfil ? 
+                                `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                                `<i class="fas fa-user"></i>`
+                            }
+                        </div>
+                        <div class="original-post-info">
+                            <strong>${post.postOriginal.autor.nombre}</strong>
+                            <span>@${post.postOriginal.autor.username}</span>
+                            <span class="content-type-badge ${post.postOriginal.tipoContenido}">${post.postOriginal.tipoContenido}</span>
+                        </div>
+                    </div>
+                    <div class="original-post-content">
+                        ${formatPostContent(post.postOriginal.contenido)}
+                    </div>
+                    ${originalMediaHTML}
+                </div>
+            ` : ''}
+            
+            ${mediaHTML}
+            
+            <div class="post-actions-bar">
+                <button class="post-action ${isLiked ? 'liked' : ''}" id="likeBtn-${post._id}">
+                    <i class="fas fa-heart"></i>
+                    <span>${likeCount}</span>
+                </button>
+                <button class="post-action" id="viewBtn-${post._id}">
+                    <i class="fas fa-comment"></i>
+                    <span>${post.comentarios?.length || 0}</span>
+                </button>
+                <button class="post-action" id="shareBtn-${post._id}">
+                    <i class="fas fa-share"></i>
+                    <span>${shareCount}</span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Función para formatear la duración
+function formatDuracion(segundos) {
+    const minutos = Math.floor(segundos / 60);
+    const segs = Math.floor(segundos % 60);
+    return `${minutos}:${segs.toString().padStart(2, '0')}`;
 }

@@ -70,12 +70,31 @@ function makeFunctionsGlobal() {
     };
     
     window.closeCoverPhotoModal = function() {
-        const modal = document.getElementById('coverPhotoModal');
-        if (modal) {
+    const modal = document.getElementById('coverPhotoModal');
+    if (modal) {
+        // Verificar si hay cambios sin guardar
+        const hasUnsavedChanges = document.getElementById('coverUploadPreview')?.style.display === 'block' || 
+                                 coverPhotos.length !== (userProfileData?.usuario?.fotos_portada?.length || 0);
+        
+        if (hasUnsavedChanges) {
+            if (confirm('Tienes cambios sin guardar. ¿Estás seguro de que quieres cerrar?')) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                // Recargar el perfil para reflejar cambios
+                setTimeout(() => {
+                    loadUserProfile();
+                }, 500);
+            }
+        } else {
             modal.style.display = 'none';
             document.body.classList.remove('modal-open');
+            // Recargar el perfil para reflejar cambios
+            setTimeout(() => {
+                loadUserProfile();
+            }, 500);
         }
-    };
+    }
+};
     
     window.closeProfilePhotoModal = function() {
         const modal = document.getElementById('profilePhotoModal');
@@ -497,6 +516,10 @@ window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUse
         closeFriendConfirmModal('friendRemoveFollower');
         executeFriendRemoveFollower(userId);
     };
+
+    // En la función makeFunctionsGlobal(), agrega:
+    window.createPostHTML = createPostHTML;
+    window.formatDuracion = formatDuracion;
     
     console.log('✅ Funciones globales creadas');
 }
@@ -691,77 +714,72 @@ function initializeFriendMenuEvents() {
 
 
 // ===== EVENTOS DE MODALES =====
+// ===== EVENTOS DE MODALES - MEJORADOS =====
 function initializeModalEvents() {
     console.log('🎯 Inicializando eventos de modales...');
     
     // LIMPIAR event listeners anteriores
-    document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.replaceWith(btn.cloneNode(true));
-    });
+    const modals = ['coverPhotoModal', 'profilePhotoModal', 'editProfileModal'];
     
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.replaceWith(modal.cloneNode(true));
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            const newModal = modal.cloneNode(true);
+            modal.parentNode.replaceChild(newModal, modal);
+        }
     });
 
-    // Eventos para cerrar modales - USANDO DELEGACIÓN
+    // Eventos para cerrar modales - CON PREVENCIÓN PARA PORTADA
     document.addEventListener('click', function(e) {
         // Cerrar con botón X
         if (e.target.classList.contains('close-modal')) {
             const modal = e.target.closest('.modal');
-            if (modal) {
+            if (modal && modal.id === 'coverPhotoModal') {
+                // Para el modal de portada, preguntar antes de cerrar
+                if (confirm('¿Estás seguro de que quieres cerrar? Los cambios no guardados se perderán.')) {
+                    modal.style.display = 'none';
+                    document.body.classList.remove('modal-open');
+                }
+            } else {
+                // Para otros modales, cerrar normalmente
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
-                console.log('✅ Modal cerrado con botón X');
             }
             return;
         }
         
-        // Cerrar haciendo click fuera del contenido
+        // Cerrar haciendo click fuera del contenido - CON PREVENCIÓN
         if (e.target.classList.contains('modal')) {
-            e.target.style.display = 'none';
-            document.body.classList.remove('modal-open');
-            console.log('✅ Modal cerrado con click fuera');
-            return;
-        }
-        
-        // Botones Cancelar en uploads
-        if (e.target.textContent === 'Cancelar' || e.target.textContent.includes('Cancelar')) {
-            if (e.target.closest('#profileUploadPreview')) {
-                cancelProfileUpload();
-            } else if (e.target.closest('#coverUploadPreview')) {
-                cancelCoverUpload();
+            if (e.target.id === 'coverPhotoModal') {
+                // Para el modal de portada, preguntar antes de cerrar
+                if (confirm('¿Estás seguro de que quieres cerrar? Los cambios no guardados se perderán.')) {
+                    e.target.style.display = 'none';
+                    document.body.classList.remove('modal-open');
+                }
+            } else {
+                // Para otros modales, cerrar normalmente
+                e.target.style.display = 'none';
+                document.body.classList.remove('modal-open');
             }
-            return;
-        }
-        
-        // Botones de subida
-        if (e.target.closest('#profileUploadArea') && e.target.type === 'button') {
-            document.getElementById('profilePhotoInput').click();
-            return;
-        }
-        
-        if (e.target.closest('#coverUploadArea') && e.target.type === 'button') {
-            document.getElementById('coverPhotoInput').click();
-            return;
-        }
-        
-        // Botones "Usar esta Foto"
-        if (e.target.closest('#profileUploadPreview') && e.target.textContent.includes('Usar esta Foto')) {
-            uploadProfilePhoto();
-            return;
-        }
-        
-        if (e.target.closest('#coverUploadPreview') && e.target.textContent.includes('Subir Foto')) {
-            uploadCoverPhoto();
             return;
         }
     });
 
-    // Eventos para inputs de archivos
-    document.getElementById('coverPhotoInput')?.addEventListener('change', handleCoverPhotoSelect);
-    document.getElementById('profilePhotoInput')?.addEventListener('change', handleProfilePhotoSelect);
+    // Eventos específicos para inputs de archivos
+    const coverInput = document.getElementById('coverPhotoInput');
+    const profileInput = document.getElementById('profilePhotoInput');
     
-    console.log('✅ Eventos de modales inicializados');
+    if (coverInput) {
+        coverInput.removeEventListener('change', handleCoverPhotoSelect);
+        coverInput.addEventListener('change', handleCoverPhotoSelect, { once: false });
+    }
+    
+    if (profileInput) {
+        profileInput.removeEventListener('change', handleProfilePhotoSelect);
+        profileInput.addEventListener('change', handleProfilePhotoSelect, { once: false });
+    }
+    
+    console.log('✅ Eventos de modales inicializados (con prevención de cierre)');
 }
 
 // ===== FUNCIONES BÁSICAS =====
@@ -898,9 +916,15 @@ function cancelProfileUpload() {
 }
 
 function cancelCoverUpload() {
-    document.getElementById('coverUploadPreview').style.display = 'none';
-    document.getElementById('coverUploadArea').style.display = 'block';
-    document.getElementById('coverPhotoInput').value = '';
+    const uploadPreview = document.getElementById('coverUploadPreview');
+    const uploadArea = document.getElementById('coverUploadArea');
+    const fileInput = document.getElementById('coverPhotoInput');
+    
+    if (uploadPreview) uploadPreview.style.display = 'none';
+    if (uploadArea) uploadArea.style.display = 'block';
+    if (fileInput) fileInput.value = '';
+    
+    console.log('✅ Upload de portada cancelado/reseteado');
 }
 
 // Función para cargar el formulario de edición
@@ -1197,6 +1221,8 @@ async function uploadProfilePhoto() {
     }
 }
 
+
+// ===== GESTIÓN DE FOTOS DE PORTADA - CORREGIDAS =====
 async function uploadCoverPhoto() {
     const fileInput = document.getElementById('coverPhotoInput');
     const file = fileInput.files[0];
@@ -1204,6 +1230,13 @@ async function uploadCoverPhoto() {
     if (!file) {
         showToast('❌ Por favor selecciona una imagen', 'error');
         return;
+    }
+    
+    // PREVENIR MÚLTIPLES CLICKS - deshabilitar botón temporalmente
+    const uploadBtn = document.querySelector('#coverUploadPreview button[onclick*="uploadCoverPhoto"]');
+    if (uploadBtn) {
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
     }
     
     try {
@@ -1226,10 +1259,13 @@ async function uploadCoverPhoto() {
             coverPhotos = result.coverPhotos || [];
             initializeCoverCarousel(coverPhotos);
             
-            // Recargar fotos existentes
-            loadExistingCoverPhotos();
+            // Recargar fotos existentes SIN cerrar el modal
+            await loadExistingCoverPhotos();
             
+            // Resetear el formulario de upload pero mantener el modal abierto
             cancelCoverUpload();
+            
+            console.log('✅ Foto subida exitosamente, modal permanece abierto');
             
         } else {
             showToast(`❌ Error: ${result.error}`, 'error');
@@ -1237,6 +1273,68 @@ async function uploadCoverPhoto() {
     } catch (error) {
         console.error('❌ Error subiendo foto de portada:', error);
         showToast('❌ Error al subir la foto', 'error');
+    } finally {
+        // Rehabilitar botón en caso de error
+        if (uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Foto';
+        }
+    }
+}
+
+// Función que ejecuta la eliminación después de la confirmación
+async function confirmDeleteCoverPhoto(index) {
+    try {
+        showToast('⏳ Eliminando foto de portada...', 'info');
+        
+        const response = await fetch(`${API_URL}/upload/cover-picture/${currentUser._id}/${index}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Foto de portada eliminada', 'success');
+            
+            // Cerrar SOLO el modal de confirmación, no el principal
+            closeDeleteCoverConfirmModal();
+            
+            // Actualizar el carrusel
+            coverPhotos = result.coverPhotos || [];
+            initializeCoverCarousel(coverPhotos);
+            
+            // Recargar las fotos existentes SIN cerrar el modal principal
+            await loadExistingCoverPhotos();
+            
+            console.log('✅ Foto eliminada exitosamente, modal principal permanece abierto');
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+            closeDeleteCoverConfirmModal();
+        }
+    } catch (error) {
+        console.error('Error eliminando foto de portada:', error);
+        showToast('❌ Error al eliminar la foto', 'error');
+        closeDeleteCoverConfirmModal();
+    }
+}
+
+async function saveCoverChangesAndClose() {
+    try {
+        showToast('⏳ Guardando cambios...', 'info');
+        
+        // Aquí puedes agregar cualquier lógica adicional que necesites
+        // antes de cerrar el modal, como sincronizar con el servidor
+        
+        // Simular un pequeño delay para mejor UX
+        setTimeout(() => {
+            closeCoverPhotoModal();
+            showToast('✅ Cambios guardados exitosamente', 'success');
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error guardando cambios:', error);
+        showToast('❌ Error al guardar los cambios', 'error');
     }
 }
 
@@ -1306,7 +1404,9 @@ async function loadExistingCoverPhotos() {
         const result = await response.json();
         
         if (result.success) {
-            const covers = result.data.usuario.fotos_portada || [];
+            const usuario = result.data.usuario;
+            const covers = usuario.fotos_portada || [];
+            const mainCover = usuario.foto_portada;
             const coversGrid = document.getElementById('coversGrid');
             
             if (!coversGrid) return;
@@ -1316,89 +1416,183 @@ async function loadExistingCoverPhotos() {
                     <div class="empty-covers">
                         <i class="fas fa-images"></i>
                         <p>No hay fotos de portada</p>
+                        <small>Agrega tu primera foto usando el botón de arriba</small>
                     </div>
                 `;
             } else {
-                coversGrid.innerHTML = covers.map((cover, index) => `
-                    <div class="cover-item">
-                        <img src="${cover}" alt="Portada ${index + 1}">
-                        <div class="cover-actions">
-                            <button class="btn-icon btn-set-main ${cover === result.data.usuario.foto_portada ? 'active' : ''}" 
-                                    onclick="setMainCoverPhoto(${index})" title="Establecer como principal">
-                                <i class="fas fa-star"></i>
-                            </button>
-                            <button class="btn-icon btn-delete-cover" 
-                                    onclick="deleteCoverPhoto(${index})" title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                coversGrid.innerHTML = covers.map((cover, index) => {
+                    const isMain = cover === mainCover;
+                    const canDelete = covers.length > 2; // Solo permitir eliminar si hay más de 2
+                    
+                    return `
+                        <div class="cover-item ${isMain ? 'main-cover' : ''}" data-index="${index}">
+                            <div class="cover-drag-handle">
+                                <i class="fas fa-grip-vertical"></i>
+                            </div>
+                            <img src="${cover}" alt="Portada ${index + 1}">
+                            <div class="cover-actions">
+                                <button class="btn-icon btn-set-main ${isMain ? 'active' : ''}" 
+                                        onclick="setMainCoverPhoto(${index})" 
+                                        title="${isMain ? 'Ya es la principal' : 'Establecer como principal'}">
+                                    <i class="fas ${isMain ? 'fa-star' : 'fa-star'}"></i>
+                                </button>
+                                <button class="btn-icon btn-delete-cover" 
+                                        onclick="deleteCoverPhoto(${index})" 
+                                        title="${canDelete ? 'Eliminar' : 'Mínimo 2 fotos requeridas'}"
+                                        ${!canDelete ? 'disabled' : ''}>
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            ${isMain ? '<div class="cover-badge">Principal</div>' : ''}
+                            ${!canDelete ? '<div class="cover-warning">Mínimo requerido</div>' : ''}
                         </div>
-                        ${cover === result.data.usuario.foto_portada ? 
-                          '<div class="cover-badge">Principal</div>' : ''}
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
+                
+                // Inicializar drag & drop después de cargar
+                setTimeout(() => initializeDragAndDrop(), 100);
             }
+            
+            console.log(`✅ ${covers.length} fotos de portada cargadas`);
         }
     } catch (error) {
         console.error('❌ Error cargando fotos de portada:', error);
     }
 }
 
+// ===== GESTIÓN DE FOTOS DE PORTADA - CORREGIDA =====
 async function setMainCoverPhoto(index) {
     try {
+        console.log(`⭐ Intentando establecer foto principal en índice: ${index}`);
+        
         const response = await fetch(`${API_URL}/upload/cover-picture/main/${currentUser._id}/${index}`, {
-            method: 'PUT'
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
         const result = await response.json();
         
         if (result.success) {
             showToast('✅ Foto de portada principal actualizada', 'success');
-            loadExistingCoverPhotos();
             
-            // Actualizar el carrusel si es necesario
-            if (coverPhotos[index]) {
-                currentCoverIndex = index;
-                updateCarousel();
+            // Actualizar datos locales
+            if (userProfileData && userProfileData.usuario) {
+                userProfileData.usuario.foto_portada = result.mainCoverPhoto;
             }
+            
+            // Actualizar currentUser en localStorage si es necesario
+            if (currentUser) {
+                currentUser.foto_portada = result.mainCoverPhoto;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            }
+            
+            // Recargar la lista de fotos existentes
+            await loadExistingCoverPhotos();
+            
+            // Actualizar el carrusel
+            currentCoverIndex = index;
+            updateCarousel();
+            
+            console.log('✅ Foto principal establecida correctamente');
+            
         } else {
+            console.error('❌ Error del servidor:', result.error);
             showToast(`❌ Error: ${result.error}`, 'error');
         }
     } catch (error) {
-        console.error('Error estableciendo foto principal:', error);
+        console.error('❌ Error estableciendo foto principal:', error);
         showToast('❌ Error al actualizar la foto principal', 'error');
     }
 }
 
+// ===== GESTIÓN DE FOTOS DE PORTADA - MEJORADA =====
 async function deleteCoverPhoto(index) {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta foto de portada?')) {
-        return;
-    }
-    
     try {
-        const response = await fetch(`${API_URL}/upload/cover-picture/${currentUser._id}/${index}`, {
-            method: 'DELETE'
-        });
-        
+        // Obtener datos actuales para mostrar en la confirmación
+        const response = await fetch(`${API_URL}/profile/${currentUser._id}`);
         const result = await response.json();
         
-        if (result.success) {
-            showToast('✅ Foto de portada eliminada', 'success');
-            
-            // Actualizar el carrusel
-            coverPhotos = result.coverPhotos || [];
-            initializeCoverCarousel(coverPhotos);
-            
-            // Recargar las fotos existentes
-            loadExistingCoverPhotos();
-            
-        } else {
-            showToast(`❌ Error: ${result.error}`, 'error');
+        if (!result.success) {
+            showToast('❌ Error al cargar datos', 'error');
+            return;
         }
+
+        const covers = result.data.usuario.fotos_portada || [];
+        const coverToDelete = covers[index];
+        
+        if (!coverToDelete) {
+            showToast('❌ No se encontró la foto a eliminar', 'error');
+            return;
+        }
+
+        // Mostrar modal de confirmación
+        showDeleteCoverConfirmModal(index, coverToDelete, covers.length);
+        
     } catch (error) {
-        console.error('Error eliminando foto de portada:', error);
-        showToast('❌ Error al eliminar la foto', 'error');
+        console.error('❌ Error preparando eliminación:', error);
+        showToast('❌ Error al preparar la eliminación', 'error');
     }
 }
+
+// Modal de confirmación para eliminar portada
+function showDeleteCoverConfirmModal(index, coverUrl, totalCovers) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'deleteCoverConfirmModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Confirmar eliminación</h3>
+                <span class="close-modal" onclick="closeDeleteCoverConfirmModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-delete-content">
+                    <div class="delete-preview">
+                        <img src="${coverUrl}" alt="Portada a eliminar" style="max-width: 100%; border-radius: 8px;">
+                    </div>
+                    
+                    <div class="delete-warning">
+                        <i class="fas fa-info-circle"></i>
+                        <p><strong>¿Estás seguro de que quieres eliminar esta foto de portada?</strong></p>
+                        <p>Esta acción no se puede deshacer.</p>
+                        
+                        ${totalCovers <= 2 ? `
+                            <div class="critical-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p><strong>¡Atención!</strong> Si eliminas esta foto, solo te quedarán ${totalCovers - 1} fotos de portada (mínimo requerido: 2).</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="confirm-actions">
+                        <button class="btn-secondary" onclick="closeDeleteCoverConfirmModal()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button class="btn-danger" onclick="confirmDeleteCoverPhoto(${index})">
+                            <i class="fas fa-trash"></i> Sí, Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+}
+
+function closeDeleteCoverConfirmModal() {
+    const modal = document.getElementById('deleteCoverConfirmModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+
 
 // ===== SECCIONES DEL PERFIL =====
 function updateProfileStats(usuario, publicaciones) {
@@ -1541,6 +1735,101 @@ async function loadFriendsSection(usuario) {
                 <p>No se pudieron cargar los datos de seguidores.</p>
             </div>
         `;
+    }
+}
+
+// ===== SISTEMA DRAG & DROP PARA PORTADAS =====
+function initializeDragAndDrop() {
+    const coversGrid = document.getElementById('coversGrid');
+    if (!coversGrid) return;
+
+    let draggedItem = null;
+
+    // Hacer elementos arrastrables
+    coversGrid.querySelectorAll('.cover-item').forEach(item => {
+        item.setAttribute('draggable', 'true');
+        
+        item.addEventListener('dragstart', function(e) {
+            draggedItem = this;
+            setTimeout(() => {
+                this.style.opacity = '0.4';
+            }, 0);
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', function() {
+            this.style.opacity = '1';
+            coversGrid.querySelectorAll('.cover-item').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+        });
+
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        item.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+
+        item.addEventListener('dragleave', function() {
+            this.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            if (draggedItem !== this) {
+                const allItems = Array.from(coversGrid.querySelectorAll('.cover-item'));
+                const fromIndex = allItems.indexOf(draggedItem);
+                const toIndex = allItems.indexOf(this);
+                
+                if (fromIndex !== -1 && toIndex !== -1) {
+                    reorderCoverPhotos(fromIndex, toIndex);
+                }
+            }
+        });
+    });
+}
+
+// Función para reordenar las fotos
+async function reorderCoverPhotos(fromIndex, toIndex) {
+    try {
+        showToast('⏳ Reordenando fotos...', 'info');
+        
+        const response = await fetch(`${API_URL}/upload/cover-picture/reorder/${currentUser._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                fromIndex: fromIndex,
+                toIndex: toIndex
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Fotos reordenadas correctamente', 'success');
+            
+            // Actualizar localmente
+            coverPhotos = result.coverPhotos || [];
+            await loadExistingCoverPhotos();
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+            // Recargar para mantener consistencia
+            await loadExistingCoverPhotos();
+        }
+    } catch (error) {
+        console.error('Error reordenando fotos:', error);
+        showToast('❌ Error al reordenar las fotos', 'error');
+        // Recargar para mantener consistencia
+        await loadExistingCoverPhotos();
     }
 }
 
@@ -1887,7 +2176,7 @@ function displayProfilePosts(posts) {
     if (!postsFeed) return;
     
     // ACTUALIZAR currentPosts con las publicaciones del perfil
-    currentPosts = posts || []; // ← AÑADE ESTA LÍNEA
+    currentPosts = posts || [];
     
     if (!posts || posts.length === 0) {
         postsFeed.innerHTML = `
@@ -1905,6 +2194,43 @@ function displayProfilePosts(posts) {
     
     postsFeed.innerHTML = posts.map(post => createPostHTML(post)).join('');
     initializePostInteractions('profilePostsFeed', posts);
+    initializeMediaPlayers(); // Inicializar reproductores de audio/video
+}
+
+// Función para inicializar reproductores de audio y video
+function initializeMediaPlayers() {
+    // Inicializar controles de audio
+    document.querySelectorAll('.audio-player').forEach(player => {
+        player.addEventListener('play', function() {
+            // Pausar otros audios cuando uno se reproduce
+            document.querySelectorAll('.audio-player').forEach(otherPlayer => {
+                if (otherPlayer !== player && !otherPlayer.paused) {
+                    otherPlayer.pause();
+                }
+            });
+        });
+    });
+    
+    // Inicializar controles de video
+    document.querySelectorAll('.video-player').forEach(player => {
+        player.addEventListener('play', function() {
+            // Pausar otros videos cuando uno se reproduce
+            document.querySelectorAll('.video-player').forEach(otherPlayer => {
+                if (otherPlayer !== player && !otherPlayer.paused) {
+                    otherPlayer.pause();
+                }
+            });
+        });
+        
+        // Agregar controles personalizados si es necesario
+        player.addEventListener('loadedmetadata', function() {
+            const duration = formatDuracion(player.duration);
+            const durationElement = player.parentElement.querySelector('.video-duration, .audio-duration');
+            if (durationElement && !durationElement.textContent) {
+                durationElement.textContent = duration;
+            }
+        });
+    });
 }
 
 // Función para recargar publicaciones del perfil
@@ -1925,6 +2251,8 @@ async function loadProfilePosts() {
     }
 }
 
+// ===== PUBLICACIONES CON AUDIO Y VIDEO =====
+// ===== PUBLICACIONES CON AUDIO Y VIDEO - VERSIÓN CORREGIDA =====
 function createPostHTML(post) {
     const isLiked = post.likes.some(like => 
         typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
@@ -1937,9 +2265,120 @@ function createPostHTML(post) {
     const isSharedPost = post.tipo === 'share';
     const hasOriginalPost = isSharedPost && post.postOriginal;
     const isAuthor = post.autor._id === currentUser._id;
+
+    // DEBUG: Verificar datos del post
+    console.log('🔍 DEBUG Post:', {
+        id: post._id,
+        tipo: post.tipo,
+        isSharedPost: isSharedPost,
+        hasOriginalPost: hasOriginalPost,
+        autor: post.autor,
+        postOriginal: post.postOriginal
+    });
+
+    // Determinar qué medio mostrar para POSTS NORMALES
+    let mediaHTML = '';
+    if (!isSharedPost) {
+        if (post.tipoContenido === 'audio' && post.audio) {
+            mediaHTML = `
+                <div class="post-audio">
+                    <audio controls class="audio-player">
+                        <source src="${post.audio}" type="audio/mpeg">
+                        <source src="${post.audio}" type="audio/wav">
+                        <source src="${post.audio}" type="audio/ogg">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    ${post.duracion ? `<div class="audio-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (post.tipoContenido === 'video' && post.video) {
+            mediaHTML = `
+                <div class="post-video">
+                    <video controls class="video-player">
+                        <source src="${post.video}" type="video/mp4">
+                        <source src="${post.video}" type="video/webm">
+                        <source src="${post.video}" type="video/ogg">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    ${post.duracion ? `<div class="video-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (post.imagen) {
+            mediaHTML = `<img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">`;
+        }
+    }
+    
+    // Determinar qué medio mostrar para POSTS COMPARTIDOS (del post original)
+    let originalMediaHTML = '';
+    let originalPostHeaderHTML = '';
+    
+    if (hasOriginalPost && post.postOriginal) {
+        const originalPost = post.postOriginal;
+        
+        // Verificar si el autor del post original está disponible
+        const originalAutor = originalPost.autor;
+        const autorNombre = originalAutor ? (originalAutor.nombre || 'Usuario') : 'Usuario';
+        const autorUsername = originalAutor ? (originalAutor.username ? `@${originalAutor.username}` : '@usuario') : '@usuario';
+        const autorFoto = originalAutor ? originalAutor.foto_perfil : '';
+
+        // Header del post original
+        originalPostHeaderHTML = `
+            <div class="original-post-header">
+                <div class="original-post-avatar">
+                    ${autorFoto ? 
+                        `<img src="${autorFoto}" alt="${autorNombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <div class="original-post-info">
+                    <strong>${autorNombre}</strong>
+                    <span>${autorUsername}</span>
+                    ${originalPost.tipoContenido ? `
+                        <span class="content-type-badge ${originalPost.tipoContenido}">
+                            ${originalPost.tipoContenido}
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        // Multimedia del post original
+        if (originalPost.tipoContenido === 'audio' && originalPost.audio) {
+            originalMediaHTML = `
+                <div class="post-audio">
+                    <audio controls class="audio-player">
+                        <source src="${originalPost.audio}" type="audio/mpeg">
+                        <source src="${originalPost.audio}" type="audio/wav">
+                        <source src="${originalPost.audio}" type="audio/ogg">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                    ${originalPost.duracion ? `<div class="audio-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (originalPost.tipoContenido === 'video' && originalPost.video) {
+            originalMediaHTML = `
+                <div class="post-video">
+                    <video controls class="video-player">
+                        <source src="${originalPost.video}" type="video/mp4">
+                        <source src="${originalPost.video}" type="video/webm">
+                        <source src="${originalPost.video}" type="video/ogg">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    ${originalPost.duracion ? `<div class="video-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
+                </div>
+            `;
+        } else if (originalPost.imagen) {
+            originalMediaHTML = `<img src="${originalPost.imagen}" alt="Imagen de publicación" class="original-post-image">`;
+        }
+    }
+    
+    // Badge de tipo de contenido
+    const contentTypeBadge = post.tipoContenido ? `
+        <span class="content-type-badge ${post.tipoContenido}">${post.tipoContenido}</span>
+    ` : '';
     
     return `
-        <div class="post-card" id="post-${post._id}">
+        <div class="post-card" id="post-${post._id}" data-content-type="${post.tipoContenido || 'texto'}">
             <div class="post-header">
                 <div class="post-avatar">
                     ${post.autor.foto_perfil ? 
@@ -1948,8 +2387,9 @@ function createPostHTML(post) {
                     }
                 </div>
                 <div class="post-user-info">
-                    <h4>${post.autor.nombre}</h4>
-                    <p>@${post.autor.username}</p>
+                    <h4>${post.autor.nombre || 'Usuario'}</h4>
+                    <p>@${post.autor.username || 'usuario'}</p>
+                    ${contentTypeBadge}
                 </div>
                 <div class="post-time">${timeAgo}</div>
                 
@@ -1975,7 +2415,7 @@ function createPostHTML(post) {
             ${isSharedPost ? `
                 <div class="post-share-header">
                     <i class="fas fa-share"></i>
-                    <span>${post.autor.nombre} compartió esto</span>
+                    <span>${post.autor.nombre || 'Usuario'} compartió esto</span>
                 </div>
             ` : ''}
             
@@ -1985,30 +2425,15 @@ function createPostHTML(post) {
             
             ${hasOriginalPost ? `
                 <div class="original-post-preview">
-                    <div class="original-post-header">
-                        <div class="original-post-avatar">
-                            ${post.postOriginal.autor.foto_perfil ? 
-                                `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
-                                `<i class="fas fa-user"></i>`
-                            }
-                        </div>
-                        <div class="original-post-info">
-                            <strong>${post.postOriginal.autor.nombre}</strong>
-                            <span>@${post.postOriginal.autor.username}</span>
-                        </div>
-                    </div>
+                    ${originalPostHeaderHTML}
                     <div class="original-post-content">
                         ${formatPostContent(post.postOriginal.contenido)}
                     </div>
-                    ${post.postOriginal.imagen ? `
-                        <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
-                    ` : ''}
+                    ${originalMediaHTML}
                 </div>
             ` : ''}
             
-            ${post.imagen && !isSharedPost ? `
-                <img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">
-            ` : ''}
+            ${mediaHTML}
             
             <div class="post-actions-bar">
                 <button class="post-action ${isLiked ? 'liked' : ''}" id="likeBtn-${post._id}">
@@ -2948,4 +3373,94 @@ function diagnoseFormData() {
     
     // Verificar intereses seleccionados
     console.log('🎯 Intereses seleccionados:', selectedInterests);
+}
+
+// ===== FUNCIONES DE UTILIDAD PARA AUDIO Y VIDEO =====
+
+// Función para formatear la duración
+function formatDuracion(segundos) {
+    if (!segundos || segundos === 0) return '';
+    
+    const minutos = Math.floor(segundos / 60);
+    const segs = Math.floor(segundos % 60);
+    return `${minutos}:${segs.toString().padStart(2, '0')}`;
+}
+
+// Función para manejar like en publicaciones
+async function handleLike(postId) {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const likeBtn = document.getElementById(`likeBtn-${postId}`);
+            const likeCount = likeBtn.querySelector('span');
+            
+            if (result.data.isLiked) {
+                likeBtn.classList.add('liked');
+                likeCount.textContent = result.data.likesCount;
+                showToast('❤️ Te gusta esta publicación', 'success');
+            } else {
+                likeBtn.classList.remove('liked');
+                likeCount.textContent = result.data.likesCount;
+            }
+        }
+    } catch (error) {
+        console.error('Error dando like:', error);
+        showToast('❌ Error al dar like', 'error');
+    }
+}
+
+// Función para manejar share en publicaciones
+async function handleShare(postId) {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const shareBtn = document.getElementById(`shareBtn-${postId}`);
+            const shareCount = shareBtn.querySelector('span');
+            
+            shareCount.textContent = result.data.sharesCount;
+            showToast('✅ Publicación compartida exitosamente', 'success');
+            
+            // Recargar las publicaciones para mostrar el nuevo post compartido
+            setTimeout(() => {
+                loadProfilePosts();
+            }, 1000);
+            
+        } else {
+            showToast(`❌ ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error compartiendo publicación:', error);
+        showToast('❌ Error al compartir la publicación', 'error');
+    }
+}
+
+// Función para ver publicación completa
+async function viewPost(postId) {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            showPostModal(result.data);
+        } else {
+            showToast('❌ Error al cargar la publicación', 'error');
+        }
+    } catch (error) {
+        console.error('Error viendo publicación:', error);
+        showToast('❌ Error al cargar la publicación', 'error');
+    }
 }

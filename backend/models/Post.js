@@ -20,6 +20,34 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // NUEVOS CAMPOS PARA AUDIO Y VIDEO
+  audio: {
+    type: String,
+    default: ''
+  },
+  audioFilename: {
+    type: String,
+    default: ''
+  },
+  video: {
+    type: String,
+    default: ''
+  },
+  videoFilename: {
+    type: String,
+    default: ''
+  },
+  // Campos para metadata de audio/video
+  duracion: {
+    type: Number, // duración en segundos
+    default: 0
+  },
+  tipoContenido: {
+    type: String,
+    enum: ['texto', 'imagen', 'audio', 'video'],
+    default: 'texto'
+  },
+  // FIN NUEVOS CAMPOS
   hashtags: [{
     type: String,
     trim: true
@@ -81,6 +109,18 @@ const postSchema = new mongoose.Schema({
 postSchema.pre('save', function(next) {
   const hashtags = this.contenido.match(/#[\wáéíóúñ]+/g) || [];
   this.hashtags = hashtags.map(tag => tag.toLowerCase().slice(1));
+  
+  // Determinar automáticamente el tipo de contenido
+  if (this.video && this.video !== '') {
+    this.tipoContenido = 'video';
+  } else if (this.audio && this.audio !== '') {
+    this.tipoContenido = 'audio';
+  } else if (this.imagen && this.imagen !== '') {
+    this.tipoContenido = 'imagen';
+  } else {
+    this.tipoContenido = 'texto';
+  }
+  
   next();
 });
 
@@ -103,5 +143,6 @@ postSchema.methods.popularPost = async function() {
 postSchema.index({ autor: 1, fecha_publicacion: -1 });
 postSchema.index({ tipo: 1, postOriginal: 1 });
 postSchema.index({ hashtags: 1 });
+postSchema.index({ tipoContenido: 1 }); // Nuevo índice
 
 module.exports = mongoose.model('Post', postSchema);

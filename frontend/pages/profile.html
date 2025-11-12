@@ -65,6 +65,10 @@
                     <i class="fas fa-users"></i>
                     <span>Usuarios</span>
                 </button>
+                <button class="nav-item" onclick="window.location.href='dashboard.html?section=messages'">
+                    <i class="fas fa-comments"></i>
+                    <span>Mensajes</span>
+                </button>
             </nav>
         </div>
 
@@ -216,7 +220,7 @@
                         </div>
                     </div>
                 </div>
-
+                
                 <!-- Sección de Fotos -->
                 <div id="photosSection" class="profile-section">
                     <div class="photos-container">
@@ -254,19 +258,20 @@
     </div>
 
     <!-- Modal para editar perfil -->
-    <div id="editProfileModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Editar Perfil</h3>
-                <span class="close-modal" onclick="closeEditProfileModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="edit-profile-form" id="editProfileForm">
-                    <!-- El formulario se cargará aquí -->
-                </div>
+<div id="editProfileModal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Editar Perfil</h3>
+            <span class="close-modal" onclick="closeEditProfileModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="edit-profile-form" id="editProfileForm">
+                <!-- El formulario se cargará aquí dinámicamente -->
             </div>
         </div>
     </div>
+</div>
+   
 
     <!-- Modal para gestionar fotos de portada -->
     <div id="coverPhotoModal" class="modal">
@@ -310,6 +315,16 @@
                     </div>
                 </div>
             </div>
+
+            <!-- En tu HTML del modal de portadas, agrega esto al final -->
+                <div class="modal-actions" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <button class="btn-primary" onclick="saveCoverChangesAndClose()">
+                        <i class="fas fa-check"></i> Guardar Cambios y Cerrar
+                    </button>
+                    <button class="btn-secondary" onclick="closeCoverPhotoModal()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
         </div>
     </div>
 
@@ -365,5 +380,13 @@
     </div>
 
     <script src="../js/profile.js"></script>
+    <script>
+        console.log("🟡 Después de dashboard.js - currentUser:", window.currentUser);
+        console.log("🟡 localStorage currentUser:", localStorage.getItem('currentUser'));
+    </script>
+    <script src="../js/messages.js"></script>
+    <script>
+        console.log("🔵 Después de messages.js - currentUser:", window.currentUser);
+    </script>
 </body>
 </html>
