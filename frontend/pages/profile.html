@@ -29,48 +29,49 @@
 
     <div class="dashboard-container">
         <!-- Sidebar -->
-        <div class="dashboard-sidebar">
-            <div class="user-card">
-                <div class="user-avatar" id="sidebarAvatar">
-                    <i class="fas fa-user"></i>
-                </div>
-                <h3 id="sidebarUserName">Nombre Usuario</h3>
-                <p id="sidebarUserUsername">@usuario</p>
-                <div class="user-stats">
-                    <div class="stat">
-                        <strong id="sidebarSeguidoresCount">0</strong>
-                        <span>Seguidores</span>
-                    </div>
-                    <div class="stat">
-                        <strong id="sidebarSeguidosCount">0</strong>
-                        <span>Siguiendo</span>
-                    </div>
-                </div>
-            </div>
-
-            <nav class="sidebar-nav">
-                <button class="nav-item" onclick="window.location.href='dashboard.html'">
-                    <i class="fas fa-home"></i>
-                    <span>Inicio</span>
-                </button>
-                <button class="nav-item active">
-                    <i class="fas fa-user"></i>
-                    <span>Mi Perfil</span>
-                </button>
-                <button class="nav-item" onclick="window.location.href='dashboard.html?section=explore'">
-                    <i class="fas fa-search"></i>
-                    <span>Explorar</span>
-                </button>
-                <button class="nav-item" onclick="window.location.href='dashboard.html?section=users'">
-                    <i class="fas fa-users"></i>
-                    <span>Usuarios</span>
-                </button>
-                <button class="nav-item" onclick="window.location.href='dashboard.html?section=messages'">
-                    <i class="fas fa-comments"></i>
-                    <span>Mensajes</span>
-                </button>
-            </nav>
+        <!-- Sidebar -->
+<div class="dashboard-sidebar">
+    <div class="user-card">
+        <div class="user-avatar" id="sidebarAvatar">
+            <i class="fas fa-user"></i>
         </div>
+        <h3 id="sidebarUserName">Nombre Usuario</h3>
+        <p id="sidebarUserUsername">@usuario</p>
+        <div class="user-stats">
+            <div class="stat">
+                <strong id="sidebarSeguidoresCount">0</strong>
+                <span>Seguidores</span>
+            </div>
+            <div class="stat">
+                <strong id="sidebarSeguidosCount">0</strong>
+                <span>Siguiendo</span>
+            </div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <button class="nav-item" onclick="goToDashboard()">
+            <i class="fas fa-home"></i>
+            <span>Inicio</span>
+        </button>
+        <button class="nav-item" id="myProfileBtn" onclick="goToMyProfile()">
+            <i class="fas fa-user"></i>
+            <span id="profileBtnText">Mi Perfil</span>
+        </button>
+        <button class="nav-item" onclick="goToExplore()">
+            <i class="fas fa-search"></i>
+            <span>Explorar</span>
+        </button>
+        <button class="nav-item" onclick="goToUsers()">
+            <i class="fas fa-users"></i>
+            <span>Usuarios</span>
+        </button>
+        <button class="nav-item" onclick="goToMessages()">
+            <i class="fas fa-comments"></i>
+            <span>Mensajes</span>
+        </button>
+    </nav>
+</div>
 
         <!-- Contenido Principal del Perfil -->
         <div class="dashboard-main">

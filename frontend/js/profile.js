@@ -13,36 +13,520 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeProfile();
 });
 
+// ===== INICIALIZACIÓN MODIFICADA =====
 async function initializeProfile() {
     console.log('🚀 Inicializando Perfil...');
     
-    currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    // CORREGIR: Establecer currentUser correctamente
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+        currentUser = JSON.parse(userData);
+        window.currentUser = currentUser;
+    }
     
     if (!currentUser) {
         window.location.href = 'dashboard.html';
         return;
     }
     
-    console.log('✅ Usuario actual:', currentUser);
+    console.log('✅ Usuario actual:', currentUser.nombre);
+    
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    
+    if (viewingUserId && viewingUserId !== currentUser._id) {
+        // Verificar si el usuario está bloqueado
+        const isBlocked = await checkIfUserIsBlocked(viewingUserId);
+        if (isBlocked) {
+            showBlockedUserModal(viewingUserId);
+            return;
+        }
+        
+        // Estamos viendo el perfil de otro usuario
+        await loadOtherUserProfile(viewingUserId);
+    } else {
+        // Estamos viendo nuestro propio perfil - LIMPIAR por si acaso
+        localStorage.removeItem('viewingUserProfile');
+        await loadUserProfile();
+    }
     
     // Hacer las funciones disponibles globalmente
     makeFunctionsGlobal();
-    makeOptionsFunctionsGlobal(); // ← AGREGAR ESTA LÍNEA
+    makeOptionsFunctionsGlobal();
     
-    initializeSidebar();
+    initializeSidebar(); // ← ESTA LÍNEA ES IMPORTANTE, debe ir después de determinar qué perfil estamos viendo
     initializeEventListeners();
-    initializeFriendMenuEvents(); // ← AGREGAR ESTA LÍNEA
-    await loadUserProfile();
+    initializeFriendMenuEvents();
     
     // Inicializar eventos de modales después de cargar
     setTimeout(initializeModalEvents, 500);
 }
 
 
+
+// ===== VERIFICACIÓN DE BLOQUEO =====
+async function checkIfUserIsBlocked(userId) {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        if (!currentUser) {
+            console.error('❌ No hay usuario actual en localStorage');
+            return false;
+        }
+
+        // Verificar si el usuario actual bloqueó al otro usuario (localmente)
+        const iBlockedThem = currentUser.usuarios_bloqueados?.includes(userId);
+        
+        if (iBlockedThem) {
+            console.log('🔒 Usuario bloqueado localmente por mí');
+            return true;
+        }
+
+        // Verificar si el otro usuario bloqueó al usuario actual (en el servidor)
+        console.log(`🔍 Verificando en servidor si usuario ${userId} me bloqueó`);
+        const response = await fetch(`${API_URL}/users/${userId}/check-blocked`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('📊 Resultado verificación bloqueo:', result);
+            
+            if (result.success) {
+                return result.data.isBlocked;
+            }
+        }
+        
+        // Si hay error en el servidor, solo verificar localmente
+        console.warn('⚠️ Error en verificación de servidor, usando solo verificación local');
+        return iBlockedThem;
+        
+    } catch (error) {
+        console.error('❌ Error verificando bloqueo:', error);
+        // En caso de error, verificar solo localmente
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        return currentUser?.usuarios_bloqueados?.includes(userId) || false;
+    }
+}
+
+// Función para mostrar modal de usuario bloqueado
+function showBlockedUserModal(userId) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'blockedUserModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-ban"></i> Usuario Bloqueado</h3>
+                <span class="close-modal" onclick="closeBlockedUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="blocked-user-content">
+                    <div class="blocked-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h4>No puedes ver este perfil</h4>
+                    <p>No puedes ver el perfil de este usuario debido a restricciones de privacidad.</p>
+                    <div class="blocked-options">
+                        <button class="btn-secondary" onclick="closeBlockedUserModal()">
+                            <i class="fas fa-times"></i> Volver al Inicio
+                        </button>
+                        <button class="btn-primary" onclick="goToMyProfileFromModal()">
+                            <i class="fas fa-user"></i> Ver mi perfil
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+}
+
+function closeBlockedUserModal() {
+    const modal = document.getElementById('blockedUserModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+    // Volver al dashboard
+    window.location.href = 'dashboard.html';
+}
+
+function goToMyProfileFromModal() {
+    localStorage.removeItem('viewingUserProfile');
+    closeBlockedUserModal();
+    window.location.href = 'profile.html';
+}
+
+// ===== FUNCIONES DE NAVEGACIÓN MEJORADAS =====
+function goToDashboard() {
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'dashboard.html';
+}
+
+function goToMyProfile() {
+    // SIEMPRE limpiar el viewingUserProfile para ir a nuestro propio perfil
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'profile.html';
+}
+
+function goToExplore() {
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'dashboard.html?section=explore';
+}
+
+function goToUsers() {
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'dashboard.html?section=users';
+}
+
+function goToMessages() {
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'dashboard.html?section=messages';
+}
+
+// ===== CARGAR PERFIL DE OTRO USUARIO =====
+async function loadOtherUserProfile(userId) {
+    try {
+        console.log('🔄 Cargando perfil de otro usuario:', userId);
+        
+        // Verificar bloqueo nuevamente por seguridad
+        const isBlocked = await checkIfUserIsBlocked(userId);
+        if (isBlocked) {
+            showBlockedUserModal(userId);
+            return;
+        }
+        
+        // Cargar datos del perfil del otro usuario
+        const [profileResponse, postsResponse] = await Promise.all([
+            fetch(`${API_URL}/profile/${userId}`),
+            fetch(`${API_URL}/posts/user/${userId}`)
+        ]);
+
+        const profileResult = await profileResponse.json();
+        const postsResult = await postsResponse.json();
+
+        if (profileResult.success) {
+            userProfileData = profileResult.data;
+            
+            // Si las publicaciones se cargaron correctamente, usarlas
+            if (postsResult.success) {
+                userProfileData.publicaciones = postsResult.data;
+            }
+            
+            displayOtherUserProfile(userProfileData);
+            
+            // Actualizar el título de la página
+            document.title = `${userProfileData.usuario.nombre} - Kion-D`;
+            
+        } else {
+            showToast('❌ Error al cargar el perfil del usuario', 'error');
+            // Redirigir al propio perfil si hay error
+            setTimeout(() => {
+                localStorage.removeItem('viewingUserProfile');
+                window.location.href = 'profile.html';
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando perfil de otro usuario:', error);
+        showToast('❌ Error de conexión', 'error');
+    }
+}
+
+// ===== MOSTRAR PERFIL DE OTRO USUARIO =====
+function displayOtherUserProfile(profileData) {
+    if (!profileData) return;
+    
+    const { usuario, publicaciones } = profileData;
+    
+    // AGREGAR CLASE CSS al body para identificar que estamos viendo otro perfil
+    document.body.classList.add('viewing-other-profile');
+    
+    updateOtherUserProfileHeader(usuario);
+    initializeCoverCarousel(usuario.fotos_portada || []);
+    updateProfileStats(usuario, publicaciones);
+    displayProfilePosts(publicaciones);
+    loadAboutSection(usuario);
+    loadFriendsSection(usuario);
+    loadPhotosSection(publicaciones);
+    loadCollectionsSection();
+    
+    // Ocultar botones de edición para otros usuarios
+    hideEditButtons();
+    
+    // Actualizar el título de la página
+    document.title = `${usuario.nombre} - Kion-D`;
+    
+    // Actualizar el sidebar para reflejar que estamos viendo otro perfil
+    initializeSidebar();
+
+}
+
+
+// ===== AGREGAR ESTILOS PARA EL INDICADOR =====
+function addViewingOtherProfileStyles() {
+    const styles = `
+
+        
+        .indicator-content i {
+            font-size: 1.2rem;
+        }
+        
+        .btn-close-indicator {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        
+        .btn-close-indicator:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+    `;
+    
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+}
+
+
+function updateOtherUserProfileHeader(usuario) {
+    if (!usuario) return;
+    
+    const profileAvatar = document.getElementById('profileAvatarImg');
+    if (profileAvatar && usuario.foto_perfil) {
+        profileAvatar.src = usuario.foto_perfil;
+        profileAvatar.style.display = 'block';
+    }
+    
+    const profileName = document.getElementById('profileUserName');
+    const profileUsername = document.getElementById('profileUserUsername');
+    const profileBio = document.getElementById('profileUserBio');
+    
+    if (profileName) profileName.textContent = usuario.nombre || 'Nombre no disponible';
+    if (profileUsername) profileUsername.textContent = `@${usuario.username || 'usuario'}`;
+    if (profileBio) profileBio.textContent = usuario.biografia || 'Este usuario aún no tiene biografía';
+    
+    // AGREGAR BOTÓN DE SEGUIR al lado del nombre
+    addFollowButton(usuario);
+}
+
+// ===== FUNCIÓN PARA AGREGAR BOTÓN DE SEGUIR =====
+function addFollowButton(otherUser) {
+    const profileMainInfo = document.querySelector('.profile-main-info');
+    if (!profileMainInfo) return;
+    
+    // Verificar si ya existe un botón de seguir y removerlo
+    const existingFollowBtn = document.getElementById('followUserBtn');
+    if (existingFollowBtn) {
+        existingFollowBtn.remove();
+    }
+    
+    // Verificar estado de seguimiento
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    const isFollowing = currentUser.seguidos?.includes(otherUser._id);
+    const isBlocked = currentUser.usuarios_bloqueados?.includes(otherUser._id) || 
+                     otherUser.usuarios_bloqueados?.includes(currentUser._id);
+    
+    // No mostrar botón de seguir si hay bloqueo
+    if (isBlocked) return;
+    
+    const followButton = document.createElement('div');
+    followButton.id = 'followUserBtn';
+    followButton.className = 'follow-user-button-container';
+    
+    if (isFollowing) {
+        followButton.innerHTML = `
+            <button class="btn-follow-profile following" onclick="toggleFollowProfile('${otherUser._id}')">
+                <i class="fas fa-user-check"></i>
+                <span>Siguiendo</span>
+            </button>
+        `;
+    } else {
+        followButton.innerHTML = `
+            <button class="btn-follow-profile" onclick="toggleFollowProfile('${otherUser._id}')">
+                <i class="fas fa-user-plus"></i>
+                <span>Seguir</span>
+            </button>
+        `;
+    }
+    
+    // Insertar después del nombre de usuario
+    const profileUsername = document.getElementById('profileUserUsername');
+    if (profileUsername && profileUsername.parentNode) {
+        profileUsername.parentNode.insertBefore(followButton, profileUsername.nextSibling);
+    }
+}
+
+// ===== FUNCIÓN PARA SEGUIR/DEJAR DE SEGUIR DESDE EL PERFIL =====
+async function toggleFollowProfile(userId) {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser) return;
+
+        const isFollowing = currentUser.seguidos?.includes(userId);
+        const endpoint = isFollowing ? 'unfollow' : 'follow';
+        
+        console.log(`🔄 ${isFollowing ? 'Dejando de seguir' : 'Siguiendo'} usuario:`, userId);
+        
+        const response = await fetch(`${API_URL}/users/${userId}/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            
+            // Actualizar currentUser en localStorage
+            if (isFollowing) {
+                currentUser.seguidos = currentUser.seguidos.filter(id => id !== userId);
+            } else {
+                if (!currentUser.seguidos) currentUser.seguidos = [];
+                currentUser.seguidos.push(userId);
+            }
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Actualizar el botón de seguir
+            updateFollowButtonState(userId, !isFollowing);
+            
+            // Actualizar contadores en sidebar
+            updateSidebarCounters();
+            
+        } else {
+            showToast(`❌ ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error en follow/unfollow desde perfil:', error);
+        showToast('❌ Error de conexión', 'error');
+    }
+}
+
+// ===== FUNCIÓN PARA ACTUALIZAR EL ESTADO DEL BOTÓN DE SEGUIR =====
+function updateFollowButtonState(userId, isFollowing) {
+    const followBtn = document.querySelector(`#followUserBtn button`);
+    if (!followBtn) return;
+    
+    if (isFollowing) {
+        followBtn.innerHTML = '<i class="fas fa-user-check"></i><span>Siguiendo</span>';
+        followBtn.className = 'btn-follow-profile following';
+    } else {
+        followBtn.innerHTML = '<i class="fas fa-user-plus"></i><span>Seguir</span>';
+        followBtn.className = 'btn-follow-profile';
+    }
+}
+
+// ===== MODIFICAR LA FUNCIÓN hideEditButtons =====
+function hideEditButtons() {
+    console.log('👁️ Ocultando elementos de edición para perfil de otro usuario');
+    
+    // Ocultar el icono de cámara del avatar de manera MÁS ESPECÍFICA
+    const avatarEditIcons = document.querySelectorAll('.btn-edit-avatar, .profile-avatar-large button, [onclick*="editProfilePhoto"]');
+    avatarEditIcons.forEach(icon => {
+        if (icon) {
+            icon.style.display = 'none';
+            console.log('❌ Ocultado icono de cámara:', icon);
+        }
+    });
+    
+    // Ocultar botones de edición generales
+    const editButtons = document.querySelectorAll(`
+        .btn-edit-cover-fixed, 
+        .btn-edit-profile, 
+        .btn-config,
+        .btn-edit-cover,
+        .cover-overlay
+    `);
+    
+    editButtons.forEach(button => {
+        if (button) {
+            button.style.display = 'none';
+            console.log('❌ Ocultado:', button.className);
+        }
+    });
+    
+    // OCULTAR BOTÓN DE AGREGAR INTERESES
+    const addInterestsBtn = document.querySelector('.btn-secondary[onclick*="editInterests"]');
+    if (addInterestsBtn) {
+        addInterestsBtn.style.display = 'none';
+        console.log('❌ Ocultado botón de agregar intereses');
+    }
+    
+    // Ocultar menús de opciones en publicaciones de otros usuarios
+    const postOptions = document.querySelectorAll('.post-options');
+    postOptions.forEach(option => {
+        if (option) option.style.display = 'none';
+    });
+    
+    // Ocultar sección de colecciones o mostrar mensaje
+    const collectionsSection = document.getElementById('collectionsSection');
+    if (collectionsSection) {
+        collectionsSection.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-lock"></i>
+                <h3>Colecciones privadas</h3>
+                <p>Las colecciones son privadas para cada usuario.</p>
+            </div>
+        `;
+    }
+    
+    // Remover el botón de nueva colección si existe
+    const newCollectionBtn = document.querySelector('.btn-primary[onclick*="createNewCollection"]');
+    if (newCollectionBtn) {
+        newCollectionBtn.style.display = 'none';
+    }
+    
+    // FORZAR la ocultación con CSS inline como respaldo
+    forceHideEditElements();
+}
+
+// ===== FUNCIÓN DE RESPALDO PARA OCULTAR ELEMENTOS =====
+function forceHideEditElements() {
+    // Agregar estilos CSS forzados para ocultar elementos de edición
+    const forcedStyles = `
+        .viewing-other-profile .btn-edit-avatar,
+        .viewing-other-profile .profile-avatar-large button,
+        .viewing-other-profile [onclick*="editProfilePhoto"],
+        .viewing-other-profile .btn-edit-cover-fixed,
+        .viewing-other-profile .cover-overlay,
+        .viewing-other-profile .btn-edit-profile,
+        .viewing-other-profile .btn-config {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+    `;
+    
+    const styleElement = document.createElement('style');
+    styleElement.id = 'force-hide-edit-elements';
+    styleElement.textContent = forcedStyles;
+    
+    // Remover estilos anteriores si existen
+    const existingStyles = document.getElementById('force-hide-edit-elements');
+    if (existingStyles) {
+        existingStyles.remove();
+    }
+    
+    document.head.appendChild(styleElement);
+}
+
 // ===== HACER FUNCIONES GLOBALES =====
 // ===== HACER FUNCIONES GLOBALES - VERSIÓN CORREGIDA =====
 function makeFunctionsGlobal() {
     console.log('🌍 Haciendo funciones globales...');
+
     
     // Funciones de modales - CON EVENTOS DIRECTOS
     window.openCoverPhotoModal = function() {
@@ -520,6 +1004,10 @@ window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUse
     // En la función makeFunctionsGlobal(), agrega:
     window.createPostHTML = createPostHTML;
     window.formatDuracion = formatDuracion;
+    window.checkIfUserIsBlocked = checkIfUserIsBlocked;
+    window.showBlockedUserModal = showBlockedUserModal;
+    window.closeBlockedUserModal = closeBlockedUserModal;
+    window.goToMyProfileFromModal = goToMyProfileFromModal;
     
     console.log('✅ Funciones globales creadas');
 }
@@ -786,6 +1274,25 @@ function initializeModalEvents() {
 function initializeSidebar() {
     if (!currentUser) return;
     
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+    
+    // Actualizar el texto del botón de perfil según el contexto
+    const profileBtnText = document.getElementById('profileBtnText');
+    const myProfileBtn = document.getElementById('myProfileBtn');
+    
+    if (profileBtnText && myProfileBtn) {
+        if (isOwnProfile) {
+            profileBtnText.textContent = 'Mi Perfil';
+            myProfileBtn.classList.add('active');
+        } else {
+            profileBtnText.textContent = 'Mi Perfil';
+            myProfileBtn.classList.remove('active');
+        }
+    }
+    
+    // Siempre mostrar nuestros datos en el sidebar, no los del usuario que estamos viendo
     document.getElementById('userGreeting').textContent = `Hola, ${currentUser.nombre}`;
     document.getElementById('sidebarUserName').textContent = currentUser.nombre;
     document.getElementById('sidebarUserUsername').textContent = `@${currentUser.username}`;
@@ -798,12 +1305,68 @@ function initializeSidebar() {
     }
 }
 
+
+// ===== MODIFICAR LA FUNCIÓN DE VOLVER AL DASHBOARD =====
 function initializeEventListeners() {
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-    document.getElementById('backToDashboard').addEventListener('click', () => {
-        window.location.href = 'dashboard.html';
-    });
+    
+    const backButton = document.getElementById('backToDashboard');
+    if (backButton) {
+        backButton.addEventListener('click', () => {
+            // Limpiar el usuario que estábamos viendo
+            localStorage.removeItem('viewingUserProfile');
+            window.location.href = 'dashboard.html';
+        });
+    }
+    
+    // Actualizar el texto del botón de volver si estamos viendo otro perfil
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    if (viewingUserId && viewingUserId !== currentUser._id && backButton) {
+        backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Volver al Inicio';
+    }
 }
+
+function addOtherUserStyles() {
+    const styles = `
+        .other-user-badge {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        
+        .user-profile-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .viewing-other-profile .edit-buttons {
+            display: none !important;
+        }
+    `;
+    
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = styles;
+    document.head.appendChild(styleSheet);
+}
+
+// Llamar a la función para agregar estilos
+addOtherUserStyles();
+
+// ===== MODIFICAR LA FUNCIÓN makeFunctionsGlobal =====
+// En la función makeFunctionsGlobal, agregar:
+window.navigateToUserProfile = function(userId) {
+    // Guardar el ID del usuario que queremos ver en el localStorage
+    localStorage.setItem('viewingUserProfile', userId);
+    
+    // Redirigir a profile.html
+    window.location.href = 'profile.html';
+};
+
 
 function setFriendsTab(tabName) {
     // Esperar a que se cargue la sección de amigos
@@ -1339,13 +1902,50 @@ async function saveCoverChangesAndClose() {
 }
 
 // ===== CARGA DE DATOS =====
+// ===== CARGA DE DATOS - VERSIÓN MEJORADA =====
 async function loadUserProfile() {
     try {
-        const response = await fetch(`${API_URL}/profile/${currentUser._id}`);
-        const result = await response.json();
+        console.log('🔄 Cargando perfil del usuario...');
+        
+        // Cargar datos del perfil y publicaciones por separado para mejor control
+        const [profileResponse, postsResponse] = await Promise.all([
+            fetch(`${API_URL}/profile/${currentUser._id}`),
+            fetch(`${API_URL}/posts/user/${currentUser._id}`) // Usar la ruta de posts del usuario
+        ]);
 
-        if (result.success) {
-            userProfileData = result.data;
+        const profileResult = await profileResponse.json();
+        const postsResult = await postsResponse.json();
+
+        if (profileResult.success) {
+            userProfileData = profileResult.data;
+            
+            // Si las publicaciones se cargaron correctamente, usarlas
+            if (postsResult.success) {
+                userProfileData.publicaciones = postsResult.data;
+                console.log('✅ Publicaciones cargadas con populate completo:', postsResult.data.length);
+                
+                // DEBUG: Verificar datos de autores
+                postsResult.data.forEach((post, index) => {
+                    console.log(`🔍 Post ${index}:`, {
+                        id: post._id,
+                        tipo: post.tipo,
+                        autor: post.autor,
+                        tieneAutor: !!post.autor,
+                        nombreAutor: post.autor?.nombre,
+                        usernameAutor: post.autor?.username
+                    });
+                    
+                    if (post.tipo === 'share' && post.postOriginal) {
+                        console.log(`📤 Post compartido ${index}:`, {
+                            autorOriginal: post.postOriginal.autor,
+                            tieneAutorOriginal: !!post.postOriginal.autor,
+                            nombreOriginal: post.postOriginal.autor?.nombre,
+                            usernameOriginal: post.postOriginal.autor?.username
+                        });
+                    }
+                });
+            }
+            
             displayUserProfile(userProfileData);
         } else {
             showToast('❌ Error al cargar el perfil', 'error');
@@ -1606,9 +2206,12 @@ function updateProfileStats(usuario, publicaciones) {
 }
 
 // Sección Acerca de
+// ===== MODIFICAR LA FUNCIÓN loadAboutSection =====
 function loadAboutSection(usuario) {
     const aboutContent = document.getElementById('aboutContent');
     const interestsContainer = document.getElementById('interestsContainer');
+    
+    if (!aboutContent || !interestsContainer) return;
     
     aboutContent.innerHTML = `
         <div class="about-item">
@@ -1635,12 +2238,24 @@ function loadAboutSection(usuario) {
             <span class="interest-tag">${interes}</span>
         `).join('');
     } else {
-        interestsContainer.innerHTML = `
-            <p class="no-data">Aún no has agregado intereses</p>
-            <button class="btn-secondary" onclick="editInterests()">
-                <i class="fas fa-plus"></i> Agregar intereses
-            </button>
-        `;
+        // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+        const viewingUserId = localStorage.getItem('viewingUserProfile');
+        const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+        
+        if (isOwnProfile) {
+            // Mostrar botón solo para nuestro propio perfil
+            interestsContainer.innerHTML = `
+                <p class="no-data">Aún no has agregado intereses</p>
+                <button class="btn-secondary" onclick="editInterests()">
+                    <i class="fas fa-plus"></i> Agregar intereses
+                </button>
+            `;
+        } else {
+            // Para otros usuarios, mostrar mensaje sin botón
+            interestsContainer.innerHTML = `
+                <p class="no-data">Este usuario aún no ha agregado intereses</p>
+            `;
+        }
     }
 }
 
@@ -2178,17 +2793,33 @@ function displayProfilePosts(posts) {
     // ACTUALIZAR currentPosts con las publicaciones del perfil
     currentPosts = posts || [];
     
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+    
     if (!posts || posts.length === 0) {
-        postsFeed.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-feather"></i>
-                <h3>No hay publicaciones aún</h3>
-                <p>Comparte tus primeras ideas con la comunidad.</p>
-                <button class="btn-primary" onclick="window.location.href='dashboard.html'">
-                    <i class="fas fa-plus"></i> Crear primera publicación
-                </button>
-            </div>
-        `;
+        if (isOwnProfile) {
+            // Mostrar botón de crear publicación solo para el propio perfil
+            postsFeed.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-feather"></i>
+                    <h3>No hay publicaciones aún</h3>
+                    <p>Comparte tus primeras ideas con la comunidad.</p>
+                    <button class="btn-primary" onclick="window.location.href='dashboard.html'">
+                        <i class="fas fa-plus"></i> Crear primera publicación
+                    </button>
+                </div>
+            `;
+        } else {
+            // Para otros usuarios sin publicaciones, mostrar mensaje diferente
+            postsFeed.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-feather"></i>
+                    <h3>No hay publicaciones</h3>
+                    <p>Este usuario aún no ha compartido ninguna publicación.</p>
+                </div>
+            `;
+        }
         return;
     }
     
@@ -2252,7 +2883,7 @@ async function loadProfilePosts() {
 }
 
 // ===== PUBLICACIONES CON AUDIO Y VIDEO =====
-// ===== PUBLICACIONES CON AUDIO Y VIDEO - VERSIÓN CORREGIDA =====
+// En la función createPostHTML, modificar la parte de las opciones del post:
 function createPostHTML(post) {
     const isLiked = post.likes.some(like => 
         typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
@@ -2264,136 +2895,38 @@ function createPostHTML(post) {
     
     const isSharedPost = post.tipo === 'share';
     const hasOriginalPost = isSharedPost && post.postOriginal;
+    
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
     const isAuthor = post.autor._id === currentUser._id;
 
-    // DEBUG: Verificar datos del post
-    console.log('🔍 DEBUG Post:', {
-        id: post._id,
-        tipo: post.tipo,
-        isSharedPost: isSharedPost,
-        hasOriginalPost: hasOriginalPost,
-        autor: post.autor,
-        postOriginal: post.postOriginal
-    });
+    // Solo mostrar opciones de edición si es nuestro propio perfil Y somos autores del post
+    const showOptions = isOwnProfile && isAuthor;
 
-    // Determinar qué medio mostrar para POSTS NORMALES
-    let mediaHTML = '';
-    if (!isSharedPost) {
-        if (post.tipoContenido === 'audio' && post.audio) {
-            mediaHTML = `
-                <div class="post-audio">
-                    <audio controls class="audio-player">
-                        <source src="${post.audio}" type="audio/mpeg">
-                        <source src="${post.audio}" type="audio/wav">
-                        <source src="${post.audio}" type="audio/ogg">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                    ${post.duracion ? `<div class="audio-duration">${formatDuracion(post.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (post.tipoContenido === 'video' && post.video) {
-            mediaHTML = `
-                <div class="post-video">
-                    <video controls class="video-player">
-                        <source src="${post.video}" type="video/mp4">
-                        <source src="${post.video}" type="video/webm">
-                        <source src="${post.video}" type="video/ogg">
-                        Tu navegador no soporta el elemento de video.
-                    </video>
-                    ${post.duracion ? `<div class="video-duration">${formatDuracion(post.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (post.imagen) {
-            mediaHTML = `<img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">`;
-        }
-    }
-    
-    // Determinar qué medio mostrar para POSTS COMPARTIDOS (del post original)
-    let originalMediaHTML = '';
-    let originalPostHeaderHTML = '';
-    
-    if (hasOriginalPost && post.postOriginal) {
-        const originalPost = post.postOriginal;
-        
-        // Verificar si el autor del post original está disponible
-        const originalAutor = originalPost.autor;
-        const autorNombre = originalAutor ? (originalAutor.nombre || 'Usuario') : 'Usuario';
-        const autorUsername = originalAutor ? (originalAutor.username ? `@${originalAutor.username}` : '@usuario') : '@usuario';
-        const autorFoto = originalAutor ? originalAutor.foto_perfil : '';
-
-        // Header del post original
-        originalPostHeaderHTML = `
-            <div class="original-post-header">
-                <div class="original-post-avatar">
-                    ${autorFoto ? 
-                        `<img src="${autorFoto}" alt="${autorNombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
-                        `<i class="fas fa-user"></i>`
-                    }
-                </div>
-                <div class="original-post-info">
-                    <strong>${autorNombre}</strong>
-                    <span>${autorUsername}</span>
-                    ${originalPost.tipoContenido ? `
-                        <span class="content-type-badge ${originalPost.tipoContenido}">
-                            ${originalPost.tipoContenido}
-                        </span>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-
-        // Multimedia del post original
-        if (originalPost.tipoContenido === 'audio' && originalPost.audio) {
-            originalMediaHTML = `
-                <div class="post-audio">
-                    <audio controls class="audio-player">
-                        <source src="${originalPost.audio}" type="audio/mpeg">
-                        <source src="${originalPost.audio}" type="audio/wav">
-                        <source src="${originalPost.audio}" type="audio/ogg">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                    ${originalPost.duracion ? `<div class="audio-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (originalPost.tipoContenido === 'video' && originalPost.video) {
-            originalMediaHTML = `
-                <div class="post-video">
-                    <video controls class="video-player">
-                        <source src="${originalPost.video}" type="video/mp4">
-                        <source src="${originalPost.video}" type="video/webm">
-                        <source src="${originalPost.video}" type="video/ogg">
-                        Tu navegador no soporta el elemento de video.
-                    </video>
-                    ${originalPost.duracion ? `<div class="video-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (originalPost.imagen) {
-            originalMediaHTML = `<img src="${originalPost.imagen}" alt="Imagen de publicación" class="original-post-image">`;
-        }
-    }
-    
-    // Badge de tipo de contenido
-    const contentTypeBadge = post.tipoContenido ? `
-        <span class="content-type-badge ${post.tipoContenido}">${post.tipoContenido}</span>
-    ` : '';
-    
     return `
         <div class="post-card" id="post-${post._id}" data-content-type="${post.tipoContenido || 'texto'}">
             <div class="post-header">
-                <div class="post-avatar">
+                <div class="post-avatar" onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer;">
                     ${post.autor.foto_perfil ? 
                         `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
                         `<i class="fas fa-user"></i>`
                     }
                 </div>
                 <div class="post-user-info">
-                    <h4>${post.autor.nombre || 'Usuario'}</h4>
-                    <p>@${post.autor.username || 'usuario'}</p>
-                    ${contentTypeBadge}
+                    <h4 onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #3498db;">
+                        ${post.autor.nombre || 'Usuario'}
+                    </h4>
+                    <p onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                        @${post.autor.username || 'usuario'}
+                    </p>
+                    ${post.tipoContenido ? `
+                        <span class="content-type-badge ${post.tipoContenido}">${post.tipoContenido}</span>
+                    ` : ''}
                 </div>
                 <div class="post-time">${timeAgo}</div>
                 
-                ${isAuthor ? `
+                ${showOptions ? `
                     <div class="post-options">
                         <button class="btn-icon post-options-btn" id="optionsBtn-${post._id}">
                             <i class="fas fa-ellipsis-h"></i>
@@ -2423,17 +2956,89 @@ function createPostHTML(post) {
                 ${formatPostContent(post.contenido)}
             </div>
             
-            ${hasOriginalPost ? `
+            ${hasOriginalPost && post.postOriginal ? `
                 <div class="original-post-preview">
-                    ${originalPostHeaderHTML}
+                    <div class="original-post-header">
+                        <div class="original-post-avatar" onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer;">
+                            ${post.postOriginal.autor.foto_perfil ? 
+                                `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                                `<i class="fas fa-user"></i>`
+                            }
+                        </div>
+                        <div class="original-post-info">
+                            <strong onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #3498db;">
+                                ${post.postOriginal.autor.nombre || 'Usuario'}
+                            </strong>
+                            <span onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                                @${post.postOriginal.autor.username || 'usuario'}
+                            </span>
+                            ${post.postOriginal.tipoContenido ? `
+                                <span class="content-type-badge ${post.postOriginal.tipoContenido}">
+                                    ${post.postOriginal.tipoContenido}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
                     <div class="original-post-content">
                         ${formatPostContent(post.postOriginal.contenido)}
                     </div>
-                    ${originalMediaHTML}
+                    ${post.postOriginal.imagen ? `
+                        <img src="${post.postOriginal.imagen}" alt="Imagen de publicación" class="original-post-image">
+                    ` : ''}
+                    ${post.postOriginal.audio ? `
+                        <div class="post-audio">
+                            <audio controls class="audio-player">
+                                <source src="${post.postOriginal.audio}" type="audio/mpeg">
+                                <source src="${post.postOriginal.audio}" type="audio/wav">
+                                <source src="${post.postOriginal.audio}" type="audio/ogg">
+                                Tu navegador no soporta el elemento de audio.
+                            </audio>
+                            ${post.postOriginal.duracion ? `<div class="audio-duration">${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                        </div>
+                    ` : ''}
+                    ${post.postOriginal.video ? `
+                        <div class="post-video">
+                            <video controls class="video-player">
+                                <source src="${post.postOriginal.video}" type="video/mp4">
+                                <source src="${post.postOriginal.video}" type="video/webm">
+                                <source src="${post.postOriginal.video}" type="video/ogg">
+                                Tu navegador no soporta el elemento de video.
+                            </video>
+                            ${post.postOriginal.duracion ? `<div class="video-duration">${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                        </div>
+                    ` : ''}
                 </div>
             ` : ''}
             
-            ${mediaHTML}
+            ${!isSharedPost ? `
+                ${post.imagen ? `
+                    <img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">
+                ` : ''}
+                
+                ${post.audio ? `
+                    <div class="post-audio">
+                        <audio controls class="audio-player">
+                            <source src="${post.audio}" type="audio/mpeg">
+                            <source src="${post.audio}" type="audio/wav">
+                            <source src="${post.audio}" type="audio/ogg">
+                            Tu navegador no soporta el elemento de audio.
+                        </audio>
+                        ${post.duracion ? `<div class="audio-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                    </div>
+                ` : ''}
+                
+                ${post.video ? `
+                    <div class="post-video">
+                        <video controls class="video-player">
+                            <source src="${post.video}" type="video/mp4">
+                            <source src="${post.video}" type="video/webm">
+                            <source src="${post.video}" type="video/ogg">
+                            Tu navegador no soporta el elemento de video.
+                        </video>
+                        ${post.duracion ? `<div class="video-duration">${formatDuracion(post.duracion)}</div>` : ''}
+                    </div>
+                ` : ''}
+            ` : ''}
             
             <div class="post-actions-bar">
                 <button class="post-action ${isLiked ? 'liked' : ''}" id="likeBtn-${post._id}">
@@ -2451,6 +3056,12 @@ function createPostHTML(post) {
             </div>
         </div>
     `;
+}
+
+// Función auxiliar para verificar si estamos viendo nuestro propio perfil
+function isOwnProfile() {
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    return !viewingUserId || viewingUserId === currentUser._id;
 }
 
 function initializePostInteractions(feedId, posts) {

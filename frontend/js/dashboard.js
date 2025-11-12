@@ -15,13 +15,19 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeDashboard() {
     console.log('🚀 Inicializando Dashboard...');
     
-    currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    window.currentUser = currentUser;
+    // CORREGIR: Establecer currentUser correctamente
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+        currentUser = JSON.parse(userData);
+        window.currentUser = currentUser; // ← ESTA LÍNEA ES IMPORTANTE
+    }
     
     if (!currentUser) {
         window.location.href = '../index.html';
         return;
     }
+    
+    console.log('✅ Usuario actual cargado:', currentUser.nombre);
     
     // VERIFICAR SI HAY SECCIÓN EN LA URL
     const urlSection = getUrlParameter('section');
@@ -1340,6 +1346,8 @@ function showSection(sectionId) {
             loadFeed(); 
             break;
         case 'profile': 
+            // LIMPIAR el usuario que estábamos viendo y cargar nuestro perfil
+            localStorage.removeItem('viewingUserProfile');
             loadUserProfile(); 
             break;
         case 'explore': 
@@ -2123,6 +2131,13 @@ function makeOptionsFunctionsGlobal() {
         // Mostrar este menú
         menu.classList.add('show');
         activeMenu = menu;
+        // ========== HACER LAS FUNCIONES GLOBALES ==========
+        // En la función makeOptionsFunctionsGlobal o en otro lugar apropiado, agregar:
+        window.navigateToUserProfile = navigateToUserProfile;
+        window.checkIfUserIsBlocked = checkIfUserIsBlocked;
+        window.showBlockedUserModal = showBlockedUserModal;
+        window.closeBlockedUserModal = closeBlockedUserModal;
+        window.goToMyProfileFromModal = goToMyProfileFromModal;
         
         console.log('✅ Menú mostrado correctamente');
     };
@@ -2844,7 +2859,37 @@ function removeVideoPreview() {
     document.getElementById('postVideo').value = '';
 }
 
-// Modificar la función createPostHTML para mostrar audio y video
+// ========== FUNCIONALIDAD DE PERFILES DE USUARIOS ==========
+
+// Función para navegar al perfil de un usuario
+// Modificar la función navigateToUserProfile
+function navigateToUserProfile(userId) {
+    // Verificar si el usuario está bloqueado antes de navegar
+    checkIfUserIsBlocked(userId).then(isBlocked => {
+        if (isBlocked) {
+            showBlockedUserModal(userId);
+            return;
+        }
+        
+        // Guardar el ID del usuario que queremos ver en el localStorage
+        localStorage.setItem('viewingUserProfile', userId);
+        
+        // Redirigir a profile.html
+        window.location.href = 'profile.html';
+    }).catch(error => {
+        console.error('Error verificando bloqueo:', error);
+        // En caso de error, navegar de todos modos
+        localStorage.setItem('viewingUserProfile', userId);
+        window.location.href = 'profile.html';
+    });
+}
+
+// Función para ver perfil desde cualquier lugar
+function viewUserProfile(userId) {
+    navigateToUserProfile(userId);
+}
+
+// Modificar la función createPostHTML para hacer los nombres clickeables
 function createPostHTML(post) {
     const isLiked = post.likes.some(like => 
         typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
@@ -2857,86 +2902,23 @@ function createPostHTML(post) {
     const isSharedPost = post.tipo === 'share';
     const hasOriginalPost = isSharedPost && post.postOriginal;
     const isAuthor = post.autor._id === currentUser._id;
-    
-    // Determinar qué medio mostrar para POSTS NORMALES
-    let mediaHTML = '';
-    if (!isSharedPost) {
-        if (post.tipoContenido === 'audio' && post.audio) {
-            mediaHTML = `
-                <div class="post-audio">
-                    <audio controls class="audio-player">
-                        <source src="${post.audio}" type="audio/mpeg">
-                        <source src="${post.audio}" type="audio/wav">
-                        <source src="${post.audio}" type="audio/ogg">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                    ${post.duracion ? `<div class="audio-duration">${formatDuracion(post.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (post.tipoContenido === 'video' && post.video) {
-            mediaHTML = `
-                <div class="post-video">
-                    <video controls class="video-player">
-                        <source src="${post.video}" type="video/mp4">
-                        <source src="${post.video}" type="video/webm">
-                        <source src="${post.video}" type="video/ogg">
-                        Tu navegador no soporta el elemento de video.
-                    </video>
-                    ${post.duracion ? `<div class="video-duration">${formatDuracion(post.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (post.imagen) {
-            mediaHTML = `<img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">`;
-        }
-    }
-    
-    // Determinar qué medio mostrar para POSTS COMPARTIDOS (del post original)
-    let originalMediaHTML = '';
-    if (hasOriginalPost && post.postOriginal) {
-        const originalPost = post.postOriginal;
-        
-        if (originalPost.tipoContenido === 'audio' && originalPost.audio) {
-            originalMediaHTML = `
-                <div class="post-audio">
-                    <audio controls class="audio-player">
-                        <source src="${originalPost.audio}" type="audio/mpeg">
-                        <source src="${originalPost.audio}" type="audio/wav">
-                        <source src="${originalPost.audio}" type="audio/ogg">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                    ${originalPost.duracion ? `<div class="audio-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (originalPost.tipoContenido === 'video' && originalPost.video) {
-            originalMediaHTML = `
-                <div class="post-video">
-                    <video controls class="video-player">
-                        <source src="${originalPost.video}" type="video/mp4">
-                        <source src="${originalPost.video}" type="video/webm">
-                        <source src="${originalPost.video}" type="video/ogg">
-                        Tu navegador no soporta el elemento de video.
-                    </video>
-                    ${originalPost.duracion ? `<div class="video-duration">${formatDuracion(originalPost.duracion)}</div>` : ''}
-                </div>
-            `;
-        } else if (originalPost.imagen) {
-            originalMediaHTML = `<img src="${originalPost.imagen}" alt="Imagen de publicación" class="original-post-image">`;
-        }
-    }
-    
+
     return `
-        <div class="post-card" id="post-${post._id}" data-content-type="${post.tipoContenido}">
+        <div class="post-card" id="post-${post._id}">
             <div class="post-header">
-                <div class="post-avatar">
+                <div class="post-avatar" onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer;">
                     ${post.autor.foto_perfil ? 
                         `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
                         `<i class="fas fa-user"></i>`
                     }
                 </div>
                 <div class="post-user-info">
-                    <h4>${post.autor.nombre}</h4>
-                    <p>@${post.autor.username}</p>
-                    <span class="content-type-badge ${post.tipoContenido}">${post.tipoContenido}</span>
+                    <h4 onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #3498db;">
+                        ${post.autor.nombre}
+                    </h4>
+                    <p onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                        @${post.autor.username}
+                    </p>
                 </div>
                 <div class="post-time">${timeAgo}</div>
                 
@@ -2973,26 +2955,65 @@ function createPostHTML(post) {
             ${hasOriginalPost ? `
                 <div class="original-post-preview">
                     <div class="original-post-header">
-                        <div class="original-post-avatar">
+                        <div class="original-post-avatar" onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer;">
                             ${post.postOriginal.autor.foto_perfil ? 
                                 `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
                                 `<i class="fas fa-user"></i>`
                             }
                         </div>
                         <div class="original-post-info">
-                            <strong>${post.postOriginal.autor.nombre}</strong>
-                            <span>@${post.postOriginal.autor.username}</span>
-                            <span class="content-type-badge ${post.postOriginal.tipoContenido}">${post.postOriginal.tipoContenido}</span>
+                            <strong onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #3498db;">
+                                ${post.postOriginal.autor.nombre}
+                            </strong>
+                            <span onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                                @${post.postOriginal.autor.username}
+                            </span>
                         </div>
                     </div>
                     <div class="original-post-content">
                         ${formatPostContent(post.postOriginal.contenido)}
                     </div>
-                    ${originalMediaHTML}
+                    ${post.postOriginal.imagen ? `
+                        <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+                    ` : ''}
                 </div>
             ` : ''}
             
-            ${mediaHTML}
+            ${!isSharedPost ? `
+                ${post.imagen ? `
+                    <div class="post-media">
+                        <img src="${post.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${post._id}">
+                    </div>
+                ` : ''}
+                
+                ${post.audio ? `
+                    <div class="post-media">
+                        <div class="audio-player-container">
+                            <audio controls class="audio-player" id="audio-${post._id}">
+                                <source src="${post.audio}" type="audio/mpeg">
+                                <source src="${post.audio}" type="audio/wav">
+                                <source src="${post.audio}" type="audio/ogg">
+                                Tu navegador no soporta el elemento de audio.
+                            </audio>
+                            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${post.video ? `
+                    <div class="post-media">
+                        <div class="video-player-container">
+                            <video controls class="video-player" id="video-${post._id}" poster="${post.videoThumbnail || ''}">
+                                <source src="${post.video}" type="video/mp4">
+                                <source src="${post.video}" type="video/webm">
+                                <source src="${post.video}" type="video/ogg">
+                                Tu navegador no soporta el elemento de video.
+                            </video>
+                            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+            ` : ''}
             
             <div class="post-actions-bar">
                 <button class="post-action ${isLiked ? 'liked' : ''}" id="likeBtn-${post._id}">
@@ -3012,9 +3033,218 @@ function createPostHTML(post) {
     `;
 }
 
+// Modificar la función createUserCardHTML para hacer los nombres clickeables
+function createUserCardHTML(user) {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    const isCurrentUser = currentUser._id === user._id;
+    const isFollowing = currentUser.seguidos?.includes(user._id);
+    const isFollower = currentUser.seguidores?.includes(user._id);
+    const isBlocked = currentUser.usuarios_bloqueados?.includes(user._id);
+    
+    return `
+        <div class="user-card-main" data-user-id="${user._id}">
+            <!-- Menú de opciones -->
+            <div class="user-card-options">
+                ${!isCurrentUser ? `
+                    <button class="btn-options" onclick="toggleOptionsMenu('${user._id}', event)">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                    <div class="options-menu" id="optionsMenu-${user._id}">
+                        ${isBlocked ? `
+                            <button class="option-item unblock-option" data-user-id="${user._id}">
+                                <i class="fas fa-lock-open"></i>
+                                <span>Desbloquear</span>
+                            </button>
+                        ` : `
+                            <button class="option-item block-option" data-user-id="${user._id}" data-user-name="${user.nombre}">
+                                <i class="fas fa-ban"></i>
+                                <span>Bloquear usuario</span>
+                            </button>
+                            ${isFollower ? `
+                                <button class="option-item remove-follower-option" data-user-id="${user._id}">
+                                    <i class="fas fa-user-times"></i>
+                                    <span>Eliminar seguidor</span>
+                                </button>
+                            ` : ''}
+                        `}
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="user-card-header">
+                <div class="user-avatar-medium" onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer;">
+                    ${user.foto_perfil ? 
+                        `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <div class="user-info">
+                    <h4 onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer; color: #3498db;">
+                        ${user.nombre} 
+                    </h4>
+                    <p class="user-username" onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer; color: #7f8c8d;">
+                        @${user.username} ${isBlocked ? `<span class="blocked-indicator">BLOQUEADO</span>` : ''}
+                    </p>
+                    ${user.biografia ? `<p class="user-bio">${user.biografia}</p>` : ''}
+                </div>
+            </div>
+            
+            <div class="user-stats">
+                <div class="stat">
+                    <strong>${user.seguidores?.length || 0}</strong>
+                    <span>Seguidores</span>
+                </div>
+                <div class="stat">
+                    <strong>${user.seguidos?.length || 0}</strong>
+                    <span>Seguidos</span>
+                </div>
+            </div>
+            
+            <div class="user-actions">
+                <button class="btn-view-profile" onclick="navigateToUserProfile('${user._id}')">
+                    <i class="fas fa-eye"></i> Ver Perfil
+                </button>
+                ${!isCurrentUser && !isBlocked ? `
+                    <button class="btn-follow ${isFollowing ? 'following' : ''}" 
+                            onclick="toggleFollow('${user._id}')">
+                        <i class="fas ${isFollowing ? 'fa-user-check' : 'fa-user-plus'}"></i>
+                        ${isFollowing ? 'Siguiendo' : 'Seguir'}
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
 // Función para formatear la duración
 function formatDuracion(segundos) {
     const minutos = Math.floor(segundos / 60);
     const segs = Math.floor(segundos % 60);
     return `${minutos}:${segs.toString().padStart(2, '0')}`;
 }
+
+// ========== VERIFICACIÓN DE BLOQUEO ==========
+async function checkIfUserIsBlocked(userId) {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        if (!currentUser) {
+            console.error('❌ No hay usuario actual en localStorage');
+            return false;
+        }
+
+        // Verificar si el usuario actual bloqueó al otro usuario (localmente)
+        const iBlockedThem = currentUser.usuarios_bloqueados?.includes(userId);
+        
+        if (iBlockedThem) {
+            console.log('🔒 Usuario bloqueado localmente por mí');
+            return true;
+        }
+
+        // Verificar si el otro usuario bloqueó al usuario actual (en el servidor)
+        console.log(`🔍 Verificando en servidor si usuario ${userId} me bloqueó`);
+        const response = await fetch(`${API_URL}/users/${userId}/check-blocked`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('📊 Resultado verificación bloqueo:', result);
+            
+            if (result.success) {
+                return result.data.isBlocked;
+            }
+        }
+        
+        // Si hay error en el servidor, solo verificar localmente
+        console.warn('⚠️ Error en verificación de servidor, usando solo verificación local');
+        return iBlockedThem;
+        
+    } catch (error) {
+        console.error('❌ Error verificando bloqueo:', error);
+        // En caso de error, verificar solo localmente
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        return currentUser?.usuarios_bloqueados?.includes(userId) || false;
+    }
+}
+
+// ========== MODAL PARA USUARIOS BLOQUEADOS ==========
+function showBlockedUserModal(userId) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'blockedUserModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-ban"></i> Usuario Bloqueado</h3>
+                <span class="close-modal" onclick="closeBlockedUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="blocked-user-content">
+                    <div class="blocked-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h4>No puedes ver este perfil</h4>
+                    <p>No puedes ver el perfil de este usuario debido a restricciones de privacidad.</p>
+                    <div class="blocked-options">
+                        <button class="btn-secondary" onclick="closeBlockedUserModal()">
+                            <i class="fas fa-times"></i> Volver
+                        </button>
+                        <button class="btn-primary" onclick="goToMyProfileFromModal()">
+                            <i class="fas fa-user"></i> Ver mi perfil
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+}
+
+function closeBlockedUserModal() {
+    const modal = document.getElementById('blockedUserModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function goToMyProfileFromModal() {
+    localStorage.removeItem('viewingUserProfile');
+    closeBlockedUserModal();
+    window.location.href = 'profile.html';
+}
+
+// ========== MODIFICAR LA FUNCIÓN navigateToUserProfile ==========
+async function navigateToUserProfile(userId) {
+    console.log('🎯 Intentando navegar al perfil de:', userId);
+    
+    try {
+        // Verificar si el usuario está bloqueado antes de navegar
+        const isBlocked = await checkIfUserIsBlocked(userId);
+        
+        if (isBlocked) {
+            console.log('🚫 Usuario bloqueado, mostrando modal');
+            showBlockedUserModal(userId);
+            return;
+        }
+        
+        // Si no está bloqueado, proceder con la navegación
+        console.log('✅ Usuario no bloqueado, navegando al perfil');
+        localStorage.setItem('viewingUserProfile', userId);
+        window.location.href = 'profile.html';
+        
+    } catch (error) {
+        console.error('❌ Error en navigateToUserProfile:', error);
+        // En caso de error, navegar de todos modos pero mostrar advertencia
+        showToast('⚠️ Error verificando bloqueo, redirigiendo...', 'info');
+        localStorage.setItem('viewingUserProfile', userId);
+        window.location.href = 'profile.html';
+    }
+}
+

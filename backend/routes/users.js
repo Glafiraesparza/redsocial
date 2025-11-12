@@ -554,4 +554,117 @@ router.get('/:id/isblocked/:targetId', async (req, res) => {
     }
 });
 
+// backend/routes/users.js - AGREGA ESTO AL FINAL, ANTES DE module.exports
+
+// VERIFICAR BLOQUEO MUTUO entre usuarios
+router.post('/:userId/check-blocked', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { currentUserId } = req.body;
+
+        console.log(`🔍 Verificando bloqueo entre ${currentUserId} y ${userId}`);
+
+        const user = await User.findById(userId);
+        const currentUser = await User.findById(currentUserId);
+
+        if (!user || !currentUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar si el usuario actual está bloqueado por el otro usuario
+        const isBlockedByThem = user.usuarios_bloqueados.includes(currentUserId);
+        // Verificar si el usuario actual bloqueó al otro usuario
+        const iBlockedThem = currentUser.usuarios_bloqueados.includes(userId);
+
+        const isBlocked = isBlockedByThem || iBlockedThem;
+
+        console.log(`📊 Resultado verificación bloqueo:`, {
+            isBlocked,
+            blockedByThem: isBlockedByThem,
+            blockedByMe: iBlockedThem
+        });
+
+        res.json({
+            success: true,
+            data: {
+                isBlocked: isBlocked,
+                blockedByThem: isBlockedByThem,
+                blockedByMe: iBlockedThem
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error verificando bloqueo:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al verificar bloqueo'
+        });
+    }
+});
+
+// También sería bueno agregar este endpoint adicional para verificar bloqueo específico
+// VERIFICAR si el usuario actual puede ver el perfil de otro usuario
+router.post('/:userId/can-view-profile', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { currentUserId } = req.body;
+
+        const user = await User.findById(userId);
+        const currentUser = await User.findById(currentUserId);
+
+        if (!user || !currentUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar bloqueos mutuos
+        const isBlockedByThem = user.usuarios_bloqueados.includes(currentUserId);
+        const iBlockedThem = currentUser.usuarios_bloqueados.includes(userId);
+        const isBlocked = isBlockedByThem || iBlockedThem;
+
+        // Verificar si el perfil es privado (si implementas perfiles privados en el futuro)
+        const isPrivate = user.configuracion?.perfil_privado || false;
+
+        let canView = true;
+        let reason = '';
+
+        if (isBlocked) {
+            canView = false;
+            if (isBlockedByThem && iBlockedThem) {
+                reason = 'bloqueo_mutuo';
+            } else if (isBlockedByThem) {
+                reason = 'ellos_te_bloquearon';
+            } else {
+                reason = 'tu_lo_bloqueaste';
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                canView: canView,
+                isBlocked: isBlocked,
+                reason: reason,
+                userInfo: {
+                    nombre: user.nombre,
+                    username: user.username,
+                    foto_perfil: user.foto_perfil
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error verificando visibilidad de perfil:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor'
+        });
+    }
+});
+
 module.exports = router;

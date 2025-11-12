@@ -64,10 +64,7 @@ const userSchema = new mongoose.Schema({
     enum: ['masculino', 'femenino', 'otro', 'prefiero_no_decir'],
     default: 'prefiero_no_decir'
   },
-  seguidores: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  // CORREGIDO: seguidores estaba duplicado
   seguidores: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -84,7 +81,26 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  
+  // Opcional: agregar configuración de privacidad para el futuro
+  configuracion: {
+    perfil_privado: {
+      type: Boolean,
+      default: false
+    },
+    mensajes_privados: {
+      type: String,
+      enum: ['todos', 'seguidos', 'nadie'],
+      default: 'todos'
+    },
+    mostrar_fecha_nacimiento: {
+      type: Boolean,
+      default: true
+    },
+    mostrar_email: {
+      type: Boolean,
+      default: false
+    }
+  },
   fecha_registro: {
     type: Date,
     default: Date.now
