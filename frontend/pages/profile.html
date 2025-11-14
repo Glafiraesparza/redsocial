@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perfil - Kion-D</title>
+    <title>Perfil - Aural</title>
     <link rel="stylesheet" href="../css/style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -12,14 +12,21 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <i class="fas fa-share-alt"></i>
-                Kion-D
+                <div class="logo-container">
+                    <div class="logo-orbits">
+                        <div class="orbit orbit-1"></div>
+                        <div class="orbit orbit-2"></div>
+                        <div class="orbit orbit-3"></div>
+                        <div class="particle particle-1"></div>
+                        <div class="particle particle-2"></div>
+                        <div class="particle particle-3"></div>
+                        <div class="particle particle-4"></div>
+                    </div>
+                    <!-- Solo la imagen del logo -->
+                    <img src="aural2.png" alt="Aural Logo" class="logo-img">
+                </div>
             </div>
             <div class="nav-user">
-                <span id="userGreeting">Hola, Usuario</span>
-                <button id="backToDashboard" class="btn-secondary btn-small">
-                    <i class="fas fa-arrow-left"></i> Volver al Inicio
-                </button>
                 <button id="logoutBtn" class="btn-secondary btn-small">
                     <i class="fas fa-sign-out-alt"></i> Salir
                 </button>
@@ -237,7 +244,7 @@
                     <div class="collections-container">
                         <div class="collections-header">
                             <h3>Mis Colecciones</h3>
-                            <button class="btn-primary" onclick="createNewCollection()">
+                            <button class="btn-primary" onclick="openCreateCollectionModal()">
                                 <i class="fas fa-plus"></i> Nueva Colección
                             </button>
                         </div>
@@ -245,7 +252,7 @@
                         <div class="collections-preview">
                             <h4>Colecciones Principales</h4>
                             <div class="collections-grid" id="collectionsGrid">
-                                <!-- Las colecciones se cargarán aquí -->
+                                <!-- Las colecciones se cargarán aquí dinámicamente -->
                             </div>
                         </div>
 
@@ -288,7 +295,7 @@
                         <h4>Agregar Nueva Foto de Portada</h4>
                         <div class="upload-area" id="coverUploadArea">
                             <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Arrastra una imagen aquí o haz click para seleccionar</p>
+                            <p>Selecciona una imagen para tu portada</p>
                             <input type="file" id="coverPhotoInput" accept="image/*" style="display: none;">
                             <button class="btn-primary" onclick="document.getElementById('coverPhotoInput').click()">
                                 <i class="fas fa-plus"></i> Seleccionar Imagen
@@ -389,5 +396,6 @@
     <script>
         console.log("🔵 Después de messages.js - currentUser:", window.currentUser);
     </script>
+    <script src="../js/collections.js"></script>
 </body>
 </html>

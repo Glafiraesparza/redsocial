@@ -6,6 +6,8 @@ let currentUser = null;
 let currentPosts = [];
 let currentPostId = null;
 let currentMediaType = 'imagen'; // 'imagen', 'audio', 'video'
+let toastTimeout = null;
+let errorHighlightTimeout = null;
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
@@ -15,11 +17,16 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeDashboard() {
     console.log('🚀 Inicializando Dashboard...');
     
-    // CORREGIR: Establecer currentUser correctamente
+    // DEBUG: Verificar elementos del DOM
+    console.log('🔍 Elementos del DOM:');
+    console.log(' - postContent:', document.getElementById('postContent'));
+    console.log(' - submitPost:', document.getElementById('submitPost'));
+    console.log(' - media buttons:', document.querySelectorAll('.media-type-btn').length);
+    
     const userData = localStorage.getItem('currentUser');
     if (userData) {
         currentUser = JSON.parse(userData);
-        window.currentUser = currentUser; // ← ESTA LÍNEA ES IMPORTANTE
+        window.currentUser = currentUser;
     }
     
     if (!currentUser) {
@@ -33,10 +40,8 @@ function initializeDashboard() {
     const urlSection = getUrlParameter('section');
     
     if (urlSection) {
-        // Mostrar la sección de la URL
         showSection(urlSection);
     } else {
-        // Comportamiento normal - mostrar feed por defecto
         showSection('feed');
     }
 
@@ -47,7 +52,11 @@ function initializeDashboard() {
     
     initializeUserInfo();
     initializeEventListeners();
+    initializeProfileCardClick();
     makeOptionsFunctionsGlobal();
+    
+    // INICIALIZAR TIPOS DE MEDIO - AGREGAR ESTA LÍNEA
+    initializeMediaTypeButtons();
     
     console.log('✅ Dashboard inicializado correctamente');
 }
@@ -79,13 +88,21 @@ function initializeEventListeners() {
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     document.getElementById('submitPost').addEventListener('click', handleCreatePost);
     
+    // Event listener para el clic en tu perfil del sidebar
+    const userProfileCard = document.querySelector('.user-profile-card');
+    if (userProfileCard) {
+        userProfileCard.addEventListener('click', function() {
+            showSection('profile');
+        });
+    }
+    
     const postContent = document.getElementById('postContent');
     const charCount = document.getElementById('charCount');
     
     postContent.addEventListener('input', function() {
         const length = this.value.length;
-        charCount.textContent = `${length}/1000`;
-        charCount.style.color = length > 900 ? '#e74c3c' : length > 700 ? '#f39c12' : '#7f8c8d';
+        charCount.textContent = `${length}/500`;
+        charCount.style.color = length > 400 ? '#e74c3c' : length > 300 ? '#f39c12' : '#7f8c8d';
     });
     
     postContent.addEventListener('keydown', function(e) {
@@ -94,14 +111,106 @@ function initializeEventListeners() {
         }
     });
     
-    // Event listeners para multimedia
+    // INICIALIZAR EVENT LISTENERS PARA MULTIMEDIA - VERSIÓN MEJORADA
+    initializeMediaEventListeners();
+    
+    // INICIALIZAR BOTONES DE TIPO DE MEDIO
+    initializeMediaTypeButtons();
+}
+
+function initializeMediaEventListeners() {
+    console.log('🔧 Inicializando event listeners de multimedia...');
+    
+    // Remover event listeners existentes primero
+    const postImageInput = document.getElementById('postImage');
+    const postAudioInput = document.getElementById('postAudio');
+    const postVideoInput = document.getElementById('postVideo');
+    
+    // Clonar y reemplazar para limpiar event listeners
+    if (postImageInput) {
+        const newImageInput = postImageInput.cloneNode(true);
+        postImageInput.parentNode.replaceChild(newImageInput, postImageInput);
+    }
+    
+    if (postAudioInput) {
+        const newAudioInput = postAudioInput.cloneNode(true);
+        postAudioInput.parentNode.replaceChild(newAudioInput, postAudioInput);
+    }
+    
+    if (postVideoInput) {
+        const newVideoInput = postVideoInput.cloneNode(true);
+        postVideoInput.parentNode.replaceChild(newVideoInput, postVideoInput);
+    }
+    
+    // Agregar nuevos event listeners
     document.getElementById('postImage').addEventListener('change', handleImageUpload);
     document.getElementById('postAudio').addEventListener('change', handleAudioUpload);
     document.getElementById('postVideo').addEventListener('change', handleVideoUpload);
 }
 
+function initializeMediaTypeButtons() {
+    console.log('🔧 Inicializando botones de tipo de medio...');
+    
+    // Remover event listeners existentes
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+    });
+    
+    // Agregar nuevos event listeners usando addEventListener
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const type = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+            changeMediaType(type);
+        });
+    });
+    
+    // Establecer imagen como tipo por defecto
+    currentMediaType = 'imagen';
+    document.getElementById('imageUpload').style.display = 'block';
+    document.getElementById('audioUpload').style.display = 'none';
+    document.getElementById('videoUpload').style.display = 'none';
+    
+    // Establecer botón activo
+    const imageBtn = document.querySelector('[onclick*="imagen"]');
+    if (imageBtn) {
+        imageBtn.classList.add('active');
+    }
+    
+    console.log('✅ Botones de tipo de medio inicializados');
+}
+
+function highlightTextareaError() {
+    const textarea = document.getElementById('postContent');
+    const charCount = document.getElementById('charCount');
+    
+    // Limpiar timeout anterior si existe
+    if (errorHighlightTimeout) {
+        clearTimeout(errorHighlightTimeout);
+        errorHighlightTimeout = null;
+    }
+    
+    // Agregar clase de error
+    textarea.classList.add('error');
+    charCount.classList.add('error');
+    
+    // Hacer scroll al textarea
+    textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Enfocar el textarea
+    textarea.focus();
+    
+    // Remover el error después de 8 segundos (mismo tiempo que el toast de error)
+    errorHighlightTimeout = setTimeout(() => {
+        textarea.classList.remove('error');
+        charCount.classList.remove('error');
+        errorHighlightTimeout = null;
+    }, 8000);
+}
+
+
 // ========== PUBLICACIONES ==========
-// En dashboard.js - CORRIGE handleCreatePost para videos
 async function handleCreatePost() {
     const content = document.getElementById('postContent').value.trim();
     
@@ -116,10 +225,21 @@ async function handleCreatePost() {
         mediaFile = document.getElementById('postVideo').files[0];
     }
     
+    console.log('🔍 DEBUG handleCreatePost:');
+    console.log(' - content:', content);
+    console.log(' - mediaType:', mediaType);
+    console.log(' - mediaFile:', mediaFile);
+    
+    // SOLO ESTA VALIDACIÓN - PERMITIR MEDIOS SIN TEXTO
     if (!content && !mediaFile) {
+        console.log('❌ Sin contenido y sin archivo');
         showToast('❌ Escribe algo o selecciona un archivo para publicar', 'error');
+        highlightTextareaError();
         return;
     }
+    
+    // Si llegamos aquí, es porque hay contenido O hay archivo (o ambos)
+    console.log('✅ Validación pasada, procediendo a publicar...');
     
     try {
         let mediaUrl = '';
@@ -129,7 +249,6 @@ async function handleCreatePost() {
         if (mediaFile) {
             showToast(`📤 Subiendo ${mediaType}...`, 'info');
             
-            // CORRECIÓN: Para video usar 'video' como fieldName
             const fieldName = mediaType === 'imagen' ? 'image' : mediaType;
             const uploadResult = await uploadMediaFile(mediaFile, fieldName);
             mediaUrl = uploadResult.url;
@@ -139,7 +258,7 @@ async function handleCreatePost() {
         
         const postData = {
             autor: currentUser._id,
-            contenido: content,
+            contenido: content || '', // Enviar string vacío si no hay contenido
             duracion: duracion,
             tipoContenido: mediaFile ? mediaType : 'texto'
         };
@@ -176,7 +295,6 @@ async function handleCreatePost() {
     }
 }
 
-
 async function loadFeed() {
     try {
         const response = await fetch(`${API_URL}/posts/feed/${currentUser._id}`);
@@ -194,30 +312,43 @@ async function loadFeed() {
     }
 }
 
+
 // Función para cambiar el tipo de contenido
-function changeMediaType(type) {
-    currentMediaType = type;
-    
-    // Ocultar todos los inputs primero
-    document.getElementById('imageUpload').style.display = 'none';
-    document.getElementById('audioUpload').style.display = 'none';
-    document.getElementById('videoUpload').style.display = 'none';
-    
-    // Mostrar solo el input correspondiente
-    if (type === 'imagen') {
-        document.getElementById('imageUpload').style.display = 'block';
-    } else if (type === 'audio') {
-        document.getElementById('audioUpload').style.display = 'block';
-    } else if (type === 'video') {
-        document.getElementById('videoUpload').style.display = 'block';
+function changeEditMediaType(type) {
+    // Verificar si hay algún medio existente
+    const hasExistingMedia = document.querySelector('.current-media-preview');
+    if (hasExistingMedia) {
+        showToast('❌ Primero elimina el medio actual para agregar uno nuevo', 'error');
+        return;
     }
     
+    // Ocultar todos los uploaders
+    document.getElementById('editImageUpload').style.display = 'none';
+    document.getElementById('editAudioUpload').style.display = 'none';
+    document.getElementById('editVideoUpload').style.display = 'none';
+    
+    // Limpiar previews
+    document.getElementById('editImagePreview').innerHTML = '';
+    document.getElementById('editAudioPreview').innerHTML = '';
+    document.getElementById('editVideoPreview').innerHTML = '';
+    
+    // Mostrar el uploader seleccionado
+    document.getElementById(`edit${type.charAt(0).toUpperCase() + type.slice(1)}Upload`).style.display = 'block';
+    
     // Actualizar botones activos
-    document.querySelectorAll('.media-type-btn').forEach(btn => {
+    document.querySelectorAll('.media-type-btn-edit').forEach(btn => {
         btn.classList.remove('active');
     });
-    document.querySelector(`[onclick="changeMediaType('${type}')"]`).classList.add('active');
+    event.target.classList.add('active');
+    
+    // Abrir selector de archivos
+    setTimeout(() => {
+        document.getElementById(`editPost${type.charAt(0).toUpperCase() + type.slice(1)}`).click();
+    }, 100);
 }
+
+
+
 
 function displayPosts(posts) {
     const postsFeed = document.getElementById('postsFeed');
@@ -258,25 +389,26 @@ function createPostHTML(post) {
     const shareCount = post.shares ? post.shares.length : 0;
     const timeAgo = getTimeAgo(new Date(post.fecha_publicacion));
     
-    // Si es un share, mostrar información del post original
     const isSharedPost = post.tipo === 'share';
     const hasOriginalPost = isSharedPost && post.postOriginal;
-    
-    // Verificar si el usuario actual es el autor del post
     const isAuthor = post.autor._id === currentUser._id;
-    
+
     return `
         <div class="post-card" id="post-${post._id}">
             <div class="post-header">
-                <div class="post-avatar">
+                <div class="post-avatar" onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer;">
                     ${post.autor.foto_perfil ? 
-                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}">` : 
                         `<i class="fas fa-user"></i>`
                     }
                 </div>
                 <div class="post-user-info">
-                    <h4>${post.autor.nombre}</h4>
-                    <p>@${post.autor.username}</p>
+                    <h4 onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #3498db;">
+                        ${post.autor.nombre}
+                    </h4>
+                    <p onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                        @${post.autor.username}
+                    </p>
                 </div>
                 <div class="post-time">${timeAgo}</div>
                 
@@ -313,27 +445,63 @@ function createPostHTML(post) {
             ${hasOriginalPost ? `
                 <div class="original-post-preview">
                     <div class="original-post-header">
-                        <div class="original-post-avatar">
+                        <div class="original-post-avatar" onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer;">
                             ${post.postOriginal.autor.foto_perfil ? 
                                 `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
                                 `<i class="fas fa-user"></i>`
                             }
                         </div>
                         <div class="original-post-info">
-                            <strong>${post.postOriginal.autor.nombre}</strong>
-                            <span>@${post.postOriginal.autor.username}</span>
+                            <strong onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #3498db;">
+                                ${post.postOriginal.autor.nombre}
+                            </strong>
+                            <span onclick="navigateToUserProfile('${post.postOriginal.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                                @${post.postOriginal.autor.username}
+                            </span>
                         </div>
                     </div>
                     <div class="original-post-content">
                         ${formatPostContent(post.postOriginal.contenido)}
                     </div>
+                    
+                    <!-- MOSTRAR MEDIA DEL POST ORIGINAL - CORRECCIÓN -->
                     ${post.postOriginal.imagen ? `
-                        <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+                        <div class="original-post-media">
+                            <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+                        </div>
+                    ` : ''}
+                    
+                    ${post.postOriginal.audio ? `
+                        <div class="original-post-media">
+                            <div class="audio-player-container">
+                                <audio controls class="audio-player">
+                                    <source src="${post.postOriginal.audio}" type="audio/mpeg">
+                                    <source src="${post.postOriginal.audio}" type="audio/wav">
+                                    <source src="${post.postOriginal.audio}" type="audio/ogg">
+                                    Tu navegador no soporta el elemento de audio.
+                                </audio>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${post.postOriginal.video ? `
+                        <div class="original-post-media">
+                            <div class="video-player-container">
+                                <video controls class="video-player" poster="${post.postOriginal.videoThumbnail || ''}">
+                                    <source src="${post.postOriginal.video}" type="video/mp4">
+                                    <source src="${post.postOriginal.video}" type="video/webm">
+                                    <source src="${post.postOriginal.video}" type="video/ogg">
+                                    Tu navegador no soporta el elemento de video.
+                                </video>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
                     ` : ''}
                 </div>
             ` : ''}
             
-            // ========== MOSTRAR MULTIMEDIA ==========
+            <!-- MEDIA DEL POST ACTUAL (solo si no es compartido) -->
             ${!isSharedPost ? `
                 ${post.imagen ? `
                     <div class="post-media">
@@ -476,6 +644,7 @@ function removeVideoPreview() {
 // ========== FUNCIONALIDAD DE EDICIÓN ==========
 
 // Función para abrir el modal de edición
+// Función para abrir el modal de edición mejorado
 function editPost(postId) {
     closeAllPostOptions();
     
@@ -518,29 +687,108 @@ function editPost(postId) {
                         </div>
                     </div>
                     
-                    ${post.imagen ? `
-                        <div class="current-image-preview">
-                            <label>
-                                <i class="fas fa-image"></i> Imagen actual
-                            </label>
-                            <div class="image-preview-container">
-                                <img src="${post.imagen}" alt="Imagen actual" class="current-image">
-                                <button type="button" class="btn-remove-image" onclick="removeCurrentImage('${postId}')">
-                                    <i class="fas fa-times"></i> Eliminar imagen
-                                </button>
+                    <!-- Sección para medios existentes -->
+                    <div class="current-media-section">
+                        ${post.imagen ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-image"></i> Imagen actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <img src="${post.imagen}" alt="Imagen actual" class="current-media">
+                                    <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'imagen')">
+                                        <i class="fas fa-times"></i> Eliminar imagen
+                                    </button>
+                                </div>
                             </div>
+                        ` : ''}
+                        
+                        ${post.audio ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-music"></i> Audio actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <div class="audio-preview-item">
+                                        <i class="fas fa-music"></i>
+                                        <div class="audio-info">
+                                            <strong>Audio actual</strong>
+                                            <span>Duración: ${formatDuracion(post.duracion)}</span>
+                                        </div>
+                                        <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'audio')">
+                                            <i class="fas fa-times"></i> Eliminar audio
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${post.video ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-video"></i> Video actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <video controls class="current-media-preview-video">
+                                        <source src="${post.video}" type="video/mp4">
+                                        Tu navegador no soporta el elemento de video.
+                                    </video>
+                                    <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'video')">
+                                        <i class="fas fa-times"></i> Eliminar video
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Sección para agregar nuevos medios (solo mostrar si no hay medio existente) -->
+                    ${!post.imagen && !post.audio && !post.video ? `
+                    <div class="add-media-section">
+                        <h4><i class="fas fa-plus"></i> Agregar medio (opcional)</h4>
+                        
+                        <div class="media-type-selector-edit">
+                            <button type="button" class="media-type-btn-edit active" onclick="changeEditMediaType('imagen')">
+                                <i class="fas fa-image"></i> Imagen
+                            </button>
+                            <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('audio')">
+                                <i class="fas fa-music"></i> Audio
+                            </button>
+                            <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('video')">
+                                <i class="fas fa-video"></i> Video
+                            </button>
                         </div>
-                    ` : `
-                        <div class="image-upload-edit">
-                            <label>
-                                <i class="fas fa-image"></i> Agregar imagen (opcional)
-                            </label>
+                        
+                        <div id="editImageUpload" class="media-upload-edit" style="display: block;">
                             <input type="file" id="editPostImage" accept="image/*" style="display: none;">
-                            <label for="editPostImage" class="btn-secondary btn-image-upload">
+                            <label for="editPostImage" class="btn-secondary btn-media-upload">
                                 <i class="fas fa-upload"></i> Seleccionar Imagen
                             </label>
-                            <div id="editImagePreview" class="image-preview"></div>
+                            <div id="editImagePreview" class="media-preview"></div>
                         </div>
+                        
+                        <div id="editAudioUpload" class="media-upload-edit" style="display: none;">
+                            <input type="file" id="editPostAudio" accept="audio/*" style="display: none;">
+                            <label for="editPostAudio" class="btn-secondary btn-media-upload">
+                                <i class="fas fa-upload"></i> Seleccionar Audio
+                            </label>
+                            <div id="editAudioPreview" class="media-preview"></div>
+                        </div>
+                        
+                        <div id="editVideoUpload" class="media-upload-edit" style="display: none;">
+                            <input type="file" id="editPostVideo" accept="video/*" style="display: none;">
+                            <label for="editPostVideo" class="btn-secondary btn-media-upload">
+                                <i class="fas fa-upload"></i> Seleccionar Video
+                            </label>
+                            <div id="editVideoPreview" class="media-preview"></div>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="media-info-message">
+                        <div class="info-alert">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Para agregar un nuevo medio, primero elimina el medio actual.</span>
+                        </div>
+                    </div>
                     `}
                     
                     <div class="form-actions" style="margin-top: 2rem;">
@@ -563,11 +811,12 @@ function editPost(postId) {
     openModal('edit');
 }
 
+
+
 // Función para inicializar eventos del modal de edición
 function initializeEditModalEvents(postId) {
     const editContent = document.getElementById('editPostContent');
     const editCharCount = document.getElementById('editCharCount');
-    const editImageInput = document.getElementById('editPostImage');
     
     // Contador de caracteres
     if (editContent && editCharCount) {
@@ -586,11 +835,10 @@ function initializeEditModalEvents(postId) {
         });
     }
     
-    // Preview de imagen
-    if (editImageInput) {
-        editImageInput.addEventListener('change', handleEditImageUpload);
-    }
+    // Inicializar eventos de medios
+    initializeEditMediaEvents();
 }
+
 
 // Función para manejar upload de imagen en edición
 function handleEditImageUpload(event) {
@@ -611,8 +859,8 @@ function handleEditImageUpload(event) {
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('editImagePreview').innerHTML = `
-                <div class="image-preview-item">
-                    <img src="${e.target.result}" alt="Vista previa" class="preview-image">
+                <div class="media-preview-item">
+                    <img src="${e.target.result}" alt="Vista previa" class="preview-media">
                     <button type="button" class="btn-remove-preview" onclick="removeEditImagePreview()">
                         <i class="fas fa-times"></i>
                     </button>
@@ -623,20 +871,184 @@ function handleEditImageUpload(event) {
     }
 }
 
-// Función para remover preview de imagen en edición
+// Función para manejar upload de audio en edición
+function handleEditAudioUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('audio/')) {
+            showToast('❌ Por favor selecciona un archivo de audio válido', 'error');
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('❌ El audio no debe superar los 10MB', 'error');
+            return;
+        }
+        
+        document.getElementById('editAudioPreview').innerHTML = `
+            <div class="media-preview-item">
+                <i class="fas fa-music"></i>
+                <div class="audio-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeEditAudioPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Función para manejar upload de video en edición
+function handleEditVideoUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('video/')) {
+            showToast('❌ Por favor selecciona un archivo de video válido', 'error');
+            return;
+        }
+        
+        if (file.size > 50 * 1024 * 1024) {
+            showToast('❌ El video no debe superar los 50MB', 'error');
+            return;
+        }
+        
+        const url = URL.createObjectURL(file);
+        document.getElementById('editVideoPreview').innerHTML = `
+            <div class="media-preview-item">
+                <video controls class="preview-media-video">
+                    <source src="${url}" type="${file.type}">
+                    Tu navegador no soporta el elemento video.
+                </video>
+                <div class="video-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeEditVideoPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+
+// Funciones para remover previews en edición
 function removeEditImagePreview() {
     document.getElementById('editImagePreview').innerHTML = '';
     document.getElementById('editPostImage').value = '';
 }
 
-// Función para remover imagen actual
-function removeCurrentImage(postId) {
+function removeEditAudioPreview() {
+    document.getElementById('editAudioPreview').innerHTML = '';
+    document.getElementById('editPostAudio').value = '';
+}
+
+function removeEditVideoPreview() {
+    document.getElementById('editVideoPreview').innerHTML = '';
+    document.getElementById('editPostVideo').value = '';
+}
+
+// Función para remover medio actual
+function removeCurrentMedia(postId, mediaType) {
     const post = currentPosts.find(p => p._id === postId);
     if (!post) return;
     
-    post.imagen = ''; // Remover la imagen
-    updatePost(postId, true);
+    // Remover el medio específico
+    if (mediaType === 'imagen') {
+        post.imagen = '';
+        post.imagenFilename = '';
+    } else if (mediaType === 'audio') {
+        post.audio = '';
+        post.audioFilename = '';
+    } else if (mediaType === 'video') {
+        post.video = '';
+        post.videoFilename = '';
+    }
+    
+    // Mostrar sección para agregar nuevos medios
+    showAddMediaSection();
+    
+    showToast('✅ Medio eliminado. Ahora puedes agregar uno nuevo si lo deseas.', 'success');
 }
+
+function showAddMediaSection() {
+    const currentMediaSection = document.querySelector('.current-media-section');
+    const mediaInfoMessage = document.querySelector('.media-info-message');
+    
+    if (currentMediaSection) {
+        // Remover todos los medios existentes del DOM
+        currentMediaSection.innerHTML = '';
+    }
+    
+    if (mediaInfoMessage) {
+        // Reemplazar el mensaje por la sección de agregar medios
+        mediaInfoMessage.outerHTML = `
+            <div class="add-media-section">
+                <h4><i class="fas fa-plus"></i> Agregar medio (opcional)</h4>
+                
+                <div class="media-type-selector-edit">
+                    <button type="button" class="media-type-btn-edit active" onclick="changeEditMediaType('imagen')">
+                        <i class="fas fa-image"></i> Imagen
+                    </button>
+                    <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('audio')">
+                        <i class="fas fa-music"></i> Audio
+                    </button>
+                    <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('video')">
+                        <i class="fas fa-video"></i> Video
+                    </button>
+                </div>
+                
+                <div id="editImageUpload" class="media-upload-edit" style="display: block;">
+                    <input type="file" id="editPostImage" accept="image/*" style="display: none;">
+                    <label for="editPostImage" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Imagen
+                    </label>
+                    <div id="editImagePreview" class="media-preview"></div>
+                </div>
+                
+                <div id="editAudioUpload" class="media-upload-edit" style="display: none;">
+                    <input type="file" id="editPostAudio" accept="audio/*" style="display: none;">
+                    <label for="editPostAudio" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Audio
+                    </label>
+                    <div id="editAudioPreview" class="media-preview"></div>
+                </div>
+                
+                <div id="editVideoUpload" class="media-upload-edit" style="display: none;">
+                    <input type="file" id="editPostVideo" accept="video/*" style="display: none;">
+                    <label for="editPostVideo" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Video
+                    </label>
+                    <div id="editVideoPreview" class="media-preview"></div>
+                </div>
+            </div>
+        `;
+        
+        // Re-inicializar eventos para los nuevos elementos
+        initializeEditMediaEvents();
+    }
+}
+
+function initializeEditMediaEvents() {
+    const editImageInput = document.getElementById('editPostImage');
+    const editAudioInput = document.getElementById('editPostAudio');
+    const editVideoInput = document.getElementById('editPostVideo');
+    
+    if (editImageInput) {
+        editImageInput.addEventListener('change', handleEditImageUpload);
+    }
+    
+    if (editAudioInput) {
+        editAudioInput.addEventListener('change', handleEditAudioUpload);
+    }
+    
+    if (editVideoInput) {
+        editVideoInput.addEventListener('change', handleEditVideoUpload);
+    }
+}
+
 
 // Función para cerrar el modal de edición
 function closeEditModal() {
@@ -683,9 +1095,11 @@ function resetPostForm() {
 }
 
 // Función para actualizar el post
-async function updatePost(postId, removeImage = false) {
+async function updatePost(postId) {
     const editContent = document.getElementById('editPostContent');
     const editImageInput = document.getElementById('editPostImage');
+    const editAudioInput = document.getElementById('editPostAudio');
+    const editVideoInput = document.getElementById('editPostVideo');
     
     if (!editContent) {
         showToast('❌ Error: No se pudo encontrar el contenido', 'error');
@@ -693,9 +1107,16 @@ async function updatePost(postId, removeImage = false) {
     }
     
     const contenido = editContent.value.trim();
+    const post = currentPosts.find(p => p._id === postId);
     
-    if (!contenido) {
-        showToast('❌ El contenido no puede estar vacío', 'error');
+    // Validación: debe haber contenido o algún medio
+    const hasExistingMedia = post.imagen || post.audio || post.video;
+    const hasNewMedia = (editImageInput && editImageInput.files[0]) || 
+                       (editAudioInput && editAudioInput.files[0]) || 
+                       (editVideoInput && editVideoInput.files[0]);
+    
+    if (!contenido && !hasExistingMedia && !hasNewMedia) {
+        showToast('❌ La publicación debe tener contenido o un archivo multimedia', 'error');
         return;
     }
     
@@ -705,17 +1126,52 @@ async function updatePost(postId, removeImage = false) {
             contenido: contenido
         };
         
-        // Si se está removiendo la imagen
-        if (removeImage) {
+        // Procesar nuevos archivos de medios (si existen)
+        let newMediaType = null;
+        let newMediaFile = null;
+        
+        if (editImageInput && editImageInput.files[0]) {
+            newMediaType = 'imagen';
+            newMediaFile = editImageInput.files[0];
+        } else if (editAudioInput && editAudioInput.files[0]) {
+            newMediaType = 'audio';
+            newMediaFile = editAudioInput.files[0];
+        } else if (editVideoInput && editVideoInput.files[0]) {
+            newMediaType = 'video';
+            newMediaFile = editVideoInput.files[0];
+        }
+        
+        // Si hay un nuevo archivo, subirlo y reemplazar el medio existente
+        if (newMediaFile) {
+            showToast(`📤 Subiendo ${newMediaType}...`, 'info');
+            
+            const fieldName = newMediaType === 'imagen' ? 'image' : newMediaType;
+            const uploadResult = await uploadMediaFile(newMediaFile, fieldName);
+            
+            // Configurar el nuevo medio
+            postData.tipoContenido = newMediaType;
+            postData.duracion = uploadResult.duracion || 0;
+            
+            // Limpiar todos los medios existentes
             postData.imagen = '';
-        } 
-        // Si hay una nueva imagen seleccionada
-        else if (editImageInput && editImageInput.files[0]) {
-            // En una implementación real, aquí subirías la imagen a un servidor
-            // Por ahora, usaremos una URL de data como ejemplo
-            const file = editImageInput.files[0];
-            const imageUrl = await uploadImage(file);
-            postData.imagen = imageUrl;
+            postData.audio = '';
+            postData.video = '';
+            
+            // Establecer el nuevo medio
+            if (newMediaType === 'imagen') {
+                postData.imagen = uploadResult.url;
+                postData.imagenFilename = uploadResult.filename;
+            } else if (newMediaType === 'audio') {
+                postData.audio = uploadResult.url;
+                postData.audioFilename = uploadResult.filename;
+            } else if (newMediaType === 'video') {
+                postData.video = uploadResult.url;
+                postData.videoFilename = uploadResult.filename;
+            }
+        } else {
+            // Si no hay nuevo archivo, mantener los medios existentes
+            postData.tipoContenido = post.imagen ? 'imagen' : post.audio ? 'audio' : post.video ? 'video' : 'texto';
+            postData.duracion = post.duracion || 0;
         }
         
         const response = await fetch(`${API_URL}/posts/${postId}`, {
@@ -742,6 +1198,7 @@ async function updatePost(postId, removeImage = false) {
     }
 }
 
+
 // Función para subir imagen (placeholder - en producción usarías un servicio como Cloudinary)
 async function uploadImage(file) {
     // En una implementación real, aquí subirías el archivo a tu servidor
@@ -756,7 +1213,6 @@ async function uploadImage(file) {
     });
 }
 
-// Función para actualizar el post en el DOM
 function updatePostInDOM(postId, updatedPost) {
     const postElement = document.getElementById(`post-${postId}`);
     if (!postElement) return;
@@ -767,25 +1223,8 @@ function updatePostInDOM(postId, updatedPost) {
         contentElement.innerHTML = formatPostContent(updatedPost.contenido);
     }
     
-    // Actualizar imagen si existe
-    const imageElement = document.getElementById(`postImage-${postId}`);
-    if (updatedPost.imagen) {
-        if (imageElement) {
-            imageElement.src = updatedPost.imagen;
-        } else {
-            // Si no existe el elemento de imagen, crearlo
-            const postContent = contentElement.parentElement;
-            const newImage = document.createElement('img');
-            newImage.src = updatedPost.imagen;
-            newImage.alt = 'Imagen de publicación';
-            newImage.className = 'post-image';
-            newImage.id = `postImage-${postId}`;
-            contentElement.after(newImage);
-        }
-    } else if (imageElement) {
-        // Remover imagen si fue eliminada
-        imageElement.remove();
-    }
+    // Actualizar medios
+    updateMediaInDOM(postId, updatedPost);
     
     // Actualizar la hora (mostrar "Editado")
     const timeElement = postElement.querySelector('.post-time');
@@ -797,6 +1236,56 @@ function updatePostInDOM(postId, updatedPost) {
     const postIndex = currentPosts.findIndex(p => p._id === postId);
     if (postIndex !== -1) {
         currentPosts[postIndex] = updatedPost;
+    }
+}
+
+// Función auxiliar para actualizar medios en el DOM
+function updateMediaInDOM(postId, updatedPost) {
+    const postElement = document.getElementById(`post-${postId}`);
+    if (!postElement) return;
+    
+    // Remover todos los medios existentes
+    const existingMedia = postElement.querySelector('.post-media');
+    if (existingMedia) {
+        existingMedia.remove();
+    }
+    
+    // Agregar el nuevo medio si existe
+    if (updatedPost.imagen) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <img src="${updatedPost.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${postId}">
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
+    } else if (updatedPost.audio) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <div class="audio-player-container">
+                <audio controls class="audio-player" id="audio-${postId}">
+                    <source src="${updatedPost.audio}" type="audio/mpeg">
+                    <source src="${updatedPost.audio}" type="audio/wav">
+                    Tu navegador no soporta el elemento de audio.
+                </audio>
+                ${updatedPost.duracion ? `<div class="media-duration">Duración: ${formatDuracion(updatedPost.duracion)}</div>` : ''}
+            </div>
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
+    } else if (updatedPost.video) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <div class="video-player-container">
+                <video controls class="video-player" id="video-${postId}">
+                    <source src="${updatedPost.video}" type="video/mp4">
+                    <source src="${updatedPost.video}" type="video/webm">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                ${updatedPost.duracion ? `<div class="media-duration">Duración: ${formatDuracion(updatedPost.duracion)}</div>` : ''}
+            </div>
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
     }
 }
 
@@ -908,9 +1397,17 @@ async function viewPost(postId) {
 }
 
 function showPostModal(post) {
+    console.log('🎯 Abriendo modal para post:', post._id);
     currentPostId = post._id;
     
+    const modal = document.getElementById('postModal');
     const modalContent = document.getElementById('postModalContent');
+    
+    if (!modal || !modalContent) {
+        console.error('❌ Modal no encontrado');
+        return;
+    }
+
     const isLiked = post.likes.some(like => 
         typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
     );
@@ -918,98 +1415,111 @@ function showPostModal(post) {
     const shareCount = post.shares ? post.shares.length : 0;
     const isAuthor = post.autor._id === currentUser._id;
     const isSharedPost = post.tipo === 'share';
-    
+
+    // Cargar contenido COMPLETO del modal - SIN ESTILOS FACEBOOK
     modalContent.innerHTML = `
+    <!-- Contenido Principal -->
+    <div class="post-content-modal-adjusted">
         <div class="post-header">
-            <div class="post-avatar">
+            <div class="post-avatar" onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer;">
                 ${post.autor.foto_perfil ? 
-                    `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                    `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}">` : 
                     `<i class="fas fa-user"></i>`
                 }
             </div>
             <div class="post-user-info">
-                <h4>${post.autor.nombre}</h4>
-                <p>@${post.autor.username}</p>
+                <h4 onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #3498db;">
+                    ${post.autor.nombre}
+                </h4>
+                <p onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer; color: #7f8c8d;">
+                    @${post.autor.username}
+                </p>
             </div>
             <div class="post-time">${new Date(post.fecha_publicacion).toLocaleString()}</div>
             
             ${isAuthor && !isSharedPost ? `
-                <div class="post-options">
-                    <button class="btn-icon post-options-btn" id="modalOptionsBtn-${post._id}">
-                        <i class="fas fa-ellipsis-h"></i>
-                    </button>
-                    <div class="post-options-menu" id="modalOptionsMenu-${post._id}">
-                        <button class="option-item edit-option" onclick="editPost('${post._id}'); closeModal('post');">
-                            <i class="fas fa-edit"></i>
-                            <span>Editar publicación</span>
-                        </button>
-                        <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}'); closeModal('post');">
-                            <i class="fas fa-trash"></i>
-                            <span>Eliminar publicación</span>
-                        </button>
+    <div class="post-options">
+        <button class="btn-icon post-options-btn" id="modalOptionsBtn-${post._id}">
+            <i class="fas fa-ellipsis-h"></i>
+        </button>
+        <div class="post-options-menu" id="modalOptionsMenu-${post._id}">
+            <button class="option-item edit-option" onclick="editPost('${post._id}'); closeModal('post');">
+                <i class="fas fa-edit"></i>
+                <span>Editar publicación</span>
+            </button>
+            <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}'); closeModal('post');">
+                <i class="fas fa-trash"></i>
+                <span>Eliminar publicación</span>
+            </button>
+        </div>
+    </div>
+` : ''}
+        </div>
+            
+            <div class="post-content">
+                ${formatPostContent(post.contenido)}
+            </div>
+            
+            ${post.imagen ? `
+                <div class="post-media-container-adjusted">
+                    <img src="${post.imagen}" alt="Imagen de publicación" class="post-image-modal">
+                </div>
+            ` : ''}
+
+            ${post.audio ? `
+                <div class="post-media-container-adjusted">
+                    <div class="audio-player-container">
+                        <audio controls class="audio-player">
+                            <source src="${post.audio}" type="audio/mpeg">
+                            <source src="${post.audio}" type="audio/wav">
+                            Tu navegador no soporta el elemento de audio.
+                        </audio>
+                        ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
                     </div>
                 </div>
             ` : ''}
-        </div>
-        
-        <div class="post-content">
-            ${formatPostContent(post.contenido)}
-        </div>
-        
-        // Dentro de showPostModal, después del contenido del post:
-        // En showPostModal, después del contenido del post, reemplaza la sección de multimedia:
-${post.imagen ? `
-    <img src="${post.imagen}" alt="Imagen de publicación" class="post-image">
-` : ''}
 
-${post.audio ? `
-    <div class="post-media">
-        <div class="audio-player-container">
-            <audio controls class="audio-player">
-                <source src="${post.audio}" type="audio/mpeg">
-                <source src="${post.audio}" type="audio/wav">
-                Tu navegador no soporta el elemento de audio.
-            </audio>
-            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
-        </div>
-    </div>
-` : ''}
+            ${post.video ? `
+                <div class="post-media-container-adjusted">
+                    <div class="video-player-container">
+                        <video controls class="video-player">
+                            <source src="${post.video}" type="video/mp4">
+                            <source src="${post.video}" type="video/webm">
+                            Tu navegador no soporta el elemento de video.
+                        </video>
+                        ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
 
-${post.video ? `
-    <div class="post-media">
-        <div class="video-player-container">
-            <video controls class="video-player">
-                <source src="${post.video}" type="video/mp4">
-                <source src="${post.video}" type="video/webm">
-                Tu navegador no soporta el elemento de video.
-            </video>
-            ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
-        </div>
-    </div>
-` : ''}
-
-${isSharedPost && post.postOriginal ? `
-    <div class="original-post-preview">
-        <div class="original-post-header">
-            <div class="original-post-avatar">
+            ${isSharedPost && post.postOriginal ? `
+    <div class="original-post-preview-adjusted">
+        <div class="original-post-header-adjusted">
+            <div class="original-post-avatar-adjusted">
                 ${post.postOriginal.autor.foto_perfil ? 
                     `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}">` : 
                     `<i class="fas fa-user"></i>`
                 }
             </div>
-            <div class="original-post-info">
-                <strong>${post.postOriginal.autor.nombre}</strong>
-                <span>@${post.postOriginal.autor.username}</span>
+            <div class="original-post-info-adjusted">
+                <strong class="original-post-name">${post.postOriginal.autor.nombre}</strong>
+                <span class="original-post-username">@${post.postOriginal.autor.username}</span>
             </div>
+            <div class="original-post-time">${getTimeAgo(new Date(post.postOriginal.fecha_publicacion))}</div>
         </div>
-        <div class="original-post-content">
+        <div class="original-post-content-adjusted">
             ${formatPostContent(post.postOriginal.contenido)}
         </div>
+        
+        <!-- AGREGAR AQUÍ LOS MEDIOS DEL POST ORIGINAL EN EL MODAL -->
         ${post.postOriginal.imagen ? `
-            <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+            <div class="original-post-media-container">
+                <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image-adjusted">
+            </div>
         ` : ''}
+        
         ${post.postOriginal.audio ? `
-            <div class="post-media">
+            <div class="original-post-media-container">
                 <div class="audio-player-container">
                     <audio controls class="audio-player">
                         <source src="${post.postOriginal.audio}" type="audio/mpeg">
@@ -1020,8 +1530,9 @@ ${isSharedPost && post.postOriginal ? `
                 </div>
             </div>
         ` : ''}
+        
         ${post.postOriginal.video ? `
-            <div class="post-media">
+            <div class="original-post-media-container">
                 <div class="video-player-container">
                     <video controls class="video-player">
                         <source src="${post.postOriginal.video}" type="video/mp4">
@@ -1034,40 +1545,113 @@ ${isSharedPost && post.postOriginal ? `
         ` : ''}
     </div>
 ` : ''}
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="post-stats-adjusted">
+            <div class="stats-container">
+                <span class="stat-item">
+                    <i class="fas fa-heart"></i>
+                    <span id="likesCountModal">${post.likes.length}</span> me gusta
+                </span>
+                <span class="stat-item">
+                    <i class="fas fa-comment"></i>
+                    <span id="comentariosCountModal">${post.comentarios?.length || 0}</span> comentarios
+                </span>
+                ${shareCount > 0 ? `
+                    <span class="stat-item">
+                        <i class="fas fa-share"></i>
+                        <span>${shareCount}</span> compartidos
+                    </span>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="post-actions-modal-adjusted">
+            <button class="post-action-btn ${isLiked ? 'liked' : ''}" id="likeBtnModal">
+                <i class="fas ${isLiked ? 'fa-heart' : 'far fa-heart'}"></i>
+                <span>Me gusta</span>
+            </button>
+            <button class="post-action-btn" id="commentBtnModal">
+                <i class="far fa-comment"></i>
+                <span>Comentar</span>
+            </button>
+            <button class="post-action-btn" id="shareBtnModal">
+                <i class="fas fa-share"></i>
+                <span>Compartir</span>
+            </button>
+        </div>
+
+       <!-- Sección de Comentarios INTEGRADA CON EL DISEÑO DEL MODAL -->
+        <div class="comentarios-section-modal-integrated">
+            <!-- Header de comentarios -->
+            <div class="comentarios-header-integrated">
+                <h4 class="comentarios-title">
+                    <i class="fas fa-comments"></i> Comentarios
+                    <span class="comentarios-count">(${post.comentarios?.length || 0})</span>
+                </h4>
+            </div>
+            
+            <!-- Lista de comentarios con scroll -->
+            <div class="lista-comentarios-modal" id="listaComentariosModal">
+                <div class="empty-comments">
+                    <i class="fas fa-comments"></i>
+                    <p>Cargando comentarios...</p>
+                </div>
+            </div>
+
+            <!-- Área de comentario FIJA adaptada al modal -->
+            <div class="comentario-fixed-modal">
+                <div class="comentario-fixed-content-modal">
+                    <div class="comentario-avatar-modal">
+                        ${currentUser.foto_perfil ? 
+                            `<img src="${currentUser.foto_perfil}" alt="${currentUser.nombre}">` : 
+                            `<i class="fas fa-user"></i>`
+                        }
+                    </div>
+                    <div class="comentario-input-modal">
+                        <textarea 
+                            id="nuevoComentario" 
+                            placeholder="Escribe un comentario..." 
+                            rows="1"
+                        ></textarea>
+                    </div>
+                    <button class="btn-comentario-modal" id="btnEnviarComentario" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="char-counter-modal">
+                    <span id="comentarioCharCount"> </span>
+                </div>
+            </div>
+        </div>
     `;
-    
-    document.getElementById('likesCountModal').textContent = post.likes.length;
-    document.getElementById('comentariosCountModal').textContent = post.comentarios?.length || 0;
-    
+
+    // Configurar eventos
+    setupModalEvents(post, isLiked, shareCount);
+    loadComentariosModal(post._id);
+    openModal('post');
+}
+
+function setupModalEvents(post, isLiked, shareCount) {
+    // Evento para like
     const likeBtnModal = document.getElementById('likeBtnModal');
-    const likeIconModal = likeBtnModal.querySelector('i');
-    const likeTextModal = likeBtnModal.querySelector('span');
-    
-    if (isLiked) {
-        likeBtnModal.classList.add('liked');
-        likeIconModal.className = 'fas fa-heart';
-        likeTextModal.textContent = 'Me gusta';
-    } else {
-        likeBtnModal.classList.remove('liked');
-        likeIconModal.className = 'far fa-heart';
-        likeTextModal.textContent = 'Me gusta';
-    }
-    
     likeBtnModal.onclick = () => handleLikeModal(post._id);
     
-    // Actualizar el botón de compartir en el modal
-    const shareAction = document.querySelector('.modal-actions .post-action:last-child');
-    shareAction.onclick = () => handleShareModal(post._id);
-    const shareCountSpan = shareAction.querySelector('span');
-    if (shareCountSpan) {
-        shareCountSpan.textContent = shareCount;
-    }
+    // Evento para comentar (focus en textarea)
+    const commentBtnModal = document.getElementById('commentBtnModal');
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    commentBtnModal.onclick = () => {
+        comentarioTextarea.focus();
+        comentarioTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
     
-    loadComentarios(post._id);
-    initializeComentarioEvents();
-    openModal('post');
-
-    // Agregar evento para el botón de opciones en el modal
+    // Evento para compartir
+    const shareBtnModal = document.getElementById('shareBtnModal');
+    shareBtnModal.onclick = () => handleShareModal(post._id);
+    
+    // Evento para el botón de opciones
     const modalOptionsBtn = document.getElementById(`modalOptionsBtn-${post._id}`);
     if (modalOptionsBtn) {
         modalOptionsBtn.addEventListener('click', (e) => {
@@ -1078,11 +1662,10 @@ ${isSharedPost && post.postOriginal ? `
             }
         });
     }
-
+    
+    // Inicializar eventos del comentario
+    initializeComentarioEvents();
 }
-
-
-
 
 async function handleLikeModal(postId) {
     const likeBtn = document.getElementById('likeBtnModal');
@@ -1167,52 +1750,139 @@ async function handleShareModal(postId) {
 
 // ========== COMENTARIOS ==========
 function initializeComentarioEvents() {
-    const comentarioInput = document.getElementById('nuevoComentario');
-    const enviarBtn = document.getElementById('enviarComentario');
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    const btnEnviarComentario = document.getElementById('btnEnviarComentario');
     
-    enviarBtn.addEventListener('click', handleNuevoComentario);
-    
-    comentarioInput.addEventListener('input', function() {
-        enviarBtn.disabled = this.value.trim().length === 0;
+    if (!comentarioTextarea || !btnEnviarComentario) {
+        console.error('❌ Elementos de comentario no encontrados');
+        return;
+    }
+
+    console.log('✅ Inicializando eventos de comentarios...');
+
+    // Habilitar/deshabilitar botón según contenido
+    comentarioTextarea.addEventListener('input', function() {
+        const hasText = this.value.trim().length > 0;
+        btnEnviarComentario.disabled = !hasText;
+        
+        // Auto-ajustar altura
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
     });
     
-    comentarioInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+    // Enviar con Enter (Ctrl+Enter para nueva línea)
+    comentarioTextarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
             e.preventDefault();
-            if (this.value.trim()) {
-                handleNuevoComentario();
+            if (!btnEnviarComentario.disabled) {
+                enviarComentarioModal();
             }
         }
     });
     
-    comentarioInput.value = '';
-    enviarBtn.disabled = true;
-    comentarioInput.style.height = 'auto';
+    // Evento de clic en el botón enviar
+    btnEnviarComentario.addEventListener('click', enviarComentarioModal);
 }
 
-async function loadComentarios(postId) {
+
+// FUNCIÓN CORREGIDA - Cargar comentarios del modal
+async function loadComentariosModal(postId) {
+    console.log('🔄 Cargando comentarios para post:', postId);
+    
+    const listaComentarios = document.getElementById('listaComentariosModal');
+    if (!listaComentarios) {
+        console.error('❌ Elemento listaComentariosModal no encontrado');
+        return;
+    }
+
     try {
+        // Mostrar loading
+        listaComentarios.innerHTML = `
+            <div class="empty-comments">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando comentarios...</p>
+            </div>
+        `;
+
         const response = await fetch(`${API_URL}/posts/${postId}/comentarios`);
-        const result = await response.json();
         
-        if (result.success) {
-            displayComentarios(result.data);
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📨 Respuesta comentarios:', result);
+
+        if (result.success && result.data && result.data.length > 0) {
+            console.log(`✅ ${result.data.length} comentarios encontrados`);
+            
+            const comentariosHTML = result.data.map(comentario => {
+                // VERIFICACIÓN DE SEGURIDAD con los nuevos nombres de campo
+                const usuario = comentario.usuario || {};
+                const nombre = usuario.nombre || 'Usuario';
+                const username = usuario.username || 'usuario';
+                const foto_perfil = usuario.foto_perfil || '';
+                const contenido = comentario.contenido || '';
+                
+                // CORREGIR: Manejo de fecha - probar diferentes campos de fecha
+                const fechaComentario = comentario.fecha_creacion || 
+                                      comentario.fecha_publicacion || 
+                                      comentario.createdAt ||
+                                      comentario.fecha;
+                
+                const fechaDisplay = fechaComentario ? 
+                    getTimeAgo(new Date(fechaComentario)) : 
+                    'Recién';
+                
+                console.log('📅 Fecha comentario:', { 
+                    fechaComentario, 
+                    fechaDisplay,
+                    campos: Object.keys(comentario) 
+                });
+                
+                return `
+                    <div class="comentario-item">
+                        <div class="comentario-avatar">
+                            ${foto_perfil ? 
+                                `<img src="${foto_perfil}" alt="${nombre}">` : 
+                                `<i class="fas fa-user"></i>`
+                            }
+                        </div>
+                        <div class="comentario-content">
+                            <div class="comentario-header">
+                                <span class="comentario-user">${nombre}</span>
+                                <span class="comentario-time">${fechaDisplay}</span>
+                            </div>
+                            <div class="comentario-text">${contenido}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            listaComentarios.innerHTML = comentariosHTML;
+            
+            // Scroll al final de los comentarios
+            setTimeout(() => {
+                listaComentarios.scrollTop = listaComentarios.scrollHeight;
+            }, 100);
+            
         } else {
-            document.getElementById('listaComentarios').innerHTML = `
-                <div class="comentario-vacio-facebook">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error al cargar comentarios</p>
+            console.log('ℹ️ No hay comentarios o respuesta vacía');
+            listaComentarios.innerHTML = `
+                <div class="empty-comments">
+                    <i class="fas fa-comments"></i>
+                    <p>No hay comentarios aún</p>
+                    <small>Sé el primero en comentar</small>
                 </div>
             `;
         }
     } catch (error) {
-        console.error('Error cargando comentarios:', error);
-        document.getElementById('listaComentarios').innerHTML = `
-            <div class="comentario-vacio-facebook">
-                <i class="fas fa-wifi"></i>
-                <p>Error de conexión</p>
+        console.error('❌ Error cargando comentarios:', error);
+        listaComentarios.innerHTML = `
+            <div class="empty-comments error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar comentarios</p>
+                <small>${error.message}</small>
             </div>
         `;
     }
@@ -1256,6 +1926,88 @@ function displayComentarios(comentarios) {
     `).join('');
     
     listaComentarios.scrollTop = listaComentarios.scrollHeight;
+}
+
+async function enviarComentarioModal() {
+    console.log('🔄 Intentando enviar comentario...');
+    
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    const btnEnviarComentario = document.getElementById('btnEnviarComentario');
+    
+    if (!comentarioTextarea || !btnEnviarComentario || !currentPostId) {
+        console.error('❌ Elementos necesarios no disponibles');
+        return;
+    }
+    
+    const contenido = comentarioTextarea.value.trim();
+    if (!contenido) {
+        console.error('❌ Contenido de comentario vacío');
+        return;
+    }
+
+    try {
+        console.log('📤 Enviando comentario:', { 
+            postId: currentPostId, 
+            contenido: contenido,
+            usuario: currentUser._id 
+        });
+        
+        btnEnviarComentario.disabled = true;
+        btnEnviarComentario.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        // USAR LOS NOMBRES DE CAMPO CORRECTOS que espera el servidor
+        const requestBody = {
+            usuario: currentUser._id,  // CAMBIADO: userId -> usuario
+            contenido: contenido       // CAMBIADO: texto -> contenido
+        };
+        
+        console.log('📦 Request body (CORREGIDO):', requestBody);
+        
+        const response = await fetch(`${API_URL}/posts/${currentPostId}/comentarios`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        console.log('📨 Response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Respuesta enviar comentario:', result);
+        
+        if (result.success) {
+            // Limpiar textarea
+            comentarioTextarea.value = '';
+            comentarioTextarea.style.height = 'auto';
+            
+            // Recargar comentarios
+            await loadComentariosModal(currentPostId);
+            
+            // Actualizar contador de comentarios
+            const comentariosCount = document.getElementById('comentariosCountModal');
+            if (comentariosCount) {
+                const currentCount = parseInt(comentariosCount.textContent) || 0;
+                comentariosCount.textContent = currentCount + 1;
+            }
+            
+            showToast('✅ Comentario publicado', 'success');
+        } else {
+            throw new Error(result.error || 'Error desconocido del servidor');
+        }
+    } catch (error) {
+        console.error('❌ Error enviando comentario:', error);
+        showToast(`❌ Error: ${error.message}`, 'error');
+    } finally {
+        btnEnviarComentario.disabled = false;
+        btnEnviarComentario.innerHTML = '<i class="fas fa-paper-plane"></i>';
+    }
 }
 
 async function handleNuevoComentario() {
@@ -1676,8 +2428,20 @@ function showToast(message, type = 'success') {
     const toastMessage = document.getElementById('toastMessage');
     const toastIcon = toast.querySelector('.toast-icon');
     
+    // Limpiar timeout anterior
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+        toastTimeout = null;
+    }
+
+    // Evitar animaciones raras
+    toast.style.transition = 'none';
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+    }, 30);
+
     toastMessage.textContent = message;
-    
+
     switch (type) {
         case 'error':
             toast.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
@@ -1691,10 +2455,24 @@ function showToast(message, type = 'success') {
             toast.style.background = 'linear-gradient(135deg, #2ecc71, #27ae60)';
             toastIcon.className = 'fas fa-check-circle toast-icon';
     }
-    
+
+    // Mostrar
     toast.style.display = 'flex';
-    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 20);
+
+    const duration = type === 'error' ? 10000 : type === 'info' ? 8000 : 6000;
+
+    toastTimeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100px)';
+        setTimeout(() => (toast.style.display = 'none'), 350);
+    }, duration);
 }
+
+
 
 function handleLogout() {
     localStorage.removeItem('currentUser');
@@ -1738,6 +2516,7 @@ function handleImageUpload(event) {
         reader.readAsDataURL(file);
     }
 }
+
 
 function focusComentario() {
     const comentarioInput = document.getElementById('nuevoComentario');
@@ -2665,13 +3444,15 @@ async function uploadMediaFile(file, fieldName) {
 
 
 // Función para manejar la creación de post con cualquier tipo de medio
-// En dashboard.js - ACTUALIZA handleCreatePost también
 async function handleCreatePost() {
+    console.log('🎯 Iniciando creación de publicación...');
+    
     const content = document.getElementById('postContent').value.trim();
     
     let mediaFile = null;
     let mediaType = currentMediaType;
     
+    // Obtener el archivo según el tipo de medio seleccionado
     if (mediaType === 'imagen') {
         mediaFile = document.getElementById('postImage').files[0];
     } else if (mediaType === 'audio') {
@@ -2680,34 +3461,62 @@ async function handleCreatePost() {
         mediaFile = document.getElementById('postVideo').files[0];
     }
     
+    console.log('🔍 DEBUG handleCreatePost:');
+    console.log(' - Contenido:', content);
+    console.log(' - Tipo de medio:', mediaType);
+    console.log(' - Archivo:', mediaFile);
+    console.log(' - currentMediaType:', currentMediaType);
+    
+    // VALIDACIÓN SIMPLIFICADA
     if (!content && !mediaFile) {
+        console.log('❌ Error: Sin contenido y sin archivo');
         showToast('❌ Escribe algo o selecciona un archivo para publicar', 'error');
+        highlightTextareaError();
         return;
     }
+    
+    console.log('✅ Validación pasada, procediendo a publicar...');
     
     try {
         let mediaUrl = '';
         let mediaFilename = '';
         let duracion = 0;
         
+        // Subir archivo si existe
         if (mediaFile) {
+            console.log(`📤 Subiendo archivo: ${mediaFile.name}`);
             showToast(`📤 Subiendo ${mediaType}...`, 'info');
             
-            // USAR 'image' para imágenes en lugar de 'imagen'
             const fieldName = mediaType === 'imagen' ? 'image' : mediaType;
-            const uploadResult = await uploadMediaFile(mediaFile, fieldName);
-            mediaUrl = uploadResult.url;
-            mediaFilename = uploadResult.filename;
-            duracion = uploadResult.duracion || 0;
+            console.log(`📤 Usando fieldName: ${fieldName}`);
+            
+            try {
+                const uploadResult = await uploadMediaFile(mediaFile, fieldName);
+                mediaUrl = uploadResult.url;
+                mediaFilename = uploadResult.filename;
+                duracion = uploadResult.duracion || 0;
+                
+                console.log('✅ Archivo subido exitosamente:', { mediaUrl, mediaFilename, duracion });
+            } catch (uploadError) {
+                console.error('❌ Error subiendo archivo:', uploadError);
+                showToast('❌ Error al subir el archivo', 'error');
+                return;
+            }
         }
         
+        // Preparar datos del post
         const postData = {
             autor: currentUser._id,
-            contenido: content,
-            duracion: duracion,
+            contenido: content || '',
             tipoContenido: mediaFile ? mediaType : 'texto'
         };
         
+        // Agregar duración si es audio o video
+        if ((mediaType === 'audio' || mediaType === 'video') && duracion > 0) {
+            postData.duracion = duracion;
+        }
+        
+        // Agregar campos específicos según el tipo de medio
         if (mediaType === 'imagen' && mediaUrl) {
             postData.imagen = mediaUrl;
             postData.imagenFilename = mediaFilename;
@@ -2719,62 +3528,109 @@ async function handleCreatePost() {
             postData.videoFilename = mediaFilename;
         }
         
+        console.log('📦 Datos a enviar al servidor:', postData);
+        
+        // Enviar al servidor
         const response = await fetch(`${API_URL}/posts`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(postData)
         });
         
+        console.log('📨 Respuesta del servidor - Status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error HTTP:', response.status, errorText);
+            throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+        
         const result = await response.json();
+        console.log('📊 Resultado completo:', result);
         
         if (result.success) {
             showToast('✅ Publicación creada exitosamente', 'success');
             resetPostForm();
-            loadFeed();
+            
+            // Recargar el feed
+            setTimeout(() => {
+                loadFeed();
+            }, 500);
+            
         } else {
+            console.error('❌ Error del servidor:', result.error);
             showToast(`❌ Error: ${result.error}`, 'error');
         }
+        
     } catch (error) {
-        console.error('Error creando publicación:', error);
+        console.error('❌ Error creando publicación:', error);
         showToast('❌ Error al crear la publicación', 'error');
     }
 }
-
 // Función uploadMediaFile simplificada
 async function uploadMediaFile(file, fieldName) {
-    const formData = new FormData();
-    formData.append(fieldName, file); // 'image', 'audio', 'video'
-    
-    let endpoint = fieldName; // Ahora son iguales: 'image', 'audio', 'video'
-    
-    console.log(`📤 Subiendo a /upload/${endpoint} con campo: ${fieldName}`);
-    
-    const response = await fetch(`${API_URL}/upload/${endpoint}`, {
-        method: 'POST',
-        body: formData
+    console.log(`📤 Iniciando upload de ${fieldName}:`, {
+        nombre: file.name,
+        tipo: file.type,
+        tamaño: file.size
     });
     
-    const result = await response.json();
+    const formData = new FormData();
+    formData.append(fieldName, file);
     
-    if (!result.success) {
-        throw new Error(result.error || 'Error al subir el archivo');
+    const endpoint = fieldName; // 'image', 'audio', 'video'
+    
+    console.log(`📤 Enviando a: ${API_URL}/upload/${endpoint}`);
+    
+    try {
+        const response = await fetch(`${API_URL}/upload/${endpoint}`, {
+            method: 'POST',
+            body: formData
+            // NO incluir Content-Type header - FormData lo establece automáticamente
+        });
+        
+        console.log('📨 Respuesta recibida - Status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error HTTP:', response.status, errorText);
+            throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('📊 Resultado del upload:', result);
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error desconocido del servidor');
+        }
+        
+        return result.data;
+        
+    } catch (error) {
+        console.error('❌ Error en uploadMediaFile:', error);
+        throw error;
     }
-    
-    return result.data;
 }
+
 // Función para resetear el formulario completamente
 function resetPostForm() {
     document.getElementById('postContent').value = '';
-    document.getElementById('charCount').textContent = '0/1000';
+    document.getElementById('charCount').textContent = '0/500';
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('audioPreview').innerHTML = '';
     document.getElementById('videoPreview').innerHTML = '';
-    document.getElementById('imageUpload').style.display = 'none';
+    
+    // Resetear a tipo imagen por defecto
+    document.getElementById('imageUpload').style.display = 'block';
     document.getElementById('audioUpload').style.display = 'none';
     document.getElementById('videoUpload').style.display = 'none';
+    
     document.getElementById('postImage').value = '';
     document.getElementById('postAudio').value = '';
     document.getElementById('postVideo').value = '';
+    
     currentMediaType = 'imagen';
     
     // Resetear botones activos
@@ -2782,6 +3638,44 @@ function resetPostForm() {
         btn.classList.remove('active');
     });
     document.querySelector('[onclick="changeMediaType(\'imagen\')"]').classList.add('active');
+}
+
+function changeMediaType(type) {
+    console.log('🔄 Cambiando tipo de medio a:', type);
+    
+    currentMediaType = type;
+    
+    // Ocultar todos los uploaders
+    document.getElementById('imageUpload').style.display = 'none';
+    document.getElementById('audioUpload').style.display = 'none';
+    document.getElementById('videoUpload').style.display = 'none';
+    
+    // Limpiar previews
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('audioPreview').innerHTML = '';
+    document.getElementById('videoPreview').innerHTML = '';
+    
+    // Mostrar el uploader seleccionado
+    document.getElementById(`${type}Upload`).style.display = 'block';
+    
+    // Actualizar botones activos
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Encontrar y activar el botón correcto
+    const activeButton = Array.from(document.querySelectorAll('.media-type-btn')).find(btn => 
+        btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${type}'`)
+    );
+    
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+    
+    // Resetear inputs de archivo
+    document.getElementById('postImage').value = '';
+    document.getElementById('postAudio').value = '';
+    document.getElementById('postVideo').value = '';
 }
 
 // Funciones para manejar la vista previa de audio y video
@@ -2884,6 +3778,19 @@ function navigateToUserProfile(userId) {
     });
 }
 
+function initializeProfileCardClick() {
+    console.log('🔧 Inicializando clics en perfiles...');
+    
+    // Los clics se manejan directamente con onclick en el HTML
+    // Esta función es solo para debug
+    document.addEventListener('click', function(e) {
+        // Verificar si se hizo clic en un elemento con onclick de perfil
+        if (e.target.closest('[onclick*="navigateToUserProfile"]')) {
+            console.log('🎯 Clic en perfil detectado');
+        }
+    });
+}
+
 // Función para ver perfil desde cualquier lugar
 function viewUserProfile(userId) {
     navigateToUserProfile(userId);
@@ -2908,7 +3815,7 @@ function createPostHTML(post) {
             <div class="post-header">
                 <div class="post-avatar" onclick="navigateToUserProfile('${post.autor._id}')" style="cursor: pointer;">
                     ${post.autor.foto_perfil ? 
-                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}">` : 
                         `<i class="fas fa-user"></i>`
                     }
                 </div>
@@ -2928,10 +3835,12 @@ function createPostHTML(post) {
                             <i class="fas fa-ellipsis-h"></i>
                         </button>
                         <div class="post-options-menu" id="optionsMenu-${post._id}">
-                            <button class="option-item edit-option" onclick="editPost('${post._id}')">
-                                <i class="fas fa-edit"></i>
-                                <span>Editar publicación</span>
-                            </button>
+                            ${!isSharedPost ? `
+                                <button class="option-item edit-option" onclick="editPost('${post._id}')">
+                                    <i class="fas fa-edit"></i>
+                                    <span>Editar publicación</span>
+                                </button>
+                            ` : ''}
                             <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}')">
                                 <i class="fas fa-trash"></i>
                                 <span>Eliminar publicación</span>
@@ -2949,7 +3858,7 @@ function createPostHTML(post) {
             ` : ''}
             
             <div class="post-content" id="postContent-${post._id}">
-                ${formatPostContent(post.contenido)}
+                ${post.contenido ? formatPostContent(post.contenido) : ''}
             </div>
             
             ${hasOriginalPost ? `
@@ -2973,12 +3882,45 @@ function createPostHTML(post) {
                     <div class="original-post-content">
                         ${formatPostContent(post.postOriginal.contenido)}
                     </div>
+                    
+                    <!-- CONTENIDO MULTIMEDIA DEL POST ORIGINAL - CORREGIDO -->
                     ${post.postOriginal.imagen ? `
-                        <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+                        <div class="post-media">
+                            <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image">
+                        </div>
+                    ` : ''}
+                    
+                    ${post.postOriginal.audio ? `
+                        <div class="post-media">
+                            <div class="audio-player-container">
+                                <audio controls class="audio-player">
+                                    <source src="${post.postOriginal.audio}" type="audio/mpeg">
+                                    <source src="${post.postOriginal.audio}" type="audio/wav">
+                                    <source src="${post.postOriginal.audio}" type="audio/ogg">
+                                    Tu navegador no soporta el elemento de audio.
+                                </audio>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${post.postOriginal.video ? `
+                        <div class="post-media">
+                            <div class="video-player-container">
+                                <video controls class="video-player" poster="${post.postOriginal.videoThumbnail || ''}">
+                                    <source src="${post.postOriginal.video}" type="video/mp4">
+                                    <source src="${post.postOriginal.video}" type="video/webm">
+                                    <source src="${post.postOriginal.video}" type="video/ogg">
+                                    Tu navegador no soporta el elemento de video.
+                                </video>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
                     ` : ''}
                 </div>
             ` : ''}
             
+            <!-- CONTENIDO MULTIMEDIA DEL POST ACTUAL (solo si no es compartido) -->
             ${!isSharedPost ? `
                 ${post.imagen ? `
                     <div class="post-media">

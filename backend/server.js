@@ -33,6 +33,8 @@ app.use('/api/posts', require('./routes/posts'));
 app.use('/api/upload', require('./routes/upload')); 
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/collections', require('./routes/collections'));
+
 
 // Manejo de errores 404
 app.use((req, res) => {

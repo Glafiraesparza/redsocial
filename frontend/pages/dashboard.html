@@ -12,11 +12,22 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <i class="fas fa-share-alt"></i>
-                Aural
+                <div class="logo-container">
+                    <div class="logo-orbits">
+                        <div class="orbit orbit-1"></div>
+                        <div class="orbit orbit-2"></div>
+                        <div class="orbit orbit-3"></div>
+                        <div class="particle particle-1"></div>
+                        <div class="particle particle-2"></div>
+                        <div class="particle particle-3"></div>
+                        <div class="particle particle-4"></div>
+                    </div>
+                    <!-- Solo la imagen del logo -->
+                    <img src="aural2.png" alt="Aural Logo" class="logo-img">
+                </div>
             </div>
             <div class="nav-user">
-                <span id="userGreeting">Hola, Usuario</span>
+                <span id="userGreeting"></span>
                 <button id="logoutBtn" class="btn-secondary btn-small">
                     <i class="fas fa-sign-out-alt"></i> Salir
                 </button>
@@ -27,7 +38,7 @@
     <div class="dashboard-container">
         <!-- Sidebar -->
         <div class="dashboard-sidebar">
-            <div class="user-card">
+            <div class="user-card" onclick="window.location.href='profile.html'">
                 <div class="user-avatar" id="userAvatar">
                     <i class="fas fa-user"></i>
                 </div>
@@ -72,70 +83,62 @@
         <!-- Contenido Principal -->
         <div class="dashboard-main">
             <!-- Crear Publicación -->
-            <div class="create-post-card">
-                <div class="post-form">
-                    <textarea id="postContent" placeholder="¿Qué estás pensando?" maxlength="1000"></textarea>
-                    <div class="post-actions">
-                        <div class="post-options">
-                            <button class="btn-icon" onclick="toggleImageUpload()">
-                                <i class="fas fa-image"></i>
-                            </button>
-                            <button class="btn-icon">
-                                <i class="fas fa-hashtag"></i>
-                            </button>
-                        </div>
-                        <div class="post-submit">
-                            <span id="charCount">0/500</span>
-                            <button id="submitPost" class="btn-primary">
-                                <i class="fas fa-paper-plane"></i> Publicar
-                            </button>
-                        </div>
-                    </div>
-
-            
-
-                    <!-- Después del textarea del contenido -->
-                    <div class="media-type-selector">
-                        <button type="button" class="media-type-btn active" onclick="changeMediaType('imagen')">
-                            <i class="fas fa-image"></i> Imagen
-                        </button>
-                        <button type="button" class="media-type-btn" onclick="changeMediaType('audio')">
-                            <i class="fas fa-music"></i> Audio
-                        </button>
-                        <button type="button" class="media-type-btn" onclick="changeMediaType('video')">
-                            <i class="fas fa-video"></i> Video
-                        </button>
-                    </div>
-
-                    <!-- Contenedor para imagen (existente) -->
-                    <div id="imageUpload" style="display: block;">
-                        <input type="file" id="postImage" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
-                        <label for="postImage" class="btn-secondary btn-image-upload">
-                            <i class="fas fa-upload"></i> Seleccionar Imagen
-                        </label>
-                        <div id="imagePreview" class="image-preview"></div>
-                    </div>
-
-                    <!-- Nuevo contenedor para audio -->
-                    <div id="audioUpload" style="display: none;">
-                        <input type="file" id="postAudio" accept="audio/*" style="display: none;" onchange="handleAudioUpload(event)">
-                        <label for="postAudio" class="btn-secondary btn-audio-upload">
-                            <i class="fas fa-upload"></i> Seleccionar Audio
-                        </label>
-                        <div id="audioPreview" class="audio-preview"></div>
-                    </div>
-
-                    <!-- Nuevo contenedor para video -->
-                    <div id="videoUpload" style="display: none;">
-                        <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
-                        <label for="postVideo" class="btn-secondary btn-video-upload">
-                            <i class="fas fa-upload"></i> Seleccionar Video
-                        </label>
-                        <div id="videoPreview" class="video-preview"></div>
-                    </div>
-
-                </div>
+            <!-- Crear Publicación -->
+            <!-- Crear Publicación -->
+            <!-- Dentro de .create-post-card, después de los inputs de archivo -->
+<div class="create-post-card">
+    <div class="post-form">
+        <textarea id="postContent" placeholder="¿Qué estás pensando?" maxlength="500"></textarea>
+        
+        <div class="post-actions">
+            <div class="media-type-selector">
+                <button type="button" class="media-type-btn active" onclick="changeMediaType('imagen')">
+                    <i class="fas fa-image"></i> Imagen
+                </button>
+                <button type="button" class="media-type-btn" onclick="changeMediaType('audio')">
+                    <i class="fas fa-music"></i> Audio
+                </button>
+                <button type="button" class="media-type-btn" onclick="changeMediaType('video')">
+                    <i class="fas fa-video"></i> Video
+                </button>
             </div>
+
+            <div class="post-submit">
+                <span id="charCount">0/500</span>
+                <button id="submitPost" class="btn-primary">
+                    <i class="fas fa-paper-plane"></i> Publicar
+                </button>
+            </div>
+        </div>
+
+        <!-- Inputs de archivo ocultos -->
+        <input type="file" id="postImage" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+        <input type="file" id="postAudio" accept="audio/*" style="display: none;" onchange="handleAudioUpload(event)">
+        <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
+
+        <!-- CONTENEDORES DE UPLOAD - AGREGAR ESTOS -->
+        <div id="imageUpload" class="media-upload-container">
+            <label for="postImage" class="btn-media-label">
+                <i class="fas fa-upload"></i> Seleccionar Imagen
+            </label>
+            <div id="imagePreview" class="image-preview"></div>
+        </div>
+
+        <div id="audioUpload" class="media-upload-container" style="display: none;">
+            <label for="postAudio" class="btn-media-label">
+                <i class="fas fa-upload"></i> Seleccionar Audio
+            </label>
+            <div id="audioPreview" class="audio-preview"></div>
+        </div>
+
+        <div id="videoUpload" class="media-upload-container" style="display: none;">
+            <label for="postVideo" class="btn-media-label">
+                <i class="fas fa-upload"></i> Seleccionar Video
+            </label>
+            <div id="videoPreview" class="video-preview"></div>
+        </div>
+    </div>
+</div>
 
             <!-- Feed de Publicaciones -->
             <div id="feedSection" class="content-section active">
@@ -188,7 +191,8 @@
             <div class="conversations-header">
                 <h3><i class="fas fa-comments"></i> Mensajes</h3>
                 <button class="btn-new-chat" onclick="openNewChatModal()">
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-comment-medical"></i>
+                    <span>Nuevo Chat</span>
                 </button>
             </div>
             <div class="conversations-search">
@@ -245,76 +249,28 @@
     </div>
 </div>
 
-    <!-- Modal para ver publicación completa  -->
-<div id="postModal" class="modal">
-    <div class="modal-content facebook-modal">
-        <div class="modal-header">
-            <h3><i class="fas fa-eye"></i> Publicación</h3>
-            <span class="close-modal" onclick="closeModal('post')">&times;</span>
-        </div>
-        <div class="modal-body facebook-modal-body">
-            <!-- Contenido de la publicación -->
-            <div id="postModalContent" class="post-modal-content">
-                <!-- El contenido del post se cargará aquí -->
+    <!-- Modal para ver publicación completa - VERSIÓN LIMPIA -->
+    <div id="postModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-eye"></i> Publicación</h3>
+                <span class="close-modal" onclick="closeModal('post')">&times;</span>
             </div>
-            
-            <!-- Estadísticas del post -->
-            <div class="post-stats-bar">
-                <div class="stats-left">
-                    <span id="likesCountModal">0</span> me gusta
-                    <span class="stat-separator">•</span>
-                    <span id="comentariosCountModal">0</span> comentarios
-                </div>
-            </div>
-            
-            <!-- Acciones del post -->
-            <div class="post-actions-bar modal-actions">
-                <button class="post-action" id="likeBtnModal">
-                    <i class="far fa-heart"></i>
-                    <span>Me gusta</span>
-                </button>
-                <button class="post-action" onclick="focusComentario()">
-                    <i class="far fa-comment"></i>
-                    <span>Comentar</span>
-                </button>
-                <button class="post-action">
-                    <i class="far fa-share-square"></i>
-                    <span>Compartir</span>
-                </button>
-            </div>
-            
-            <!-- Lista de comentarios - MEJORADA -->
-            <div id="listaComentarios" class="lista-comentarios-facebook">
-                <!-- Los comentarios se cargarán aquí -->
-                <div class="comentario-vacio-facebook">
-                    <i class="far fa-comment"></i>
-                    <p>No hay comentarios aún</p>
-                    <small>Sé el primero en comentar</small>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Formulario de comentario FIJO en la parte inferior - MEJORADO -->
-        <div class="comentario-fixed-footer">
-            <div class="comentario-fixed-container">
-                <div class="comentario-avatar-fixed" id="currentUserAvatar">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="comentario-input-container">
-                    <textarea id="nuevoComentario" placeholder="Escribe un comentario..." rows="1"></textarea>
-                    <button id="enviarComentario" class="btn-comentario" disabled>
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+            <div class="modal-body modal-body-scrollable" id="postModalContent">
+                <!-- TODO se cargará dinámicamente -->
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Cargando publicación...</p>
                 </div>
             </div>
         </div>
     </div>
-</div>
     <!-- Toast para mensajes -->
     <div id="toast" class="toast">
         <div class="toast-content">
             <i class="fas fa-check-circle toast-icon"></i>
             <span id="toastMessage">Operación completada</span>
+            
         </div>
     </div>
 

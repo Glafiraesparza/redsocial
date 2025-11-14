@@ -9,8 +9,9 @@ const postSchema = new mongoose.Schema({
   },
   contenido: {
     type: String,
-    required: true,
-    maxlength: 1000
+    required: false, // CAMBIAR de true a false
+    maxlength: 1000,
+    default: '' // Agregar valor por defecto
   },
   imagen: {
     type: String,
@@ -20,7 +21,6 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // NUEVOS CAMPOS PARA AUDIO Y VIDEO
   audio: {
     type: String,
     default: ''
@@ -37,9 +37,8 @@ const postSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Campos para metadata de audio/video
   duracion: {
-    type: Number, // duración en segundos
+    type: Number,
     default: 0
   },
   tipoContenido: {
@@ -47,7 +46,6 @@ const postSchema = new mongoose.Schema({
     enum: ['texto', 'imagen', 'audio', 'video'],
     default: 'texto'
   },
-  // FIN NUEVOS CAMPOS
   hashtags: [{
     type: String,
     trim: true
@@ -105,10 +103,20 @@ const postSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Extraer hashtags del contenido antes de guardar
+// MODIFICAR el pre-save para validación condicional
 postSchema.pre('save', function(next) {
-  const hashtags = this.contenido.match(/#[\wáéíóúñ]+/g) || [];
-  this.hashtags = hashtags.map(tag => tag.toLowerCase().slice(1));
+  // Validar que haya al menos contenido o algún medio
+  if (!this.contenido && !this.imagen && !this.audio && !this.video) {
+    return next(new Error('El post debe tener contenido textual o un archivo multimedia'));
+  }
+  
+  // Extraer hashtags solo si hay contenido
+  if (this.contenido) {
+    const hashtags = this.contenido.match(/#[\wáéíóúñ]+/g) || [];
+    this.hashtags = hashtags.map(tag => tag.toLowerCase().slice(1));
+  } else {
+    this.hashtags = [];
+  }
   
   // Determinar automáticamente el tipo de contenido
   if (this.video && this.video !== '') {

@@ -470,14 +470,6 @@ router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
             });
         }
 
-        // Verificar límite mínimo
-        if (user.fotos_portada.length <= 2) {
-            return res.status(400).json({
-                success: false,
-                error: 'Mínimo 2 fotos de portada requeridas'
-            });
-        }
-
         // Eliminar archivo físico
         const photoToDelete = user.fotos_portada[photoIndex];
         const imagePath = path.join(directories.covers, path.basename(photoToDelete));

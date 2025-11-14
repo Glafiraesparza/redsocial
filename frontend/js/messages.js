@@ -9,6 +9,7 @@ let currentUserMessages = null;
 let conversaciones = [];
 let mensajesInterval = null;
 let isMessagesInitialized = false; // DEFINIDA AL INICIO
+let isStartingNewChat = false;
 
 // ========== INICIALIZACIÓN ==========
 function initializeMessages() {
@@ -221,6 +222,42 @@ function filterConversaciones() {
     displayConversaciones(filtered);
 }
 
+// ========== MEJORAR CARGA DE CONVERSACIONES ==========
+let lastConversacionesHash = ''; // 🔥 Track del estado anterior
+
+async function loadConversaciones() {
+    if (!currentUserMessages || !currentUserMessages._id) {
+        return;
+    }
+    
+    if (window.isLoadingConversaciones) {
+        return;
+    }
+    
+    try {
+        window.isLoadingConversaciones = true;
+        
+        const response = await fetch(`${MESSAGES_API}/conversaciones/${currentUserMessages._id}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // 🔥 DETECCIÓN DE CAMBIOS MÁS EFECTIVA
+            const newHash = JSON.stringify(result.data);
+            if (newHash !== lastConversacionesHash) {
+                conversaciones = result.data;
+                lastConversacionesHash = newHash;
+                displayConversaciones(conversaciones);
+                console.log('✅ Conversaciones actualizadas');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error cargando conversaciones:', error);
+    } finally {
+        window.isLoadingConversaciones = false;
+    }
+}
+
+
 // ========== MENSAJES ==========
 async function openConversacion(conversacion) {
     currentConversacion = conversacion;
@@ -264,12 +301,8 @@ function displayMensajes(mensajes) {
     const otroUsuario = currentConversacion.participantes.find(p => p._id !== currentUserMessages._id);
     if (!otroUsuario) return;
     
-    // Actualizar header
-    const currentChatUser = document.getElementById('currentChatUser');
-    const currentChatUsername = document.getElementById('currentChatUsername');
-    
-    if (currentChatUser) currentChatUser.textContent = otroUsuario.nombre;
-    if (currentChatUsername) currentChatUsername.textContent = `@${otroUsuario.username}`;
+    // ACTUALIZAR HEADER COMPLETO CON AVATAR
+    updateChatHeader(otroUsuario);
     
     if (mensajes.length === 0) {
         container.innerHTML = `
@@ -286,11 +319,140 @@ function displayMensajes(mensajes) {
     container.scrollTop = container.scrollHeight;
 }
 
+// NUEVA FUNCIÓN PARA ACTUALIZAR EL HEADER DEL CHAT
+function updateChatHeader(otroUsuario) {
+    console.log('🔄 Actualizando header del chat con usuario:', otroUsuario);
+    
+    // Buscar el avatar del header por múltiples selectores
+    let chatAvatar = document.querySelector('.chat-user-avatar');
+    
+    // Si no se encuentra, buscar por otras clases comunes
+    if (!chatAvatar) {
+        chatAvatar = document.querySelector('.chat-header-avatar');
+    }
+    if (!chatAvatar) {
+        chatAvatar = document.querySelector('.current-chat-avatar');
+    }
+    if (!chatAvatar) {
+        // Buscar por estructura del DOM
+        const chatHeader = document.querySelector('.chat-header');
+        if (chatHeader) {
+            chatAvatar = chatHeader.querySelector('.user-avatar');
+        }
+    }
+    
+    // Actualizar el avatar si se encontró - HACERLO CLICKEABLE
+    if (chatAvatar) {
+        if (otroUsuario.foto_perfil) {
+            chatAvatar.innerHTML = `
+                <img src="${otroUsuario.foto_perfil}" 
+                     alt="${otroUsuario.nombre}" 
+                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; cursor: pointer;"
+                     onclick="navigateToUserProfile('${otroUsuario._id}')">
+            `;
+        } else {
+            chatAvatar.innerHTML = `
+                <i class="fas fa-user" 
+                   style="cursor: pointer;" 
+                   onclick="navigateToUserProfile('${otroUsuario._id}')"></i>
+            `;
+        }
+        chatAvatar.style.cursor = 'pointer';
+        chatAvatar.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
+        console.log('✅ Avatar actualizado en el header (clickeable)');
+    } else {
+        console.error('❌ No se pudo encontrar el elemento del avatar en el header');
+    }
+    
+    // Actualizar nombre y username - HACERLOS CLICKEABLES
+    const currentChatUser = document.getElementById('currentChatUser');
+    const currentChatUsername = document.getElementById('currentChatUsername');
+    
+    if (currentChatUser) {
+        currentChatUser.textContent = otroUsuario.nombre;
+        currentChatUser.style.cursor = 'pointer';
+        currentChatUser.style.color = '#3498db';
+        currentChatUser.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
+        console.log('✅ Nombre actualizado (clickeable):', otroUsuario.nombre);
+    } else {
+        console.error('❌ Elemento currentChatUser no encontrado');
+    }
+    
+    if (currentChatUsername) {
+        currentChatUsername.textContent = `@${otroUsuario.username}`;
+        currentChatUsername.style.cursor = 'pointer';
+        currentChatUsername.style.color = '#7f8c8d';
+        currentChatUsername.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
+        console.log('✅ Username actualizado (clickeable):', otroUsuario.username);
+    } else {
+        console.error('❌ Elemento currentChatUsername no encontrado');
+    }
+    
+    // AGREGAR EVENTO AL HEADER COMPLETO SI ES NECESARIO
+    const chatHeader = document.querySelector('.chat-header');
+    if (chatHeader && !chatHeader.hasAttribute('data-profile-click-initialized')) {
+        chatHeader.style.cursor = 'pointer';
+        chatHeader.setAttribute('data-profile-click-initialized', 'true');
+        chatHeader.addEventListener('click', function(e) {
+            // Evitar que se active cuando se hace clic en otros elementos del header
+            if (!e.target.closest('.chat-actions') && !e.target.closest('.btn-icon')) {
+                navigateToUserProfile(otroUsuario._id);
+            }
+        });
+    }
+}
+
+// FUNCIÓN PARA NAVEGAR AL PERFIL DEL USUARIO
+function navigateToUserProfile(userId) {
+    console.log('🎯 Navegando al perfil de usuario:', userId);
+    
+    // Verificar si el usuario está bloqueado antes de navegar
+    if (typeof checkIfUserIsBlocked === 'function') {
+        checkIfUserIsBlocked(userId).then(isBlocked => {
+            if (isBlocked) {
+                if (typeof showBlockedUserModal === 'function') {
+                    showBlockedUserModal(userId);
+                } else {
+                    showMessageToast('❌ No puedes ver este perfil', 'error');
+                }
+                return;
+            }
+            
+            // Guardar el ID del usuario que queremos ver en el localStorage
+            localStorage.setItem('viewingUserProfile', userId);
+            
+            // Redirigir a profile.html
+            window.location.href = 'profile.html';
+        }).catch(error => {
+            console.error('Error verificando bloqueo:', error);
+            // En caso de error, navegar de todos modos
+            localStorage.setItem('viewingUserProfile', userId);
+            window.location.href = 'profile.html';
+        });
+    } else {
+        // Si no existe la función de verificación, navegar directamente
+        localStorage.setItem('viewingUserProfile', userId);
+        window.location.href = 'profile.html';
+    }
+}
+
 function createMensajeHTML(mensaje) {
     const isOwnMessage = mensaje.remitente._id === currentUserMessages._id;
     
+    // Obtener el usuario correcto para mostrar la foto
+    const usuarioMensaje = isOwnMessage ? currentUserMessages : mensaje.remitente;
+    
     return `
         <div class="message ${isOwnMessage ? 'own-message' : 'other-message'}">
+            ${!isOwnMessage ? `
+                <div class="message-avatar">
+                    ${usuarioMensaje.foto_perfil ? 
+                        `<img src="${usuarioMensaje.foto_perfil}" alt="${usuarioMensaje.nombre}">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+            ` : ''}
+            
             <div class="message-content">
                 <div class="message-text">${mensaje.contenido}</div>
                 <div class="message-time">
@@ -301,6 +463,15 @@ function createMensajeHTML(mensaje) {
                     ${mensaje.leido && isOwnMessage ? '<i class="fas fa-check-double read-indicator"></i>' : ''}
                 </div>
             </div>
+            
+            ${isOwnMessage ? `
+                <div class="message-avatar own-avatar">
+                    ${usuarioMensaje.foto_perfil ? 
+                        `<img src="${usuarioMensaje.foto_perfil}" alt="${usuarioMensaje.nombre}">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -462,7 +633,25 @@ function createUserChatItemHTML(user) {
 }
 
 async function startNewChat(user) {
+    if (isStartingNewChat) {
+        console.log('⏳ Ya se está iniciando un chat, omitiendo...');
+        return;
+    }
+
+    const userElement = document.getElementById(`user-chat-${user._id}`);
+    
     try {
+        isStartingNewChat = true;
+        
+        // Feedback visual
+        if (userElement) {
+            userElement.style.pointerEvents = 'none';
+            userElement.style.opacity = '0.6';
+            userElement.querySelector('.user-chat-action').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        console.log('🔄 Iniciando nuevo chat con:', user.nombre);
+        
         const response = await fetch(`${MESSAGES_API}/conversacion/nueva`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -475,17 +664,37 @@ async function startNewChat(user) {
         const result = await response.json();
         
         if (result.success) {
+            console.log('✅ Conversación procesada:', result.data._id, result.message);
             closeNewChatModal();
-            showMessageToast('✅ Conversación iniciada', 'success');
-            openConversacion(result.data);
+            showMessageToast(result.message, 'success');
+            
+            // Pequeño delay para UI
+            setTimeout(() => {
+                openConversacion(result.data);
+                // 🔥 ACTUALIZAR CONVERSACIONES DESPUÉS DE CREAR NUEVA
+                setTimeout(() => loadConversaciones(), 1000);
+            }, 300);
         } else {
+            console.error('❌ Error del servidor:', result.error);
             showMessageToast(`❌ ${result.error}`, 'error');
         }
     } catch (error) {
-        console.error('Error iniciando nuevo chat:', error);
-        showMessageToast('❌ Error al iniciar conversación', 'error');
+        console.error('Error de red iniciando chat:', error);
+        showMessageToast('❌ Error de conexión', 'error');
+    } finally {
+        isStartingNewChat = false;
+        
+        // Restaurar UI
+        if (userElement) {
+            setTimeout(() => {
+                userElement.style.pointerEvents = 'auto';
+                userElement.style.opacity = '1';
+                userElement.querySelector('.user-chat-action').innerHTML = '<i class="fas fa-chevron-right"></i>';
+            }, 1000);
+        }
     }
 }
+
 
 function closeNewChatModal() {
     const modal = document.getElementById('newChatModal');
@@ -534,6 +743,23 @@ function cleanupMessages() {
     }
     isMessagesInitialized = false;
 }
+
+// ========== DEBUG ==========
+function debugConversaciones() {
+    console.log('🐛 DEBUG CONVERSACIONES:');
+    console.log('- Total conversaciones:', conversaciones.length);
+    console.log('- Conversaciones actuales:', conversaciones.map(c => ({
+        id: c._id,
+        participantes: c.participantes.map(p => p.nombre),
+        ultimoMensaje: c.ultimo_mensaje ? c.ultimo_mensaje.contenido : 'Ninguno'
+    })));
+    console.log('- CurrentConversacion:', currentConversacion ? currentConversacion._id : 'Ninguna');
+    console.log('- isLoadingConversaciones:', window.isLoadingConversaciones);
+    console.log('- isStartingNewChat:', isStartingNewChat);
+}
+
+// Ejecutar en consola para debug
+window.debugMessages = debugConversaciones;
 
 // Hacer funciones disponibles globalmente
 window.initializeMessages = initializeMessages;

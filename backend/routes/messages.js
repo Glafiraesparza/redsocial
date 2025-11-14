@@ -75,7 +75,7 @@ router.post('/conversacion/nueva', async (req, res) => {
         console.log('Usuario 1:', usuario1Id);
         console.log('Usuario 2:', usuario2Id);
 
-        // Validaciones básicas
+        // 🔥 VALIDACIÓN MEJORADA
         if (!usuario1Id || !usuario2Id) {
             return res.status(400).json({
                 success: false,
@@ -90,7 +90,39 @@ router.post('/conversacion/nueva', async (req, res) => {
             });
         }
 
-        // Verificar que los usuarios existen
+        // ORDENAR participantes
+        const participantesOrdenados = [usuario1Id, usuario2Id].sort();
+        console.log('📋 Participantes ordenados:', participantesOrdenados);
+
+        // 🔥 VERIFICAR QUE LOS IDs SON VÁLIDOS
+        if (!mongoose.Types.ObjectId.isValid(usuario1Id) || !mongoose.Types.ObjectId.isValid(usuario2Id)) {
+            return res.status(400).json({
+                success: false,
+                error: 'IDs de usuario no válidos'
+            });
+        }
+
+        // Buscar conversación existente
+        let conversacion = await Conversacion.findOne({
+            participantes: participantesOrdenados
+        }).populate('participantes', 'nombre username foto_perfil')
+          .populate('ultimo_mensaje');
+
+        console.log('🔍 Conversación encontrada:', conversacion ? 'SÍ' : 'NO');
+
+        // Si existe, retornarla
+        if (conversacion) {
+            console.log('✅ Conversación existente retornada:', conversacion._id);
+            return res.json({
+                success: true,
+                data: conversacion,
+                message: 'Conversación existente'
+            });
+        }
+
+        // Validar usuarios y seguimiento
+        console.log('🆕 Validando usuarios para nueva conversación...');
+        
         const [usuario1, usuario2] = await Promise.all([
             User.findById(usuario1Id),
             User.findById(usuario2Id)
@@ -107,6 +139,9 @@ router.post('/conversacion/nueva', async (req, res) => {
         const usuario1SigueA2 = usuario1.seguidos.includes(usuario2Id);
         const usuario2SigueA1 = usuario2.seguidores.includes(usuario1Id);
 
+        console.log(`🔍 Seguimiento: ${usuario1.nombre} sigue a ${usuario2.nombre}:`, usuario1SigueA2);
+        console.log(`🔍 Seguimiento: ${usuario2.nombre} sigue a ${usuario1.nombre}:`, usuario2SigueA1);
+
         if (!usuario1SigueA2 || !usuario2SigueA1) {
             return res.status(403).json({
                 success: false,
@@ -114,60 +149,79 @@ router.post('/conversacion/nueva', async (req, res) => {
             });
         }
 
-        // ORDENAR LOS IDs
-        const participantesOrdenados = [usuario1Id, usuario2Id].sort();
-        console.log('📋 Participantes ordenados:', participantesOrdenados);
+        // 🔥 CREAR CONVERSACIÓN CON VALIDACIÓN EXPLÍCITA
+        console.log('🆕 Creando NUEVA conversación...');
+        
+        // Verificar explícitamente que tenemos 2 participantes válidos
+        if (participantesOrdenados.length !== 2) {
+            throw new Error('Array de participantes no tiene 2 elementos');
+        }
 
-        // BÚSQUEDA SIMPLE PERO EFECTIVA
-        let conversacion = await Conversacion.findOne({
-            participantes: participantesOrdenados
-        });
+        try {
+            conversacion = new Conversacion({
+                participantes: participantesOrdenados,
+                fecha_creacion: new Date(),
+                fecha_actualizacion: new Date()
+            });
 
-        console.log('🔍 Conversación encontrada:', conversacion ? 'SÍ' : 'NO');
+            // 🔥 VALIDAR ANTES DE GUARDAR
+            const validationError = conversacion.validateSync();
+            if (validationError) {
+                console.error('❌ Error de validación:', validationError);
+                throw validationError;
+            }
 
-        // Si no existe, crear nueva con UPSERT (crear o actualizar)
-        if (!conversacion) {
-            console.log('🆕 Creando NUEVA conversación...');
+            await conversacion.save();
             
-            // Usar findOneAndUpdate con upsert para evitar race conditions
-            conversacion = await Conversacion.findOneAndUpdate(
-                { participantes: participantesOrdenados },
-                { 
-                    $setOnInsert: { 
-                        participantes: participantesOrdenados,
-                        fecha_creacion: new Date()
-                    }
-                },
-                { 
-                    upsert: true,
-                    new: true,
-                    setDefaultsOnInsert: true
+            // Populate después de guardar
+            await conversacion.populate('participantes', 'nombre username foto_perfil');
+
+            console.log('✅ Nueva conversación creada:', conversacion._id);
+            console.log('📊 Participantes finales:', conversacion.participantes.map(p => p._id));
+
+            res.json({
+                success: true,
+                data: conversacion,
+                message: 'Nueva conversación creada'
+            });
+
+        } catch (error) {
+            // Manejar error de duplicado
+            if (error.code === 11000) {
+                console.log('🔄 Conversación creada simultáneamente, buscando...');
+                
+                const conversacionExistente = await Conversacion.findOne({
+                    participantes: participantesOrdenados
+                }).populate('participantes', 'nombre username foto_perfil')
+                  .populate('ultimo_mensaje');
+                
+                if (conversacionExistente) {
+                    return res.json({
+                        success: true,
+                        data: conversacionExistente,
+                        message: 'Conversación creada simultáneamente'
+                    });
                 }
-            );
+            }
             
-            console.log('✅ Conversación procesada:', conversacion._id);
+            // 🔥 MANEJO ESPECÍFICO DE ERROR DE VALIDACIÓN
+            if (error.message.includes('Debe haber exactamente 2 participantes')) {
+                console.error('❌ Error de validación de participantes:', participantesOrdenados);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Error en los datos de participantes: ' + error.message
+                });
+            }
+            
+            throw error;
         }
-
-        // Popular datos para respuesta
-        await conversacion.populate('participantes', 'nombre username foto_perfil');
-        if (conversacion.ultimo_mensaje) {
-            await conversacion.populate('ultimo_mensaje');
-        }
-
-        console.log('🎯 Conversación final enviada:', conversacion._id);
-
-        res.json({
-            success: true,
-            data: conversacion,
-            message: conversacion.ultimo_mensaje ? 'Conversación encontrada' : 'Nueva conversación creada'
-        });
 
     } catch (error) {
         console.error('❌ Error creando conversación:', error);
         
-        // Manejar error de duplicado (aunque upsert debería prevenirlo)
         if (error.code === 11000) {
             console.log('🔄 Error de duplicado, buscando conversación existente...');
+            
             const participantesOrdenados = [req.body.usuario1Id, req.body.usuario2Id].sort();
             const conversacionExistente = await Conversacion.findOne({
                 participantes: participantesOrdenados
@@ -177,7 +231,7 @@ router.post('/conversacion/nueva', async (req, res) => {
                 return res.json({
                     success: true,
                     data: conversacionExistente,
-                    message: 'Conversación ya existente'
+                    message: 'Conversación ya existente (recuperada)'
                 });
             }
         }
@@ -188,7 +242,6 @@ router.post('/conversacion/nueva', async (req, res) => {
         });
     }
 });
-
 // ENVIAR mensaje
 router.post('/mensaje/enviar', async (req, res) => {
     try {

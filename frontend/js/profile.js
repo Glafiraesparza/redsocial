@@ -6,6 +6,7 @@ let userProfileData = null;
 let currentCoverIndex = 0;
 let coverPhotos = [];
 let currentPosts = []; 
+let currentPostId = null;
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
@@ -222,7 +223,7 @@ async function loadOtherUserProfile(userId) {
             displayOtherUserProfile(userProfileData);
             
             // Actualizar el título de la página
-            document.title = `${userProfileData.usuario.nombre} - Kion-D`;
+            document.title = `${userProfileData.usuario.nombre} - Aural`;
             
         } else {
             showToast('❌ Error al cargar el perfil del usuario', 'error');
@@ -260,7 +261,7 @@ function displayOtherUserProfile(profileData) {
     hideEditButtons();
     
     // Actualizar el título de la página
-    document.title = `${usuario.nombre} - Kion-D`;
+    document.title = `${usuario.nombre} - Aural`;
     
     // Actualizar el sidebar para reflejar que estamos viendo otro perfil
     initializeSidebar();
@@ -1008,6 +1009,15 @@ window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUse
     window.showBlockedUserModal = showBlockedUserModal;
     window.closeBlockedUserModal = closeBlockedUserModal;
     window.goToMyProfileFromModal = goToMyProfileFromModal;
+    window.showPostModal = showPostModal;
+    window.viewPost = viewPost;
+    window.closeModal = closeModal;
+    window.openModal = openModal;
+    window.handleLikeModal = handleLikeModal;
+    window.handleShareModal = handleShareModal;
+    window.initializeComentarioEvents = initializeComentarioEvents;
+    window.loadComentariosModal = loadComentariosModal;
+    window.enviarComentarioModal = enviarComentarioModal;
     
     console.log('✅ Funciones globales creadas');
 }
@@ -1272,39 +1282,103 @@ function initializeModalEvents() {
 
 // ===== FUNCIONES BÁSICAS =====
 function initializeSidebar() {
-    if (!currentUser) return;
-    
-    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
-    const viewingUserId = localStorage.getItem('viewingUserProfile');
-    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
-    
-    // Actualizar el texto del botón de perfil según el contexto
-    const profileBtnText = document.getElementById('profileBtnText');
-    const myProfileBtn = document.getElementById('myProfileBtn');
-    
-    if (profileBtnText && myProfileBtn) {
-        if (isOwnProfile) {
-            profileBtnText.textContent = 'Mi Perfil';
-            myProfileBtn.classList.add('active');
-        } else {
-            profileBtnText.textContent = 'Mi Perfil';
-            myProfileBtn.classList.remove('active');
-        }
+    if (!currentUser) {
+        console.warn('⚠️ No hay usuario actual para inicializar sidebar');
+        return;
     }
     
-    // Siempre mostrar nuestros datos en el sidebar, no los del usuario que estamos viendo
-    document.getElementById('userGreeting').textContent = `Hola, ${currentUser.nombre}`;
-    document.getElementById('sidebarUserName').textContent = currentUser.nombre;
-    document.getElementById('sidebarUserUsername').textContent = `@${currentUser.username}`;
-    document.getElementById('sidebarSeguidoresCount').textContent = currentUser.seguidores?.length || 0;
-    document.getElementById('sidebarSeguidosCount').textContent = currentUser.seguidos?.length || 0;
-    
-    const sidebarAvatar = document.getElementById('sidebarAvatar');
-    if (currentUser.foto_perfil) {
-        sidebarAvatar.innerHTML = `<img src="${currentUser.foto_perfil}" alt="${currentUser.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+    try {
+        // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+        const viewingUserId = localStorage.getItem('viewingUserProfile');
+        const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+        
+        // Actualizar el texto del botón de perfil según el contexto
+        const profileBtnText = document.getElementById('profileBtnText');
+        const myProfileBtn = document.getElementById('myProfileBtn');
+        
+        console.log('🔍 Elementos del sidebar:', {
+            profileBtnText: !!profileBtnText,
+            myProfileBtn: !!myProfileBtn,
+            isOwnProfile: isOwnProfile
+        });
+        
+        // VERIFICACIÓN MÁS ROBUSTA
+        if (profileBtnText) {
+            profileBtnText.textContent = 'Mi Perfil';
+        } else {
+            console.warn('⚠️ Elemento profileBtnText no encontrado');
+        }
+        
+        if (myProfileBtn) {
+            if (isOwnProfile) {
+                myProfileBtn.classList.add('active');
+            } else {
+                myProfileBtn.classList.remove('active');
+            }
+        } else {
+            console.warn('⚠️ Elemento myProfileBtn no encontrado');
+        }
+        
+        // AGREGAR EVENT LISTENER PARA EL BOTÓN DE MI PERFIL CON VERIFICACIÓN
+        if (myProfileBtn) {
+            // Remover event listeners existentes para evitar duplicados
+            const newMyProfileBtn = myProfileBtn.cloneNode(true);
+            myProfileBtn.parentNode.replaceChild(newMyProfileBtn, myProfileBtn);
+            
+            // Agregar nuevo event listener
+            newMyProfileBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🎯 Navegando a mi perfil desde sidebar...');
+                goToMyProfile();
+            });
+        }
+        
+        // AGREGAR EVENT LISTENER PARA EL AVATAR DEL SIDEBAR TAMBIÉN
+        const sidebarAvatar = document.getElementById('sidebarAvatar');
+        if (sidebarAvatar) {
+            sidebarAvatar.style.cursor = 'pointer';
+            sidebarAvatar.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🎯 Navegando a mi perfil desde avatar del sidebar...');
+                goToMyProfile();
+            });
+        }
+        
+        // AGREGAR EVENT LISTENER PARA EL NOMBRE DE USUARIO EN SIDEBAR
+        const sidebarUserName = document.getElementById('sidebarUserName');
+        if (sidebarUserName) {
+            sidebarUserName.style.cursor = 'pointer';
+            sidebarUserName.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🎯 Navegando a mi perfil desde nombre de usuario...');
+                goToMyProfile();
+            });
+        }
+        
+        // Siempre mostrar nuestros datos en el sidebar, no los del usuario que estamos viendo
+        const userGreeting = document.getElementById('userGreeting');
+        const sidebarUserUsername = document.getElementById('sidebarUserUsername');
+        const sidebarSeguidoresCount = document.getElementById('sidebarSeguidoresCount');
+        const sidebarSeguidosCount = document.getElementById('sidebarSeguidosCount');
+        
+        if (userGreeting) userGreeting.textContent = `Hola, ${currentUser.nombre}`;
+        if (sidebarUserName) sidebarUserName.textContent = currentUser.nombre;
+        if (sidebarUserUsername) sidebarUserUsername.textContent = `@${currentUser.username}`;
+        if (sidebarSeguidoresCount) sidebarSeguidoresCount.textContent = currentUser.seguidores?.length || 0;
+        if (sidebarSeguidosCount) sidebarSeguidosCount.textContent = currentUser.seguidos?.length || 0;
+        
+        // Actualizar avatar del sidebar
+        if (sidebarAvatar && currentUser.foto_perfil) {
+            sidebarAvatar.innerHTML = `<img src="${currentUser.foto_perfil}" alt="${currentUser.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; cursor: pointer;">`;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en initializeSidebar:', error);
     }
 }
-
 
 // ===== MODIFICAR LA FUNCIÓN DE VOLVER AL DASHBOARD =====
 function initializeEventListeners() {
@@ -1393,7 +1467,6 @@ function initializeCoverCarousel(photos) {
             <div class="cover-slide active" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                 <div class="cover-placeholder">
                     <i class="fas fa-mountain"></i>
-                    <p>Agrega fotos para tu portada</p>
                 </div>
             </div>
         `;
@@ -1407,10 +1480,15 @@ function initializeCoverCarousel(photos) {
         </div>
     `).join('');
     
-    indicators.innerHTML = coverPhotos.map((_, index) => `
-        <button class="carousel-indicator ${index === 0 ? 'active' : ''}" 
-                onclick="goToCoverPhoto(${index})"></button>
-    `).join('');
+    // Mostrar indicadores solo si hay más de 1 foto
+    if (coverPhotos.length > 1) {
+        indicators.innerHTML = coverPhotos.map((_, index) => `
+            <button class="carousel-indicator ${index === 0 ? 'active' : ''}" 
+                    onclick="goToCoverPhoto(${index})"></button>
+        `).join('');
+    } else {
+        indicators.innerHTML = '';
+    }
     
     updateCarouselControls();
 }
@@ -1846,6 +1924,7 @@ async function uploadCoverPhoto() {
 }
 
 // Función que ejecuta la eliminación después de la confirmación
+// Función que ejecuta la eliminación después de la confirmación
 async function confirmDeleteCoverPhoto(index) {
     try {
         showToast('⏳ Eliminando foto de portada...', 'info');
@@ -1986,7 +2065,7 @@ function updateProfileHeader(usuario) {
     
     if (profileName) profileName.textContent = usuario.nombre || 'Nombre no disponible';
     if (profileUsername) profileUsername.textContent = `@${usuario.username || 'usuario'}`;
-    if (profileBio) profileBio.textContent = usuario.biografia || '¡Hola! Estoy usando Kion-D';
+    if (profileBio) profileBio.textContent = usuario.biografia || '¡Hola! Estoy usando Aural';
 }
 
 function loadCurrentProfilePhoto() {
@@ -2022,7 +2101,6 @@ async function loadExistingCoverPhotos() {
             } else {
                 coversGrid.innerHTML = covers.map((cover, index) => {
                     const isMain = cover === mainCover;
-                    const canDelete = covers.length > 2; // Solo permitir eliminar si hay más de 2
                     
                     return `
                         <div class="cover-item ${isMain ? 'main-cover' : ''}" data-index="${index}">
@@ -2038,13 +2116,11 @@ async function loadExistingCoverPhotos() {
                                 </button>
                                 <button class="btn-icon btn-delete-cover" 
                                         onclick="deleteCoverPhoto(${index})" 
-                                        title="${canDelete ? 'Eliminar' : 'Mínimo 2 fotos requeridas'}"
-                                        ${!canDelete ? 'disabled' : ''}>
+                                        title="Eliminar">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
                             ${isMain ? '<div class="cover-badge">Principal</div>' : ''}
-                            ${!canDelete ? '<div class="cover-warning">Mínimo requerido</div>' : ''}
                         </div>
                     `;
                 }).join('');
@@ -2137,6 +2213,7 @@ async function deleteCoverPhoto(index) {
 }
 
 // Modal de confirmación para eliminar portada
+// Modal de confirmación para eliminar portada
 function showDeleteCoverConfirmModal(index, coverUrl, totalCovers) {
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -2157,13 +2234,6 @@ function showDeleteCoverConfirmModal(index, coverUrl, totalCovers) {
                         <i class="fas fa-info-circle"></i>
                         <p><strong>¿Estás seguro de que quieres eliminar esta foto de portada?</strong></p>
                         <p>Esta acción no se puede deshacer.</p>
-                        
-                        ${totalCovers <= 2 ? `
-                            <div class="critical-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <p><strong>¡Atención!</strong> Si eliminas esta foto, solo te quedarán ${totalCovers - 1} fotos de portada (mínimo requerido: 2).</p>
-                            </div>
-                        ` : ''}
                     </div>
                     
                     <div class="confirm-actions">
@@ -2206,7 +2276,6 @@ function updateProfileStats(usuario, publicaciones) {
 }
 
 // Sección Acerca de
-// ===== MODIFICAR LA FUNCIÓN loadAboutSection =====
 function loadAboutSection(usuario) {
     const aboutContent = document.getElementById('aboutContent');
     const interestsContainer = document.getElementById('interestsContainer');
@@ -2220,7 +2289,7 @@ function loadAboutSection(usuario) {
         </div>
         <div class="about-item">
             <strong><i class="fas fa-birthday-cake"></i> Fecha de nacimiento</strong>
-            <span>${usuario.fecha_nacimiento ? new Date(usuario.fecha_nacimiento).toLocaleDateString() : 'No especificada'}</span>
+            <span>${usuario.fecha_nacimiento ? formatDateForDisplay(usuario.fecha_nacimiento) : 'No especificada'}</span>
         </div>
         <div class="about-item">
             <strong><i class="fas fa-user"></i> Género</strong>
@@ -2246,9 +2315,6 @@ function loadAboutSection(usuario) {
             // Mostrar botón solo para nuestro propio perfil
             interestsContainer.innerHTML = `
                 <p class="no-data">Aún no has agregado intereses</p>
-                <button class="btn-secondary" onclick="editInterests()">
-                    <i class="fas fa-plus"></i> Agregar intereses
-                </button>
             `;
         } else {
             // Para otros usuarios, mostrar mensaje sin botón
@@ -2489,14 +2555,15 @@ function createFriendCardHTML(user, tipo) {
 
             ${isBlocked ? `<div class="blocked-indicator">BLOQUEADO</div>` : ''}
 
-            <div class="friend-avatar">
+            <!-- HACER CLICK EN EL AVATAR O INFO PARA IR AL PERFIL -->
+            <div class="friend-avatar" onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer;">
                 ${user.foto_perfil ? 
                     `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
                     `<i class="fas fa-user"></i>`
                 }
             </div>
             
-            <div class="friend-info">
+            <div class="friend-info" onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer;">
                 <h4>${user.nombre}</h4>
                 <p class="friend-username">@${user.username}</p>
                 <div class="friend-stats">
@@ -2509,8 +2576,8 @@ function createFriendCardHTML(user, tipo) {
             
             <div class="friend-actions">
                 ${!isCurrentUser ? `
-                    <button class="btn-view-friend" onclick="viewUserProfile('${user._id}')">
-                        <i class="fas fa-eye"></i> Ver
+                    <button class="btn-view-friend" onclick="navigateToUserProfile('${user._id}')">
+                        <i class="fas fa-eye"></i> Ver Perfil
                     </button>
                     <button class="btn-follow-friend ${isFollowing ? 'following' : ''}" 
                             onclick="toggleFollowFriend('${user._id}', this)">
@@ -2521,16 +2588,6 @@ function createFriendCardHTML(user, tipo) {
                     <span class="current-user-badge">Tú</span>
                 `}
             </div>
-            
-            ${tipo === 'seguidor' ? `
-                <div class="friend-badge follower-badge">
-                    Te sigue
-                </div>
-            ` : `
-                <div class="friend-badge following-badge">
-                    Siguiendo
-                </div>
-            `}
         </div>
     `;
 }
@@ -2745,44 +2802,46 @@ function loadPhotosSection(publicaciones) {
 }
 
 // Sección de Colecciones
+// ===== SECCIÓN DE COLECCIONES =====
 function loadCollectionsSection() {
     const collectionsGrid = document.getElementById('collectionsGrid');
     const allCollections = document.getElementById('allCollections');
     
+    if (!collectionsGrid || !allCollections) return;
+
+    // Mostrar estado de carga temporalmente
     collectionsGrid.innerHTML = `
-        <div class="collection-card">
-            <div class="collection-icon">
-                <i class="fas fa-heart"></i>
-            </div>
-            <h4>Favoritos</h4>
-            <p>12 elementos</p>
-        </div>
-        <div class="collection-card">
-            <div class="collection-icon">
-                <i class="fas fa-bookmark"></i>
-            </div>
-            <h4>Guardados</h4>
-            <p>8 elementos</p>
-        </div>
-        <div class="collection-card">
-            <div class="collection-icon">
-                <i class="fas fa-star"></i>
-            </div>
-            <h4>Destacados</h4>
-            <p>5 elementos</p>
+        <div class="loading-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Cargando colecciones...</p>
         </div>
     `;
     
-    allCollections.innerHTML = `
-        <div class="empty-state">
-            <i class="fas fa-folder-open"></i>
-            <h3>Gestiona tus colecciones</h3>
-            <p>Crea colecciones para organizar tus publicaciones favoritas.</p>
-            <button class="btn-primary" onclick="createNewCollection()">
-                <i class="fas fa-plus"></i> Crear primera colección
-            </button>
-        </div>
-    `;
+    allCollections.innerHTML = '';
+
+    // Intentar cargar colecciones si la función existe
+    if (typeof loadUserCollections === 'function') {
+        loadUserCollections();
+    } else if (typeof initializeCollections === 'function') {
+        initializeCollections();
+    } else {
+        // Si no existen las funciones de colecciones, mostrar mensaje
+        collectionsGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>Sistema de colecciones</h3>
+                <p>Las colecciones te permiten organizar tus publicaciones favoritas.</p>
+                <button class="btn-primary" onclick="showCollectionsInfo()">
+                    <i class="fas fa-info"></i> Más información
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Función temporal para mostrar información
+function showCollectionsInfo() {
+    showToast('🔧 El sistema de colecciones estará disponible pronto', 'info');
 }
 
 // ===== PUBLICACIONES =====
@@ -2827,6 +2886,8 @@ function displayProfilePosts(posts) {
     initializePostInteractions('profilePostsFeed', posts);
     initializeMediaPlayers(); // Inicializar reproductores de audio/video
 }
+
+
 
 // Función para inicializar reproductores de audio y video
 function initializeMediaPlayers() {
@@ -2902,7 +2963,7 @@ function createPostHTML(post) {
     const isAuthor = post.autor._id === currentUser._id;
 
     // Solo mostrar opciones de edición si es nuestro propio perfil Y somos autores del post
-    const showOptions = isOwnProfile && isAuthor;
+    const showOptions = isOwnProfile && isAuthor && !isSharedPost;
 
     return `
         <div class="post-card" id="post-${post._id}" data-content-type="${post.tipoContenido || 'texto'}">
@@ -2926,23 +2987,27 @@ function createPostHTML(post) {
                 </div>
                 <div class="post-time">${timeAgo}</div>
                 
-                ${showOptions ? `
-                    <div class="post-options">
-                        <button class="btn-icon post-options-btn" id="optionsBtn-${post._id}">
-                            <i class="fas fa-ellipsis-h"></i>
-                        </button>
-                        <div class="post-options-menu" id="optionsMenu-${post._id}">
-                            <button class="option-item edit-option" onclick="editPost('${post._id}')">
-                                <i class="fas fa-edit"></i>
-                                <span>Editar publicación</span>
-                            </button>
-                            <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}')">
-                                <i class="fas fa-trash"></i>
-                                <span>Eliminar publicación</span>
-                            </button>
-                        </div>
-                    </div>
-                ` : ''}
+                ${(isOwnProfile && isAuthor) ? `
+    <div class="post-options">
+        <button class="btn-icon post-options-btn" id="optionsBtn-${post._id}">
+            <i class="fas fa-ellipsis-h"></i>
+        </button>
+        <div class="post-options-menu" id="optionsMenu-${post._id}">
+            ${!isSharedPost ? `
+                <!-- Solo mostrar editar si NO es un post compartido -->
+                <button class="option-item edit-option" onclick="editPost('${post._id}')">
+                    <i class="fas fa-edit"></i>
+                    <span>Editar publicación</span>
+                </button>
+            ` : ''}
+            <!-- Siempre mostrar eliminar para posts propios -->
+            <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}')">
+                <i class="fas fa-trash"></i>
+                <span>Eliminar publicación</span>
+            </button>
+        </div>
+    </div>
+` : ''}
             </div>
             
             ${isSharedPost ? `
@@ -3452,29 +3517,108 @@ function editPost(postId) {
                         </div>
                     </div>
                     
-                    ${post.imagen ? `
-                        <div class="current-image-preview">
-                            <label>
-                                <i class="fas fa-image"></i> Imagen actual
-                            </label>
-                            <div class="image-preview-container">
-                                <img src="${post.imagen}" alt="Imagen actual" class="current-image">
-                                <button type="button" class="btn-remove-image" onclick="removeCurrentImage('${postId}')">
-                                    <i class="fas fa-times"></i> Eliminar imagen
-                                </button>
+                    <!-- Sección para medios existentes -->
+                    <div class="current-media-section">
+                        ${post.imagen ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-image"></i> Imagen actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <img src="${post.imagen}" alt="Imagen actual" class="current-media">
+                                    <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'imagen')">
+                                        <i class="fas fa-times"></i> Eliminar imagen
+                                    </button>
+                                </div>
                             </div>
+                        ` : ''}
+                        
+                        ${post.audio ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-music"></i> Audio actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <div class="audio-preview-item">
+                                        <i class="fas fa-music"></i>
+                                        <div class="audio-info">
+                                            <strong>Audio actual</strong>
+                                            <span>Duración: ${formatDuracion(post.duracion)}</span>
+                                        </div>
+                                        <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'audio')">
+                                            <i class="fas fa-times"></i> Eliminar audio
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${post.video ? `
+                            <div class="current-media-preview">
+                                <label>
+                                    <i class="fas fa-video"></i> Video actual
+                                </label>
+                                <div class="media-preview-container">
+                                    <video controls class="current-media-preview-video">
+                                        <source src="${post.video}" type="video/mp4">
+                                        Tu navegador no soporta el elemento de video.
+                                    </video>
+                                    <button type="button" class="btn-remove-media" onclick="removeCurrentMedia('${postId}', 'video')">
+                                        <i class="fas fa-times"></i> Eliminar video
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Sección para agregar nuevos medios (solo mostrar si no hay medio existente) -->
+                    ${!post.imagen && !post.audio && !post.video ? `
+                    <div class="add-media-section">
+                        <h4><i class="fas fa-plus"></i> Agregar medio (opcional)</h4>
+                        
+                        <div class="media-type-selector-edit">
+                            <button type="button" class="media-type-btn-edit active" onclick="changeEditMediaType('imagen')">
+                                <i class="fas fa-image"></i> Imagen
+                            </button>
+                            <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('audio')">
+                                <i class="fas fa-music"></i> Audio
+                            </button>
+                            <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('video')">
+                                <i class="fas fa-video"></i> Video
+                            </button>
                         </div>
-                    ` : `
-                        <div class="image-upload-edit">
-                            <label>
-                                <i class="fas fa-image"></i> Agregar imagen (opcional)
-                            </label>
+                        
+                        <div id="editImageUpload" class="media-upload-edit" style="display: block;">
                             <input type="file" id="editPostImage" accept="image/*" style="display: none;">
-                            <label for="editPostImage" class="btn-secondary btn-image-upload">
+                            <label for="editPostImage" class="btn-secondary btn-media-upload">
                                 <i class="fas fa-upload"></i> Seleccionar Imagen
                             </label>
-                            <div id="editImagePreview" class="image-preview"></div>
+                            <div id="editImagePreview" class="media-preview"></div>
                         </div>
+                        
+                        <div id="editAudioUpload" class="media-upload-edit" style="display: none;">
+                            <input type="file" id="editPostAudio" accept="audio/*" style="display: none;">
+                            <label for="editPostAudio" class="btn-secondary btn-media-upload">
+                                <i class="fas fa-upload"></i> Seleccionar Audio
+                            </label>
+                            <div id="editAudioPreview" class="media-preview"></div>
+                        </div>
+                        
+                        <div id="editVideoUpload" class="media-upload-edit" style="display: none;">
+                            <input type="file" id="editPostVideo" accept="video/*" style="display: none;">
+                            <label for="editPostVideo" class="btn-secondary btn-media-upload">
+                                <i class="fas fa-upload"></i> Seleccionar Video
+                            </label>
+                            <div id="editVideoPreview" class="media-preview"></div>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="media-info-message">
+                        <div class="info-alert">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Para agregar un nuevo medio, primero elimina el medio actual.</span>
+                        </div>
+                    </div>
                     `}
                     
                     <div class="form-actions" style="margin-top: 2rem;">
@@ -3495,6 +3639,197 @@ function editPost(postId) {
     // Inicializar eventos del modal de edición
     initializeEditModalEvents(postId);
     openModal('edit');
+}
+
+function removeCurrentMedia(postId, mediaType) {
+    const post = currentPosts.find(p => p._id === postId);
+    if (!post) return;
+    
+    // Remover el medio específico
+    if (mediaType === 'imagen') {
+        post.imagen = '';
+        post.imagenFilename = '';
+    } else if (mediaType === 'audio') {
+        post.audio = '';
+        post.audioFilename = '';
+    } else if (mediaType === 'video') {
+        post.video = '';
+        post.videoFilename = '';
+    }
+    
+    // Mostrar sección para agregar nuevos medios
+    showAddMediaSection();
+    
+    showToast('✅ Medio eliminado. Ahora puedes agregar uno nuevo si lo deseas.', 'success');
+}
+
+function showAddMediaSection() {
+    const currentMediaSection = document.querySelector('.current-media-section');
+    const mediaInfoMessage = document.querySelector('.media-info-message');
+    
+    if (currentMediaSection) {
+        // Remover todos los medios existentes del DOM
+        currentMediaSection.innerHTML = '';
+    }
+    
+    if (mediaInfoMessage) {
+        // Reemplazar el mensaje por la sección de agregar medios
+        mediaInfoMessage.outerHTML = `
+            <div class="add-media-section">
+                <h4><i class="fas fa-plus"></i> Agregar medio (opcional)</h4>
+                
+                <div class="media-type-selector-edit">
+                    <button type="button" class="media-type-btn-edit active" onclick="changeEditMediaType('imagen')">
+                        <i class="fas fa-image"></i> Imagen
+                    </button>
+                    <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('audio')">
+                        <i class="fas fa-music"></i> Audio
+                    </button>
+                    <button type="button" class="media-type-btn-edit" onclick="changeEditMediaType('video')">
+                        <i class="fas fa-video"></i> Video
+                    </button>
+                </div>
+                
+                <div id="editImageUpload" class="media-upload-edit" style="display: block;">
+                    <input type="file" id="editPostImage" accept="image/*" style="display: none;">
+                    <label for="editPostImage" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Imagen
+                    </label>
+                    <div id="editImagePreview" class="media-preview"></div>
+                </div>
+                
+                <div id="editAudioUpload" class="media-upload-edit" style="display: none;">
+                    <input type="file" id="editPostAudio" accept="audio/*" style="display: none;">
+                    <label for="editPostAudio" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Audio
+                    </label>
+                    <div id="editAudioPreview" class="media-preview"></div>
+                </div>
+                
+                <div id="editVideoUpload" class="media-upload-edit" style="display: none;">
+                    <input type="file" id="editPostVideo" accept="video/*" style="display: none;">
+                    <label for="editPostVideo" class="btn-secondary btn-media-upload">
+                        <i class="fas fa-upload"></i> Seleccionar Video
+                    </label>
+                    <div id="editVideoPreview" class="media-preview"></div>
+                </div>
+            </div>
+        `;
+        
+        // Re-inicializar eventos para los nuevos elementos
+        initializeEditMediaEvents();
+    }
+}
+
+function initializeEditMediaEvents() {
+    const editImageInput = document.getElementById('editPostImage');
+    const editAudioInput = document.getElementById('editPostAudio');
+    const editVideoInput = document.getElementById('editPostVideo');
+    
+    if (editImageInput) {
+        editImageInput.addEventListener('change', handleEditImageUpload);
+    }
+    
+    if (editAudioInput) {
+        editAudioInput.addEventListener('change', handleEditAudioUpload);
+    }
+    
+    if (editVideoInput) {
+        editVideoInput.addEventListener('change', handleEditVideoUpload);
+    }
+}
+
+function handleEditAudioUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('audio/')) {
+            showToast('❌ Por favor selecciona un archivo de audio válido', 'error');
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('❌ El audio no debe superar los 10MB', 'error');
+            return;
+        }
+        
+        document.getElementById('editAudioPreview').innerHTML = `
+            <div class="media-preview-item">
+                <i class="fas fa-music"></i>
+                <div class="audio-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeEditAudioPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function handleEditVideoUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('video/')) {
+            showToast('❌ Por favor selecciona un archivo de video válido', 'error');
+            return;
+        }
+        
+        if (file.size > 50 * 1024 * 1024) {
+            showToast('❌ El video no debe superar los 50MB', 'error');
+            return;
+        }
+        
+        const url = URL.createObjectURL(file);
+        document.getElementById('editVideoPreview').innerHTML = `
+            <div class="media-preview-item">
+                <video controls class="preview-media-video">
+                    <source src="${url}" type="${file.type}">
+                    Tu navegador no soporta el elemento video.
+                </video>
+                <div class="video-info">
+                    <strong>${file.name}</strong>
+                    <span>${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+                <button type="button" class="btn-remove-preview" onclick="removeEditVideoPreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function changeEditMediaType(type) {
+    // Verificar si hay algún medio existente
+    const hasExistingMedia = document.querySelector('.current-media-preview');
+    if (hasExistingMedia) {
+        showToast('❌ Primero elimina el medio actual para agregar uno nuevo', 'error');
+        return;
+    }
+    
+    // Ocultar todos los uploaders
+    document.getElementById('editImageUpload').style.display = 'none';
+    document.getElementById('editAudioUpload').style.display = 'none';
+    document.getElementById('editVideoUpload').style.display = 'none';
+    
+    // Limpiar previews
+    document.getElementById('editImagePreview').innerHTML = '';
+    document.getElementById('editAudioPreview').innerHTML = '';
+    document.getElementById('editVideoPreview').innerHTML = '';
+    
+    // Mostrar el uploader seleccionado
+    document.getElementById(`edit${type.charAt(0).toUpperCase() + type.slice(1)}Upload`).style.display = 'block';
+    
+    // Actualizar botones activos
+    document.querySelectorAll('.media-type-btn-edit').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Abrir selector de archivos
+    setTimeout(() => {
+        document.getElementById(`editPost${type.charAt(0).toUpperCase() + type.slice(1)}`).click();
+    }, 100);
 }
 
 // Función para inicializar eventos del formulario de edición
@@ -3572,6 +3907,45 @@ function validateInterestsLimit() {
     }
 }
 
+// ===== FUNCIONES UTILITARIAS PARA FECHAS =====
+
+/**
+ * Convierte una fecha a formato YYYY-MM-DD para inputs type="date"
+ * Maneja correctamente las zonas horarias
+ */
+function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    
+    // Ajustar por zona horaria para obtener la fecha correcta
+    const offset = date.getTimezoneOffset();
+    const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+    
+    return adjustedDate.toISOString().split('T')[0];
+}
+
+/**
+ * Convierte una fecha de input a formato ISO para guardar en la base de datos
+ */
+function formatDateForStorage(dateString) {
+    if (!dateString) return '';
+    
+    // Las fechas de input type="date" ya están en formato YYYY-MM-DD
+    // Agregar tiempo para evitar problemas de zona horaria
+    return new Date(dateString + 'T12:00:00').toISOString();
+}
+
+/**
+ * Formatea una fecha para mostrar al usuario (DD/MM/YYYY)
+ */
+function formatDateForDisplay(dateString) {
+    if (!dateString) return 'No especificada';
+    
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES');
+}
+
 // Función para guardar los cambios del perfil
 // Función para guardar los cambios del perfil - VERSIÓN CORREGIDA
 async function saveProfileChanges() {
@@ -3584,10 +3958,7 @@ async function saveProfileChanges() {
         return;
     }
 
-    // Ejecutar diagnóstico primero
-    diagnoseFormData();
-
-    // Obtener valores directamente de los inputs (más confiable que FormData)
+    // Obtener valores de los inputs
     const nombreInput = document.getElementById('editNombre');
     const biografiaInput = document.getElementById('editBiografia');
     const ubicacionInput = document.getElementById('editUbicacion');
@@ -3605,7 +3976,9 @@ async function saveProfileChanges() {
         nombre: nombreInput ? nombreInput.value.trim() : '',
         biografia: biografiaInput ? biografiaInput.value.trim() : '',
         ubicacion: ubicacionInput ? ubicacionInput.value.trim() : '',
-        fecha_nacimiento: fechaNacimientoInput ? fechaNacimientoInput.value : '',
+        // CORREGIDO: Usar el formateo correcto para fechas
+        fecha_nacimiento: fechaNacimientoInput && fechaNacimientoInput.value ? 
+            formatDateForStorage(fechaNacimientoInput.value) : '',
         genero: generoSelect ? generoSelect.value : 'prefiero_no_decir',
         intereses: selectedInterests || []
     };
@@ -3694,7 +4067,6 @@ window.editProfile = function() {
 function initializeEditModalEvents(postId) {
     const editContent = document.getElementById('editPostContent');
     const editCharCount = document.getElementById('editCharCount');
-    const editImageInput = document.getElementById('editPostImage');
     
     // Contador de caracteres
     if (editContent && editCharCount) {
@@ -3713,11 +4085,10 @@ function initializeEditModalEvents(postId) {
         });
     }
     
-    // Preview de imagen
-    if (editImageInput) {
-        editImageInput.addEventListener('change', handleEditImageUpload);
-    }
+    // Inicializar eventos de medios
+    initializeEditMediaEvents();
 }
+
 
 // Función para manejar upload de imagen en edición
 function handleEditImageUpload(event) {
@@ -3738,8 +4109,8 @@ function handleEditImageUpload(event) {
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('editImagePreview').innerHTML = `
-                <div class="image-preview-item">
-                    <img src="${e.target.result}" alt="Vista previa" class="preview-image">
+                <div class="media-preview-item">
+                    <img src="${e.target.result}" alt="Vista previa" class="preview-media">
                     <button type="button" class="btn-remove-preview" onclick="removeEditImagePreview()">
                         <i class="fas fa-times"></i>
                     </button>
@@ -3775,9 +4146,11 @@ function closeEditModal() {
 }
 
 // Función para actualizar el post
-async function updatePost(postId, removeImage = false) {
+async function updatePost(postId) {
     const editContent = document.getElementById('editPostContent');
     const editImageInput = document.getElementById('editPostImage');
+    const editAudioInput = document.getElementById('editPostAudio');
+    const editVideoInput = document.getElementById('editPostVideo');
     
     if (!editContent) {
         showToast('❌ Error: No se pudo encontrar el contenido', 'error');
@@ -3785,9 +4158,16 @@ async function updatePost(postId, removeImage = false) {
     }
     
     const contenido = editContent.value.trim();
+    const post = currentPosts.find(p => p._id === postId);
     
-    if (!contenido) {
-        showToast('❌ El contenido no puede estar vacío', 'error');
+    // Validación: debe haber contenido o algún medio
+    const hasExistingMedia = post.imagen || post.audio || post.video;
+    const hasNewMedia = (editImageInput && editImageInput.files[0]) || 
+                       (editAudioInput && editAudioInput.files[0]) || 
+                       (editVideoInput && editVideoInput.files[0]);
+    
+    if (!contenido && !hasExistingMedia && !hasNewMedia) {
+        showToast('❌ La publicación debe tener contenido o un archivo multimedia', 'error');
         return;
     }
     
@@ -3797,15 +4177,52 @@ async function updatePost(postId, removeImage = false) {
             contenido: contenido
         };
         
-        // Si se está removiendo la imagen
-        if (removeImage) {
+        // Procesar nuevos archivos de medios (si existen)
+        let newMediaType = null;
+        let newMediaFile = null;
+        
+        if (editImageInput && editImageInput.files[0]) {
+            newMediaType = 'imagen';
+            newMediaFile = editImageInput.files[0];
+        } else if (editAudioInput && editAudioInput.files[0]) {
+            newMediaType = 'audio';
+            newMediaFile = editAudioInput.files[0];
+        } else if (editVideoInput && editVideoInput.files[0]) {
+            newMediaType = 'video';
+            newMediaFile = editVideoInput.files[0];
+        }
+        
+        // Si hay un nuevo archivo, subirlo y reemplazar el medio existente
+        if (newMediaFile) {
+            showToast(`📤 Subiendo ${newMediaType}...`, 'info');
+            
+            const fieldName = newMediaType === 'imagen' ? 'image' : newMediaType;
+            const uploadResult = await uploadMediaFile(newMediaFile, fieldName);
+            
+            // Configurar el nuevo medio
+            postData.tipoContenido = newMediaType;
+            postData.duracion = uploadResult.duracion || 0;
+            
+            // Limpiar todos los medios existentes
             postData.imagen = '';
-        } 
-        // Si hay una nueva imagen seleccionada
-        else if (editImageInput && editImageInput.files[0]) {
-            const file = editImageInput.files[0];
-            const uploadResult = await uploadImageToServer(file);
-            postData.imagen = uploadResult.url;
+            postData.audio = '';
+            postData.video = '';
+            
+            // Establecer el nuevo medio
+            if (newMediaType === 'imagen') {
+                postData.imagen = uploadResult.url;
+                postData.imagenFilename = uploadResult.filename;
+            } else if (newMediaType === 'audio') {
+                postData.audio = uploadResult.url;
+                postData.audioFilename = uploadResult.filename;
+            } else if (newMediaType === 'video') {
+                postData.video = uploadResult.url;
+                postData.videoFilename = uploadResult.filename;
+            }
+        } else {
+            // Si no hay nuevo archivo, mantener los medios existentes
+            postData.tipoContenido = post.imagen ? 'imagen' : post.audio ? 'audio' : post.video ? 'video' : 'texto';
+            postData.duracion = post.duracion || 0;
         }
         
         const response = await fetch(`${API_URL}/posts/${postId}`, {
@@ -3832,6 +4249,29 @@ async function updatePost(postId, removeImage = false) {
     }
 }
 
+async function uploadMediaFile(file, fieldName) {
+    const formData = new FormData();
+    formData.append(fieldName, file); // 'image', 'audio', 'video'
+    
+    let endpoint = fieldName; // Ahora son iguales
+    
+    console.log(`📤 Subiendo ${fieldName} a /upload/${endpoint}`);
+    
+    const response = await fetch(`${API_URL}/upload/${endpoint}`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+        throw new Error(result.error || 'Error al subir el archivo');
+    }
+    
+    return result.data;
+}
+
+
 // Función para actualizar el post en el DOM
 function updatePostInDOM(postId, updatedPost) {
     const postElement = document.getElementById(`post-${postId}`);
@@ -3843,25 +4283,8 @@ function updatePostInDOM(postId, updatedPost) {
         contentElement.innerHTML = formatPostContent(updatedPost.contenido);
     }
     
-    // Actualizar imagen si existe
-    const imageElement = document.getElementById(`postImage-${postId}`);
-    if (updatedPost.imagen) {
-        if (imageElement) {
-            imageElement.src = updatedPost.imagen;
-        } else {
-            // Si no existe el elemento de imagen, crearlo
-            const postContent = contentElement.parentElement;
-            const newImage = document.createElement('img');
-            newImage.src = updatedPost.imagen;
-            newImage.alt = 'Imagen de publicación';
-            newImage.className = 'post-image';
-            newImage.id = `postImage-${postId}`;
-            contentElement.after(newImage);
-        }
-    } else if (imageElement) {
-        // Remover imagen si fue eliminada
-        imageElement.remove();
-    }
+    // Actualizar medios
+    updateMediaInDOM(postId, updatedPost);
     
     // Actualizar la hora (mostrar "Editado")
     const timeElement = postElement.querySelector('.post-time');
@@ -3873,6 +4296,56 @@ function updatePostInDOM(postId, updatedPost) {
     const postIndex = currentPosts.findIndex(p => p._id === postId);
     if (postIndex !== -1) {
         currentPosts[postIndex] = updatedPost;
+    }
+}
+
+// Función auxiliar para actualizar medios en el DOM
+function updateMediaInDOM(postId, updatedPost) {
+    const postElement = document.getElementById(`post-${postId}`);
+    if (!postElement) return;
+    
+    // Remover todos los medios existentes
+    const existingMedia = postElement.querySelector('.post-media');
+    if (existingMedia) {
+        existingMedia.remove();
+    }
+    
+    // Agregar el nuevo medio si existe
+    if (updatedPost.imagen) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <img src="${updatedPost.imagen}" alt="Imagen de publicación" class="post-image" id="postImage-${postId}">
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
+    } else if (updatedPost.audio) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <div class="audio-player-container">
+                <audio controls class="audio-player" id="audio-${postId}">
+                    <source src="${updatedPost.audio}" type="audio/mpeg">
+                    <source src="${updatedPost.audio}" type="audio/wav">
+                    Tu navegador no soporta el elemento de audio.
+                </audio>
+                ${updatedPost.duracion ? `<div class="media-duration">Duración: ${formatDuracion(updatedPost.duracion)}</div>` : ''}
+            </div>
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
+    } else if (updatedPost.video) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'post-media';
+        mediaDiv.innerHTML = `
+            <div class="video-player-container">
+                <video controls class="video-player" id="video-${postId}">
+                    <source src="${updatedPost.video}" type="video/mp4">
+                    <source src="${updatedPost.video}" type="video/webm">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                ${updatedPost.duracion ? `<div class="media-duration">Duración: ${formatDuracion(updatedPost.duracion)}</div>` : ''}
+            </div>
+        `;
+        postElement.querySelector('.post-content').after(mediaDiv);
     }
 }
 
@@ -4073,5 +4546,618 @@ async function viewPost(postId) {
     } catch (error) {
         console.error('Error viendo publicación:', error);
         showToast('❌ Error al cargar la publicación', 'error');
+    }
+}
+
+// ===== SISTEMA DE COMENTARIOS IDÉNTICO A DASHBOARD =====
+
+// Variable global para el post actual en el modal
+
+
+// Función para mostrar el modal de publicación (IDÉNTICA A DASHBOARD)
+function showPostModal(post) {
+    console.log('🎯 Abriendo modal para post en profile:', post._id);
+    currentPostId = post._id;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'postModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; height: 90vh;">
+            <div class="modal-header">
+                <h3><i class="fas fa-comment"></i> Publicación</h3>
+                <span class="close-modal" onclick="closeModal('post')">&times;</span>
+            </div>
+            <div class="modal-body" style="height: calc(100% - 120px); overflow-y: auto;">
+                ${createPostModalContent(post)}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    setupModalEvents(post);
+    loadComentariosModal(post._id);
+    openModal('post');
+}
+
+// Función IDÉNTICA a dashboard.js
+function createPostModalContent(post) {
+    const isLiked = post.likes.some(like => 
+        typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
+    );
+    
+    const shareCount = post.shares ? post.shares.length : 0;
+    const isAuthor = post.autor._id === currentUser._id;
+    const isSharedPost = post.tipo === 'share';
+
+    return `
+        <!-- Contenido Principal - MISMAS CLASES QUE DASHBOARD -->
+        <div class="post-content-modal-adjusted">
+            <div class="post-header">
+                <div class="post-avatar">
+                    ${post.autor.foto_perfil ? 
+                        `<img src="${post.autor.foto_perfil}" alt="${post.autor.nombre}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <div class="post-user-info">
+                    <h4>${post.autor.nombre}</h4>
+                    <p>@${post.autor.username}</p>
+                </div>
+                <div class="post-time">${new Date(post.fecha_publicacion).toLocaleString()}</div>
+                
+                ${isAuthor && !isSharedPost ? `
+    <div class="post-options">
+        <button class="btn-icon post-options-btn" id="modalOptionsBtn-${post._id}">
+            <i class="fas fa-ellipsis-h"></i>
+        </button>
+        <div class="post-options-menu" id="modalOptionsMenu-${post._id}">
+            ${!isSharedPost ? `
+                <button class="option-item edit-option" onclick="editPost('${post._id}'); closeModal('post');">
+                    <i class="fas fa-edit"></i>
+                    <span>Editar publicación</span>
+                </button>
+            ` : ''}
+            <button class="option-item delete-option" onclick="confirmDeletePost('${post._id}'); closeModal('post');">
+                <i class="fas fa-trash"></i>
+                <span>Eliminar publicación</span>
+            </button>
+        </div>
+    </div>
+` : ''}
+            </div>
+            
+            <div class="post-content">
+                ${formatPostContent(post.contenido)}
+            </div>
+            
+            ${post.imagen ? `
+                <div class="post-media-container-adjusted">
+                    <img src="${post.imagen}" alt="Imagen de publicación" class="post-image-modal">
+                </div>
+            ` : ''}
+
+            ${post.audio ? `
+                <div class="post-media-container-adjusted">
+                    <div class="audio-player-container">
+                        <audio controls class="audio-player">
+                            <source src="${post.audio}" type="audio/mpeg">
+                            <source src="${post.audio}" type="audio/wav">
+                            Tu navegador no soporta el elemento de audio.
+                        </audio>
+                        ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${post.video ? `
+                <div class="post-media-container-adjusted">
+                    <div class="video-player-container">
+                        <video controls class="video-player">
+                            <source src="${post.video}" type="video/mp4">
+                            <source src="${post.video}" type="video/webm">
+                            Tu navegador no soporta el elemento de video.
+                        </video>
+                        ${post.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.duracion)}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${isSharedPost && post.postOriginal ? `
+                <div class="original-post-preview-adjusted">
+                    <div class="original-post-header-adjusted">
+                        <div class="original-post-avatar-adjusted">
+                            ${post.postOriginal.autor.foto_perfil ? 
+                                `<img src="${post.postOriginal.autor.foto_perfil}" alt="${post.postOriginal.autor.nombre}">` : 
+                                `<i class="fas fa-user"></i>`
+                            }
+                        </div>
+                        <div class="original-post-info-adjusted">
+                            <strong class="original-post-name">${post.postOriginal.autor.nombre}</strong>
+                            <span class="original-post-username">@${post.postOriginal.autor.username}</span>
+                        </div>
+                        <div class="original-post-time">${getTimeAgo(new Date(post.postOriginal.fecha_publicacion))}</div>
+                    </div>
+                    <div class="original-post-content-adjusted">
+                        ${formatPostContent(post.postOriginal.contenido)}
+                    </div>
+                    ${post.postOriginal.imagen ? `
+                        <div class="original-post-media-container">
+                            <img src="${post.postOriginal.imagen}" alt="Imagen" class="original-post-image-adjusted">
+                        </div>
+                    ` : ''}
+                    ${post.postOriginal.audio ? `
+                        <div class="original-post-media-container">
+                            <div class="audio-player-container">
+                                <audio controls class="audio-player">
+                                    <source src="${post.postOriginal.audio}" type="audio/mpeg">
+                                    <source src="${post.postOriginal.audio}" type="audio/wav">
+                                    Tu navegador no soporta el elemento de audio.
+                                </audio>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${post.postOriginal.video ? `
+                        <div class="original-post-media-container">
+                            <div class="video-player-container">
+                                <video controls class="video-player">
+                                    <source src="${post.postOriginal.video}" type="video/mp4">
+                                    <source src="${post.postOriginal.video}" type="video/webm">
+                                    Tu navegador no soporta el elemento de video.
+                                </video>
+                                ${post.postOriginal.duracion ? `<div class="media-duration">Duración: ${formatDuracion(post.postOriginal.duracion)}</div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+        </div>
+
+        <!-- Estadísticas - MISMAS CLASES QUE DASHBOARD -->
+        <div class="post-stats-adjusted">
+            <div class="stats-container">
+                <span class="stat-item">
+                    <i class="fas fa-heart"></i>
+                    <span id="likesCountModal">${post.likes.length}</span> me gusta
+                </span>
+                <span class="stat-item">
+                    <i class="fas fa-comment"></i>
+                    <span id="comentariosCountModal">${post.comentarios?.length || 0}</span> comentarios
+                </span>
+                ${shareCount > 0 ? `
+                    <span class="stat-item">
+                        <i class="fas fa-share"></i>
+                        <span>${shareCount}</span> compartidos
+                    </span>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Acciones - MISMAS CLASES QUE DASHBOARD -->
+        <div class="post-actions-modal-adjusted">
+            <button class="post-action-btn ${isLiked ? 'liked' : ''}" id="likeBtnModal">
+                <i class="fas ${isLiked ? 'fa-heart' : 'far fa-heart'}"></i>
+                <span>Me gusta</span>
+            </button>
+            <button class="post-action-btn" id="commentBtnModal">
+                <i class="far fa-comment"></i>
+                <span>Comentar</span>
+            </button>
+            <button class="post-action-btn" id="shareBtnModal">
+                <i class="fas fa-share"></i>
+                <span>Compartir</span>
+            </button>
+        </div>
+
+        <!-- Sección de Comentarios INTEGRADA CON EL DISEÑO DEL MODAL - MISMAS CLASES -->
+        <div class="comentarios-section-modal-integrated">
+            <!-- Header de comentarios -->
+            <div class="comentarios-header-integrated">
+                <h4 class="comentarios-title">
+                    <i class="fas fa-comments"></i> Comentarios
+                    <span class="comentarios-count">(${post.comentarios?.length || 0})</span>
+                </h4>
+            </div>
+            
+            <!-- Lista de comentarios con scroll -->
+            <div class="lista-comentarios-modal" id="listaComentariosModal">
+                <div class="empty-comments">
+                    <i class="fas fa-comments"></i>
+                    <p>Cargando comentarios...</p>
+                </div>
+            </div>
+
+            <!-- Área de comentario FIJA adaptada al modal -->
+            <div class="comentario-fixed-modal">
+                <div class="comentario-fixed-content-modal">
+                    <div class="comentario-avatar-modal">
+                        ${currentUser.foto_perfil ? 
+                            `<img src="${currentUser.foto_perfil}" alt="${currentUser.nombre}">` : 
+                            `<i class="fas fa-user"></i>`
+                        }
+                    </div>
+                    <div class="comentario-input-modal">
+                        <textarea 
+                            id="nuevoComentario" 
+                            placeholder="Escribe un comentario..." 
+                            rows="1"
+                        ></textarea>
+                    </div>
+                    <button class="btn-comentario-modal" id="btnEnviarComentario" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="char-counter-modal">
+                    <span id="comentarioCharCount"> </span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Configurar eventos del modal - MISMAS FUNCIONES QUE DASHBOARD
+function setupModalEvents(post, isLiked, shareCount) {
+    // Evento para like
+    const likeBtnModal = document.getElementById('likeBtnModal');
+    likeBtnModal.onclick = () => handleLikeModal(post._id);
+    
+    // Evento para comentar (focus en textarea)
+    const commentBtnModal = document.getElementById('commentBtnModal');
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    commentBtnModal.onclick = () => {
+        comentarioTextarea.focus();
+        comentarioTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    
+    // Evento para compartir
+    const shareBtnModal = document.getElementById('shareBtnModal');
+    shareBtnModal.onclick = () => handleShareModal(post._id);
+    
+    // Evento para el botón de opciones
+    const modalOptionsBtn = document.getElementById(`modalOptionsBtn-${post._id}`);
+    if (modalOptionsBtn) {
+        modalOptionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const modalOptionsMenu = document.getElementById(`modalOptionsMenu-${post._id}`);
+            if (modalOptionsMenu) {
+                modalOptionsMenu.style.display = modalOptionsMenu.style.display === 'block' ? 'none' : 'block';
+            }
+        });
+    }
+    
+    // Inicializar eventos del comentario
+    initializeComentarioEvents();
+}
+
+// Función para manejar like en el modal - IDÉNTICA A DASHBOARD
+async function handleLikeModal(postId) {
+    const likeBtn = document.getElementById('likeBtnModal');
+    const likeIcon = likeBtn.querySelector('i');
+    const likesCount = document.getElementById('likesCountModal');
+    
+    const wasLiked = likeBtn.classList.contains('liked');
+    const currentCount = parseInt(likesCount.textContent);
+    
+    if (!wasLiked) {
+        likeBtn.classList.add('liked');
+        likeIcon.className = 'fas fa-heart';
+        likesCount.textContent = currentCount + 1;
+    } else {
+        likeBtn.classList.remove('liked');
+        likeIcon.className = 'far fa-heart';
+        likesCount.textContent = currentCount - 1;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            if (!wasLiked) {
+                likeBtn.classList.remove('liked');
+                likeIcon.className = 'far fa-heart';
+                likesCount.textContent = currentCount;
+            } else {
+                likeBtn.classList.add('liked');
+                likeIcon.className = 'fas fa-heart';
+                likesCount.textContent = currentCount;
+            }
+        }
+    } catch (error) {
+        console.error('Error dando like:', error);
+        if (!wasLiked) {
+            likeBtn.classList.remove('liked');
+            likeIcon.className = 'far fa-heart';
+            likesCount.textContent = currentCount;
+        } else {
+            likeBtn.classList.add('liked');
+            likeIcon.className = 'fas fa-heart';
+            likesCount.textContent = currentCount;
+        }
+    }
+}
+
+// Función para manejar share en el modal - IDÉNTICA A DASHBOARD
+async function handleShareModal(postId) {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Publicación compartida exitosamente', 'success');
+            closeModal('post');
+            
+            // Recargar las publicaciones del perfil
+            setTimeout(() => {
+                loadProfilePosts();
+            }, 500);
+            
+        } else {
+            showToast(`❌ ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error compartiendo publicación:', error);
+        showToast('❌ Error al compartir la publicación', 'error');
+    }
+}
+
+// ===== FUNCIONES DE COMENTARIOS IDÉNTICAS A DASHBOARD =====
+
+// Inicializar eventos del área de comentarios - IDÉNTICA A DASHBOARD
+function initializeComentarioEvents() {
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    const btnEnviarComentario = document.getElementById('btnEnviarComentario');
+    
+    if (!comentarioTextarea || !btnEnviarComentario) {
+        console.error('❌ Elementos de comentario no encontrados');
+        return;
+    }
+
+    console.log('✅ Inicializando eventos de comentarios en profile...');
+
+    // Habilitar/deshabilitar botón según contenido
+    comentarioTextarea.addEventListener('input', function() {
+        const hasText = this.value.trim().length > 0;
+        btnEnviarComentario.disabled = !hasText;
+        
+        // Auto-ajustar altura
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+    
+    // Enviar con Enter (Ctrl+Enter para nueva línea)
+    comentarioTextarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+            e.preventDefault();
+            if (!btnEnviarComentario.disabled) {
+                enviarComentarioModal();
+            }
+        }
+    });
+    
+    // Evento de clic en el botón enviar
+    btnEnviarComentario.addEventListener('click', enviarComentarioModal);
+}
+
+// Cargar comentarios en el modal - IDÉNTICA A DASHBOARD
+async function loadComentariosModal(postId) {
+    console.log('🔄 Cargando comentarios para post en profile:', postId);
+    
+    const listaComentarios = document.getElementById('listaComentariosModal');
+    if (!listaComentarios) {
+        console.error('❌ Elemento listaComentariosModal no encontrado');
+        return;
+    }
+
+    try {
+        // Mostrar loading
+        listaComentarios.innerHTML = `
+            <div class="empty-comments">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando comentarios...</p>
+            </div>
+        `;
+
+        const response = await fetch(`${API_URL}/posts/${postId}/comentarios`);
+        
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📨 Respuesta comentarios en profile:', result);
+
+        if (result.success && result.data && result.data.length > 0) {
+            console.log(`✅ ${result.data.length} comentarios encontrados en profile`);
+            
+            const comentariosHTML = result.data.map(comentario => {
+                // VERIFICACIÓN DE SEGURIDAD con los nuevos nombres de campo
+                const usuario = comentario.usuario || {};
+                const nombre = usuario.nombre || 'Usuario';
+                const username = usuario.username || 'usuario';
+                const foto_perfil = usuario.foto_perfil || '';
+                const contenido = comentario.contenido || '';
+                
+                // CORREGIR: Manejo de fecha - probar diferentes campos de fecha
+                const fechaComentario = comentario.fecha_creacion || 
+                                      comentario.fecha_publicacion || 
+                                      comentario.createdAt ||
+                                      comentario.fecha;
+                
+                const fechaDisplay = fechaComentario ? 
+                    getTimeAgo(new Date(fechaComentario)) : 
+                    'Recién';
+                
+                console.log('📅 Fecha comentario:', { 
+                    fechaComentario, 
+                    fechaDisplay,
+                    campos: Object.keys(comentario) 
+                });
+                
+                return `
+                    <div class="comentario-item">
+                        <div class="comentario-avatar">
+                            ${foto_perfil ? 
+                                `<img src="${foto_perfil}" alt="${nombre}">` : 
+                                `<i class="fas fa-user"></i>`
+                            }
+                        </div>
+                        <div class="comentario-content">
+                            <div class="comentario-header">
+                                <span class="comentario-user">${nombre}</span>
+                                <span class="comentario-time">${fechaDisplay}</span>
+                            </div>
+                            <div class="comentario-text">${contenido}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            listaComentarios.innerHTML = comentariosHTML;
+            
+            // Scroll al final de los comentarios
+            setTimeout(() => {
+                listaComentarios.scrollTop = listaComentarios.scrollHeight;
+            }, 100);
+            
+        } else {
+            console.log('ℹ️ No hay comentarios o respuesta vacía en profile');
+            listaComentarios.innerHTML = `
+                <div class="empty-comments">
+                    <i class="fas fa-comments"></i>
+                    <p>No hay comentarios aún</p>
+                    <small>Sé el primero en comentar</small>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('❌ Error cargando comentarios en profile:', error);
+        listaComentarios.innerHTML = `
+            <div class="empty-comments error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar comentarios</p>
+                <small>${error.message}</small>
+            </div>
+        `;
+    }
+}
+
+// Enviar comentario desde el modal - IDÉNTICA A DASHBOARD
+async function enviarComentarioModal() {
+    console.log('🔄 Intentando enviar comentario desde profile...');
+    
+    const comentarioTextarea = document.getElementById('nuevoComentario');
+    const btnEnviarComentario = document.getElementById('btnEnviarComentario');
+    
+    if (!comentarioTextarea || !btnEnviarComentario || !currentPostId) {
+        console.error('❌ Elementos necesarios no disponibles en profile');
+        return;
+    }
+    
+    const contenido = comentarioTextarea.value.trim();
+    if (!contenido) {
+        console.error('❌ Contenido de comentario vacío en profile');
+        return;
+    }
+
+    try {
+        console.log('📤 Enviando comentario desde profile:', { 
+            postId: currentPostId, 
+            contenido: contenido,
+            usuario: currentUser._id 
+        });
+        
+        btnEnviarComentario.disabled = true;
+        btnEnviarComentario.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        // USAR LOS NOMBRES DE CAMPO CORRECTOS que espera el servidor
+        const requestBody = {
+            usuario: currentUser._id,  // CAMBIADO: userId -> usuario
+            contenido: contenido       // CAMBIADO: texto -> contenido
+        };
+        
+        console.log('📦 Request body (CORREGIDO) desde profile:', requestBody);
+        
+        const response = await fetch(`${API_URL}/posts/${currentPostId}/comentarios`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        console.log('📨 Response status desde profile:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response desde profile:', errorText);
+            throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Respuesta enviar comentario desde profile:', result);
+        
+        if (result.success) {
+            // Limpiar textarea
+            comentarioTextarea.value = '';
+            comentarioTextarea.style.height = 'auto';
+            
+            // Recargar comentarios
+            await loadComentariosModal(currentPostId);
+            
+            // Actualizar contador de comentarios
+            const comentariosCount = document.getElementById('comentariosCountModal');
+            if (comentariosCount) {
+                const currentCount = parseInt(comentariosCount.textContent) || 0;
+                comentariosCount.textContent = currentCount + 1;
+            }
+            
+            showToast('✅ Comentario publicado', 'success');
+        } else {
+            throw new Error(result.error || 'Error desconocido del servidor');
+        }
+    } catch (error) {
+        console.error('❌ Error enviando comentario desde profile:', error);
+        showToast(`❌ Error: ${error.message}`, 'error');
+    } finally {
+        btnEnviarComentario.disabled = false;
+        btnEnviarComentario.innerHTML = '<i class="fas fa-paper-plane"></i>';
+    }
+}
+
+// Función para abrir modal - IDÉNTICA A DASHBOARD
+function openModal(type) {
+    const modal = document.getElementById(`${type}Modal`);
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+}
+
+// Función para cerrar modal - IDÉNTICA A DASHBOARD
+function closeModal(type) {
+    const modal = document.getElementById(`${type}Modal`);
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+        
+        if (type === 'post') {
+            currentPostId = null;
+            const comentarioTextarea = document.getElementById('nuevoComentario');
+            if (comentarioTextarea) {
+                comentarioTextarea.value = '';
+            }
+        }
     }
 }
