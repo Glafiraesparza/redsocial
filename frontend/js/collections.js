@@ -1,28 +1,34 @@
 // frontend/js/collections.js - VERSIÓN CORREGIDA
-// Variables globales
 let currentCollections = [];
 let currentCollection = null;
 let isEditing = false;
 let currentEditingCollectionId = null;
+let currentOpenCollectionMenu = null;
+let collectionMenuClickHandler = null;
 
 // ===== INICIALIZACIÓN =====
 function initializeCollections() {
     console.log('🔄 Inicializando sistema de colecciones...');
     loadUserCollections();
+    initializeCollectionMenuEvents();
 }
 
 // ===== CARGAR COLECCIONES DEL USUARIO =====
+// ===== CARGAR COLECCIONES DEL USUARIO - VERSIÓN MEJORADA =====
 async function loadUserCollections() {
     try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
         if (!currentUser) return;
 
-        const response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/usuario/${currentUser._id}`);
+        const response = await fetch(`${API_URL}/collections/usuario/${currentUser._id}`);
         const result = await response.json();
 
         if (result.success) {
             currentCollections = result.data;
             displayCollectionsGrid(currentCollections);
+            
+            // Inicializar eventos después de cargar las colecciones
+            setTimeout(initializeCollectionMenuEvents, 100);
         } else {
             console.error('Error cargando colecciones:', result.error);
         }
@@ -31,12 +37,11 @@ async function loadUserCollections() {
     }
 }
 
-// ===== MOSTRAR COLECCIONES EN GRILLA =====
 function displayCollectionsGrid(collections) {
     const collectionsGrid = document.getElementById('collectionsGrid');
     const allCollections = document.getElementById('allCollections');
     
-    if (!collectionsGrid || !allCollections) return;
+    if (!collectionsGrid) return;
 
     if (collections.length === 0) {
         collectionsGrid.innerHTML = `
@@ -50,49 +55,50 @@ function displayCollectionsGrid(collections) {
             </div>
         `;
         
-        allCollections.innerHTML = '';
+        // Limpiar el contenedor de todas las colecciones si existe
+        if (allCollections) {
+            allCollections.innerHTML = '';
+        }
         return;
     }
 
-    // Colecciones principales (máximo 3)
-    const mainCollections = collections.slice(0, 3);
-    collectionsGrid.innerHTML = mainCollections.map(collection => 
-        createCollectionCardHTML(collection)
-    ).join('');
-
-    // Todas las colecciones
-    allCollections.innerHTML = `
-        <div class="collections-header">
-            <h3>Todas mis colecciones (${collections.length})</h3>
-            <div class="collections-actions">
-                <button class="btn-primary" onclick="openCreateCollectionModal()">
-                    <i class="fas fa-plus"></i> Nueva Colección
-                </button>
-            </div>
-        </div>
-        <div class="all-collections-grid">
-            ${collections.map(collection => 
-                createCollectionCardHTML(collection, true)
-            ).join('')}
+    // Primero actualizas el header
+    document.getElementById('collectionsHeader').innerHTML = `
+        <h3>Mis Colecciones (${collections.length})</h3>
+        <div class="collections-actions">
+            <button class="btn-primary" onclick="openCreateCollectionModal()">
+                <i class="fas fa-plus"></i> Nueva Colección
+            </button>
         </div>
     `;
+
+    // Mostrar TODAS las colecciones en un solo grid
+    collectionsGrid.innerHTML = `
+    ${collections.map(collection => 
+        createCollectionCardHTML(collection)
+    ).join('')}
+`;
+    
+    // Limpiar el contenedor de todas las colecciones
+    if (allCollections) {
+        allCollections.innerHTML = '';
+    }
 }
 
 // ===== CREAR TARJETA DE COLECCIÓN MEJORADA =====
-function createCollectionCardHTML(collection, isLarge = false) {
+function createCollectionCardHTML(collection) {
     const postCount = collection.posts?.length || 0;
     const lastUpdated = getTimeAgo(new Date(collection.fecha_actualizacion));
     
     return `
-        <div class="collection-card ${isLarge ? 'large' : ''}" 
-             data-collection-id="${collection._id}">
+        <div class="collection-card" data-collection-id="${collection._id}">
             
             <div class="collection-header">
                 <div class="collection-icon" style="background-color: ${collection.color};">
                     <i class="${collection.icono}"></i>
                 </div>
                 <div class="collection-actions">
-                    <button class="btn-icon" onclick="event.stopPropagation(); openCollectionOptions('${collection._id}')">
+                    <button class="btn-icon" onclick="openCollectionOptions('${collection._id}', event)">
                         <i class="fas fa-ellipsis-h"></i>
                     </button>
                     <div class="collection-options-menu" id="collectionOptions-${collection._id}">
@@ -133,12 +139,6 @@ function createCollectionCardHTML(collection, isLarge = false) {
                     </div>
                 ` : ''}
             </div>
-            
-            ${collection.foto_portada ? `
-                <div class="collection-cover">
-                    <img src="${collection.foto_portada}" alt="${collection.nombre}">
-                </div>
-            ` : ''}
         </div>
     `;
 }
@@ -433,34 +433,107 @@ function closeDeleteCollectionModal() {
 
 // ===== EDITAR COLECCIÓN =====
 function editCollection(collectionId) {
-    closeCollectionOptions();
+    closeAllCollectionMenus();
+    console.log('✏️ Editando colección:', collectionId);
+    // Aquí va tu lógica para editar la colección
     openCreateCollectionModal(collectionId);
 }
 
 // ===== AGREGAR POSTS A COLECCIÓN =====
 function addPostsToCollection(collectionId) {
-    closeCollectionOptions();
-    showCollectionToast('🔧 Funcionalidad para agregar posts disponible pronto', 'info');
+    closeAllCollectionMenus();
+    console.log('➕ Agregando posts a colección:', collectionId);
+    // Aquí va tu lógica para agregar posts
+    showToast('🔧 Funcionalidad para agregar posts disponible pronto', 'info');
 }
 
 // ===== MENÚ DE OPCIONES DE COLECCIÓN =====
-function openCollectionOptions(collectionId) {
-    closeCollectionOptions();
+function openCollectionOptions(collectionId, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    console.log('🎯 Abriendo menú de colección:', collectionId);
     
     const menu = document.getElementById(`collectionOptions-${collectionId}`);
-    if (menu) {
-        menu.style.display = 'block';
-        
-        setTimeout(() => {
-            const closeMenuHandler = (e) => {
-                if (!menu.contains(e.target) && !e.target.closest('.collection-actions .btn-icon')) {
-                    closeCollectionOptions();
-                    document.removeEventListener('click', closeMenuHandler);
-                }
-            };
-            document.addEventListener('click', closeMenuHandler);
-        }, 10);
+    if (!menu) {
+        console.error('❌ Menú de colección no encontrado:', `collectionOptions-${collectionId}`);
+        return;
     }
+    
+    // Si el menú ya está abierto, cerrarlo
+    if (menu.classList.contains('show')) {
+        closeAllCollectionMenus();
+        return;
+    }
+    
+    // Cerrar otros menús primero
+    closeAllCollectionMenus();
+    
+    // Mostrar este menú
+    menu.style.display = 'block';
+    
+    // Pequeño delay para la animación CSS
+    setTimeout(() => {
+        menu.classList.add('show');
+    }, 10);
+    
+    currentOpenCollectionMenu = collectionId;
+    
+    // Configurar evento para cerrar al hacer click fuera - VERSIÓN SIMPLIFICADA
+    setTimeout(() => {
+        const closeHandler = function(e) {
+            const clickedMenu = e.target.closest('.collection-options-menu');
+            const clickedButton = e.target.closest('.collection-actions .btn-icon');
+            
+            if (!clickedMenu && !clickedButton) {
+                closeAllCollectionMenus();
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        
+        document.addEventListener('click', closeHandler);
+    }, 100);
+}
+
+function setupCollectionMenuCloseHandler(collectionId) {
+    // Remover handler anterior si existe
+    if (collectionMenuClickHandler) {
+        document.removeEventListener('click', collectionMenuClickHandler);
+    }
+    
+    collectionMenuClickHandler = function(e) {
+        const menu = document.getElementById(`collectionOptions-${collectionId}`);
+        const button = document.querySelector(`#collectionOptions-${collectionId}`)?.closest('.collection-actions')?.querySelector('.btn-icon');
+        
+        const isClickInsideMenu = menu?.contains(e.target);
+        const isClickOnButton = button?.contains(e.target);
+        
+        if (!isClickInsideMenu && !isClickOnButton) {
+            closeAllCollectionMenus();
+        }
+    };
+    
+    // Usar setTimeout para evitar que se active inmediatamente
+    setTimeout(() => {
+        document.addEventListener('click', collectionMenuClickHandler);
+    }, 100);
+}
+
+function closeAllCollectionMenus() {
+    console.log('🔒 Cerrando todos los menús de colecciones...');
+    
+    document.querySelectorAll('.collection-options-menu').forEach(menu => {
+        menu.classList.remove('show');
+        
+        // Esperar a que termine la animación antes de ocultar completamente
+        setTimeout(() => {
+            menu.style.display = 'none';
+        }, 200);
+    });
+    
+    currentOpenCollectionMenu = null;
 }
 
 function closeCollectionOptions() {
@@ -713,6 +786,22 @@ function showCollectionToast(message, type = 'success') {
     }
 }
 
+// Función para inicializar eventos de los menús de colecciones
+function initializeCollectionMenuEvents() {
+    console.log('🎯 Inicializando eventos de menús de colecciones...');
+    
+    // Cerrar menús al hacer scroll
+    window.addEventListener('scroll', closeAllCollectionMenus);
+    
+    // Cerrar menús al cambiar de sección
+    const navItems = document.querySelectorAll('.profile-nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', closeAllCollectionMenus);
+    });
+    
+    console.log('✅ Eventos de menús de colecciones inicializados');
+}
+
 // ===== HACER FUNCIONES GLOBALES =====
 window.initializeCollections = initializeCollections;
 window.openCreateCollectionModal = openCreateCollectionModal;
@@ -725,5 +814,41 @@ window.deleteCollection = deleteCollection;
 window.closeDeleteCollectionModal = closeDeleteCollectionModal;
 window.addPostsToCollection = addPostsToCollection;
 window.openCollectionOptions = openCollectionOptions;
+window.openCollectionOptions = openCollectionOptions;
+window.closeAllCollectionMenus = closeAllCollectionMenus;
+window.editCollection = editCollection;
+window.addPostsToCollection = addPostsToCollection;
+window.confirmDeleteCollection = confirmDeleteCollection;
+window.deleteCollection = deleteCollection;
+window.viewCollection = viewCollection;
+window.initializeCollectionMenuEvents = initializeCollectionMenuEvents;
 
-console.log('✅ Sistema de colecciones completo cargado');
+// ===== FUNCIÓN DE DIAGNÓSTICO =====
+function debugCollectionMenus() {
+    console.log('🔍 DIAGNÓSTICO DE MENÚS DE COLECCIONES:');
+    
+    // Verificar que los menús existen en el DOM
+    const menus = document.querySelectorAll('.collection-options-menu');
+    console.log(`📋 Menús encontrados en DOM: ${menus.length}`);
+    
+    menus.forEach(menu => {
+        console.log(`🎯 Menú: ${menu.id}, Display: ${menu.style.display}, Clases: ${menu.className}`);
+    });
+    
+    // Verificar que los botones existen
+    const buttons = document.querySelectorAll('.collection-actions .btn-icon');
+    console.log(`🔘 Botones encontrados: ${buttons.length}`);
+    
+    buttons.forEach(button => {
+        console.log(`🔘 Botón:`, button);
+    });
+    
+    // Verificar eventos
+    console.log('🎯 Event listeners activos:', {
+        currentOpenCollectionMenu,
+        collectionMenuClickHandler: !!collectionMenuClickHandler
+    });
+}
+
+// Llamar al diagnóstico después de cargar las colecciones
+setTimeout(debugCollectionMenus, 1000);
