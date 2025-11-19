@@ -109,11 +109,18 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// UPDATE - Agregar post a colección
+// UPDATE - Agregar múltiples posts a colección
 router.post('/:id/posts', async (req, res) => {
   try {
-    const { postId } = req.body;
+    const { postIds } = req.body;
     
+    if (!postIds || !Array.isArray(postIds) || postIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere un array de postIds'
+      });
+    }
+
     const coleccion = await Collection.findById(req.params.id);
     if (!coleccion) {
       return res.status(404).json({
@@ -122,39 +129,54 @@ router.post('/:id/posts', async (req, res) => {
       });
     }
 
-    // Verificar si el post ya está en la colección
-    if (coleccion.posts.includes(postId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'El post ya está en esta colección'
-      });
-    }
-
-    // Verificar que el post existe
-    const post = await Post.findById(postId);
-    if (!post) {
+    // Verificar que todos los posts existen
+    const posts = await Post.find({ _id: { $in: postIds } });
+    if (posts.length !== postIds.length) {
       return res.status(404).json({
         success: false,
-        error: 'Post no encontrado'
+        error: 'Uno o más posts no existen'
       });
     }
 
-    coleccion.posts.push(postId);
+    // Filtrar posts que no estén ya en la colección
+    const existingPostIds = coleccion.posts.map(post => post.toString());
+    const newPostIds = postIds.filter(postId => !existingPostIds.includes(postId));
+
+    if (newPostIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Todos los posts seleccionados ya están en la colección'
+      });
+    }
+
+    // Agregar nuevos posts a la colección
+    coleccion.posts.push(...newPostIds);
+    coleccion.fecha_actualizacion = new Date();
     await coleccion.save();
 
-    // Actualizar el post para referenciar la colección
-    post.coleccion = coleccion._id;
-    await post.save();
+    // Actualizar los posts para referenciar la colección
+    await Post.updateMany(
+      { _id: { $in: newPostIds } },
+      { $set: { coleccion: coleccion._id } }
+    );
 
-    await coleccion.populate('posts');
+    // Popular los datos completos de la colección actualizada
+    await coleccion.populate({
+      path: 'posts',
+      populate: {
+        path: 'autor',
+        select: 'nombre username foto_perfil'
+      }
+    });
 
     res.json({
       success: true,
       data: coleccion,
-      message: 'Post agregado a la colección'
+      message: `Se agregaron ${newPostIds.length} posts a la colección`,
+      addedCount: newPostIds.length
     });
   } catch (error) {
-    console.error('Error agregando post a colección:', error);
+    console.error('Error agregando posts a colección:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -173,15 +195,35 @@ router.delete('/:id/posts/:postId', async (req, res) => {
       });
     }
 
-    coleccion.posts = coleccion.posts.filter(
-      post => post.toString() !== req.params.postId
+    // Verificar si el post existe en la colección
+    const postIndex = coleccion.posts.findIndex(
+      post => post.toString() === req.params.postId
     );
-    
+
+    if (postIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'El post no está en esta colección'
+      });
+    }
+
+    // Remover el post de la colección
+    coleccion.posts.splice(postIndex, 1);
+    coleccion.fecha_actualizacion = new Date();
     await coleccion.save();
 
     // Remover referencia de colección del post
     await Post.findByIdAndUpdate(req.params.postId, {
       $unset: { coleccion: "" }
+    });
+
+    // Popular los datos actualizados
+    await coleccion.populate({
+      path: 'posts',
+      populate: {
+        path: 'autor',
+        select: 'nombre username foto_perfil'
+      }
     });
 
     res.json({

@@ -3318,63 +3318,6 @@ setTimeout(function() {
     }
 }, 1000);
 
-// ===== DIAGNÓSTICO Y SOLUCIÓN TEMPORAL =====
-
-setTimeout(function() {
-    console.log('🔍 DIAGNÓSTICO DE BOTONES...');
-    
-    // Verificar posición y visibilidad de los botones
-    const coverBtn = document.querySelector('.btn-edit-cover');
-    const overlay = document.querySelector('.cover-overlay');
-    
-    if (coverBtn) {
-        const rect = coverBtn.getBoundingClientRect();
-        console.log('📍 Posición botón portada:', rect);
-        console.log('👀 Botón visible:', rect.width > 0 && rect.height > 0);
-        console.log('🎨 Estilos botón:', {
-            display: getComputedStyle(coverBtn).display,
-            visibility: getComputedStyle(coverBtn).visibility,
-            opacity: getComputedStyle(coverBtn).opacity,
-            pointerEvents: getComputedStyle(coverBtn).pointerEvents,
-            zIndex: getComputedStyle(coverBtn).zIndex
-        });
-    }
-    
-    if (overlay) {
-        console.log('🎨 Estilos overlay:', {
-            display: getComputedStyle(overlay).display,
-            opacity: getComputedStyle(overlay).opacity,
-            pointerEvents: getComputedStyle(overlay).pointerEvents,
-            zIndex: getComputedStyle(overlay).zIndex
-        });
-    }
-    
-    // Solución temporal: hacer overlay siempre visible
-    if (overlay) {
-        overlay.classList.add('always-visible');
-        console.log('✅ Overlay hecho siempre visible temporalmente');
-    }
-    
-    // Agregar botón de emergencia si es necesario
-    if (!document.getElementById('emergencyCoverBtn')) {
-        const emergencyBtn = document.createElement('button');
-        emergencyBtn.id = 'emergencyCoverBtn';
-        emergencyBtn.className = 'btn-always-visible';
-        emergencyBtn.innerHTML = '<i class="fas fa-camera"></i> Portada (EMERGENCIA)';
-        emergencyBtn.onclick = function() {
-            console.log('🚨 BOTÓN DE EMERGENCIA - Abriendo modal portada');
-            const modal = document.getElementById('coverPhotoModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                document.body.classList.add('modal-open');
-                loadExistingCoverPhotos();
-            }
-        };
-        document.body.appendChild(emergencyBtn);
-        console.log('🚨 Botón de emergencia agregado');
-    }
-    
-}, 2000);
 
 // ========== FUNCIONALIDAD DE EDICIÓN EN PERFIL ==========
 

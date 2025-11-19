@@ -93,7 +93,8 @@ const postSchema = new mongoose.Schema({
   },
   coleccion: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Collection'
+    ref: 'Collection',
+    default: null
   },
   fecha_publicacion: {
     type: Date,

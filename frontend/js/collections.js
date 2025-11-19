@@ -85,19 +85,54 @@ function displayCollectionsGrid(collections) {
     }
 }
 
-// ===== CREAR TARJETA DE COLECCIÓN MEJORADA =====
+// ===== CERRAR MODALES DE FORMA SEGURA =====
+function safelyCloseModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        // Agregar animación de salida
+        modal.style.opacity = '0';
+        modal.style.transform = 'scale(0.9)';
+        
+        setTimeout(() => {
+            modal.remove();
+            document.body.classList.remove('modal-open');
+        }, 300);
+    }
+}
+
+// Reemplazar las funciones close existentes:
+function closeDeleteCollectionModal() {
+    safelyCloseModal('deleteCollectionModal');
+}
+
+function closeCreateCollectionModal() {
+    safelyCloseModal('createCollectionModal');
+}
+
+function closeCollectionDetailModal() {
+    safelyCloseModal('collectionDetailModal');
+}
+
+function closeAddPostsModal() {
+    safelyCloseModal('addPostsModal');
+}
+
+function closeManagePostsModal() {
+    safelyCloseModal('managePostsModal');
+}
+
+// ===== CREAR TARJETA DE COLECCIÓN MEJORADA - VERSIÓN CORREGIDA =====
 function createCollectionCardHTML(collection) {
     const postCount = collection.posts?.length || 0;
     const lastUpdated = getTimeAgo(new Date(collection.fecha_actualizacion));
     
     return `
-        <div class="collection-card" data-collection-id="${collection._id}">
-            
+        <div class="collection-card" data-collection-id="${collection._id}" onclick="viewCollection('${collection._id}')">
             <div class="collection-header">
                 <div class="collection-icon" style="background-color: ${collection.color};">
                     <i class="${collection.icono}"></i>
                 </div>
-                <div class="collection-actions">
+                <div class="collection-actions" onclick="event.stopPropagation()">
                     <button class="btn-icon" onclick="openCollectionOptions('${collection._id}', event)">
                         <i class="fas fa-ellipsis-h"></i>
                     </button>
@@ -105,17 +140,17 @@ function createCollectionCardHTML(collection) {
                         <button class="option-item" onclick="editCollection('${collection._id}')">
                             <i class="fas fa-edit"></i> Editar
                         </button>
-                        <button class="option-item" onclick="addPostsToCollection('${collection._id}')">
-                            <i class="fas fa-plus"></i> Agregar posts
+                        <button class="option-item" onclick="openManagePostsModal('${collection._id}')">
+                            <i class="fas fa-cog"></i> Gestionar Posts
                         </button>
                         <button class="option-item delete-option" onclick="confirmDeleteCollection('${collection._id}', '${collection.nombre}')">
-                            <i class="fas fa-trash"></i> Eliminar
+                            <i class="fas fa-trash"></i> Eliminar Colección
                         </button>
                     </div>
                 </div>
             </div>
             
-            <div class="collection-content" onclick="viewCollection('${collection._id}')">
+            <div class="collection-content">
                 <h4>${collection.nombre}</h4>
                 <p class="collection-desc">${collection.descripcion || 'Sin descripción'}</p>
                 
@@ -139,6 +174,59 @@ function createCollectionCardHTML(collection) {
                     </div>
                 ` : ''}
             </div>
+        </div>
+    `;
+}
+
+
+// ===== CREAR HTML DE POST EN COLECCIÓN - ACTUALIZADA CON BOTÓN ELIMINAR =====
+function createCollectionPostHTML(post, collectionId) {
+    const isImage = post.tipoContenido === 'imagen' && post.imagen;
+    const isVideo = post.tipoContenido === 'video' && post.video;
+    const isAudio = post.tipoContenido === 'audio' && post.audio;
+    
+    let mediaContent = '';
+    
+    if (isImage) {
+        mediaContent = `<img src="${post.imagen}" alt="Imagen" class="post-thumbnail">`;
+    } else if (isVideo) {
+        mediaContent = `
+            <div class="video-thumbnail">
+                <i class="fas fa-play"></i>
+                <video>
+                    <source src="${post.video}" type="video/mp4">
+                </video>
+            </div>
+        `;
+    } else if (isAudio) {
+        mediaContent = `
+            <div class="audio-thumbnail">
+                <i class="fas fa-music"></i>
+            </div>
+        `;
+    } else {
+        mediaContent = `
+            <div class="text-thumbnail">
+                <i class="fas fa-file-alt"></i>
+                <p>${post.contenido ? post.contenido.substring(0, 100) + (post.contenido.length > 100 ? '...' : '') : 'Publicación'}</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="collection-post-item" data-post-id="${post._id}">
+            <div class="collection-post-content" onclick="viewPost('${post._id}')">
+                ${mediaContent}
+                <div class="post-overlay">
+                    <div class="post-info">
+                        <p class="post-preview">${post.contenido ? post.contenido.substring(0, 50) + (post.contenido.length > 50 ? '...' : '') : 'Publicación'}</p>
+                        <span class="post-date">${getTimeAgo(new Date(post.fecha_publicacion))}</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-remove-from-collection" onclick="removePostFromCollection('${collectionId}', '${post._id}', event)">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
     `;
 }
@@ -364,8 +452,10 @@ async function handleCreateOrUpdateCollection(event) {
     }
 }
 
-// ===== ELIMINAR COLECCIÓN =====
 function confirmDeleteCollection(collectionId, collectionName) {
+    // Cerrar cualquier modal existente primero
+    closeDeleteCollectionModal();
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'deleteCollectionModal';
@@ -400,6 +490,13 @@ function confirmDeleteCollection(collectionId, collectionName) {
     document.body.appendChild(modal);
     modal.style.display = 'flex';
     document.body.classList.add('modal-open');
+    
+    // Prevenir múltiples eventos
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeDeleteCollectionModal();
+        }
+    });
 }
 
 async function deleteCollection(collectionId) {
@@ -443,9 +540,838 @@ function editCollection(collectionId) {
 function addPostsToCollection(collectionId) {
     closeAllCollectionMenus();
     console.log('➕ Agregando posts a colección:', collectionId);
-    // Aquí va tu lógica para agregar posts
-    showToast('🔧 Funcionalidad para agregar posts disponible pronto', 'info');
+    
+    // Encontrar la colección
+    const collection = currentCollections.find(c => c._id === collectionId);
+    if (!collection) {
+        showCollectionToast('❌ No se pudo encontrar la colección', 'error');
+        return;
+    }
+    
+    openAddPostsModal(collection);
 }
+
+// ===== MODAL PARA AGREGAR POSTS - ACTUALIZADO =====
+function openAddPostsModal(collection) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'addPostsModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 900px; height: 90vh;">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-plus"></i> 
+                    Agregar posts a "${collection.nombre}"
+                </h3>
+                <span class="close-modal" onclick="closeAddPostsModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="height: calc(100% - 120px); display: flex; flex-direction: column;">
+                <div class="add-posts-container" style="flex: 1; display: flex; flex-direction: column;">
+                    <!-- Búsqueda y filtros -->
+                    <div class="search-section">
+                        <div class="search-input-with-icon">
+                            <i class="fas fa-search"></i>
+                            <input 
+                                type="text" 
+                                id="searchPostsInput" 
+                                placeholder="Buscar en tus publicaciones..."
+                                onkeyup="filterPosts()"
+                            >
+                        </div>
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" data-filter="all" onclick="setPostsFilter('all')">
+                                <i class="fas fa-layer-group"></i> Todas
+                            </button>
+                            <button class="filter-btn" data-filter="images" onclick="setPostsFilter('images')">
+                                <i class="fas fa-image"></i> Imágenes
+                            </button>
+                            <button class="filter-btn" data-filter="videos" onclick="setPostsFilter('videos')">
+                                <i class="fas fa-video"></i> Videos
+                            </button>
+                            <button class="filter-btn" data-filter="audio" onclick="setPostsFilter('audio')">
+                                <i class="fas fa-music"></i> Audio
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de posts -->
+                    <div class="posts-selection-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <h4>Selecciona los posts que quieres agregar</h4>
+                        <div class="posts-grid" id="postsSelectionGrid" style="flex: 1;">
+                            <div class="loading-state">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Cargando tus publicaciones...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Posts seleccionados -->
+                    <div class="selected-posts-section" id="selectedPostsSection" style="display: none;">
+                        <h4>
+                            <i class="fas fa-check-circle"></i>
+                            Posts seleccionados: 
+                            <span id="selectedCount">0</span>
+                        </h4>
+                        <div class="selected-posts-list" id="selectedPostsList">
+                            <!-- Los posts seleccionados aparecerán aquí -->
+                        </div>
+                    </div>
+                    
+                    <!-- Acciones -->
+                    <div class="add-posts-actions">
+                        <button class="btn-secondary" onclick="closeAddPostsModal()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button class="btn-primary" id="addPostsBtn" onclick="addSelectedPostsToCollection('${collection._id}')" disabled>
+                            <i class="fas fa-plus"></i> Agregar a colección
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    
+    // Inicializar filtros
+    setTimeout(() => {
+        document.querySelectorAll('.filter-btn').forEach((btn, index) => {
+            const filters = ['all', 'images', 'videos', 'audio'];
+            btn.dataset.filter = filters[index] || 'all';
+        });
+    }, 100);
+    
+    // Cargar los posts del usuario
+    loadUserPostsForSelection(collection._id);
+}
+
+// ===== CARGAR POSTS DEL USUARIO PARA SELECCIÓN =====
+async function loadUserPostsForSelection(collectionId) {
+    try {
+        console.log('🔄 Cargando posts para selección...');
+        
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser) {
+            console.error('❌ No hay usuario logueado');
+            return;
+        }
+
+        const response = await fetch(`${API_URL}/posts/user/${currentUser._id}`);
+        const result = await response.json();
+
+        console.log('📨 Respuesta posts:', result);
+
+        if (result.success) {
+            // Filtrar posts que no estén ya en la colección
+            const collection = currentCollections.find(c => c._id === collectionId);
+            const existingPostIds = collection?.posts?.map(post => 
+                typeof post === 'object' ? post._id : post
+            ) || [];
+            
+            console.log('📋 Posts existentes en colección:', existingPostIds);
+            
+            const availablePosts = result.data.filter(post => 
+                !existingPostIds.includes(post._id)
+            );
+            
+            console.log('✅ Posts disponibles:', availablePosts.length);
+            
+            displayPostsForSelection(availablePosts);
+            
+            if (availablePosts.length === 0) {
+                document.getElementById('postsSelectionGrid').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No hay posts disponibles</h3>
+                        <p>Todos tus posts ya están en esta colección o no tienes publicaciones.</p>
+                        <button class="btn-primary" onclick="window.location.href='dashboard.html'">
+                            <i class="fas fa-plus"></i> Crear nuevo post
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando posts:', error);
+        document.getElementById('postsSelectionGrid').innerHTML = `
+            <div class="empty-state error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error al cargar posts</h3>
+                <p>No se pudieron cargar tus publicaciones.</p>
+                <small>${error.message}</small>
+            </div>
+        `;
+    }
+}
+
+// ===== ACTUALIZACIÓN DESDE MODAL DE AGREGAR POSTS =====
+function refreshAfterAddingPosts(collectionId) {
+    console.log('🔄 Actualizando después de agregar posts...');
+    
+    // Cerrar modal de agregar posts
+    closeAddPostsModal();
+    
+    // Actualizar todas las vistas
+    updateAllCollectionViews(collectionId);
+    
+    // Resetear selección
+    selectedPosts = [];
+}
+
+// ===== MOSTRAR POSTS PARA SELECCIÓN - ACTUALIZADA =====
+function displayPostsForSelection(posts) {
+    const grid = document.getElementById('postsSelectionGrid');
+    
+    if (posts.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h3>No hay posts disponibles</h3>
+                <p>Todos tus posts ya están en colecciones.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = posts.map(post => createPostSelectionCard(post)).join('');
+    
+    // Inicializar checkboxes después de renderizar
+    setTimeout(initializeCheckboxes, 100);
+}
+
+// ===== CREAR TARJETA DE POST PARA SELECCIÓN - VERSIÓN MEJORADA =====
+function createPostSelectionCard(post) {
+    const isImage = post.tipoContenido === 'imagen' && post.imagen;
+    const isVideo = post.tipoContenido === 'video' && post.video;
+    const isAudio = post.tipoContenido === 'audio' && post.audio;
+    
+    let mediaPreview = '';
+    let typeIcon = 'fas fa-file-alt';
+    let typeClass = 'text';
+    
+    if (isImage) {
+        mediaPreview = `<img src="${post.imagen}" alt="Imagen" class="post-selection-preview">`;
+        typeIcon = 'fas fa-image';
+        typeClass = 'image';
+    } else if (isVideo) {
+        mediaPreview = `
+            <div class="video-preview">
+                <i class="fas fa-play"></i>
+            </div>
+        `;
+        typeIcon = 'fas fa-video';
+        typeClass = 'video';
+    } else if (isAudio) {
+        mediaPreview = `
+            <div class="audio-preview">
+                <i class="fas fa-music"></i>
+            </div>
+        `;
+        typeIcon = 'fas fa-music';
+        typeClass = 'audio';
+    } else {
+        mediaPreview = `
+            <div class="text-preview">
+                <p>${post.contenido ? post.contenido.substring(0, 100) + (post.contenido.length > 100 ? '...' : '') : 'Publicación de texto'}</p>
+            </div>
+        `;
+    }
+    
+    const timeAgo = getTimeAgo(new Date(post.fecha_publicacion));
+    const contentPreview = post.contenido ? 
+        post.contenido.substring(0, 150) + (post.contenido.length > 150 ? '...' : '') : 
+        'Publicación sin texto';
+    
+    return `
+        <div class="post-selection-card" data-post-id="${post._id}" data-post-type="${post.tipoContenido}" onclick="togglePostSelectionByCard('${post._id}')">
+            <div class="post-selection-checkbox" onclick="event.stopPropagation()">
+                <input 
+                    type="checkbox" 
+                    id="post-${post._id}" 
+                    onchange="togglePostSelection('${post._id}')"
+                >
+                <label for="post-${post._id}"></label>
+            </div>
+            
+            <div class="post-selection-content">
+                <div class="post-preview-media ${typeClass}">
+                    ${mediaPreview}
+                    <div class="post-type-badge">
+                        <i class="${typeIcon}"></i>
+                    </div>
+                </div>
+                
+                <div class="post-selection-info">
+                    <p class="post-preview-text">${contentPreview}</p>
+                    <div class="post-selection-meta">
+                        <span class="post-date">
+                            <i class="fas fa-clock"></i> ${timeAgo}
+                        </span>
+                        <span class="post-stats">
+                            <i class="fas fa-heart"></i> ${post.likes?.length || 0}
+                            <i class="fas fa-comment"></i> ${post.comentarios?.length || 0}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ===== TOGGLE SELECCIÓN DE POST =====
+let selectedPosts = [];
+
+// ===== TOGGLE SELECCIÓN CON EVENTO - VERSIÓN SIMPLIFICADA =====
+function togglePostSelectionWithEvent(postId, event) {
+    // Solo procesar si el click no fue directamente en el checkbox o label
+    if (event.target.type === 'checkbox' || event.target.tagName === 'LABEL') {
+        return;
+    }
+    
+    event.stopPropagation();
+    event.preventDefault();
+    
+    const checkbox = document.getElementById(`post-${postId}`);
+    if (checkbox) {
+        // Cambiar el estado manualmente
+        checkbox.checked = !checkbox.checked;
+        
+        // Actualizar visualización inmediatamente
+        updateCheckboxVisual(postId, checkbox.checked);
+        updateSelectedPostsUI();
+    }
+}
+
+// ===== ACTUALIZAR VISUAL DEL CHECKBOX =====
+function updateCheckboxVisual(postId, isChecked) {
+    const checkbox = document.getElementById(`post-${postId}`);
+    const label = document.querySelector(`label[for="post-${postId}"]`);
+    const postCard = document.querySelector(`[data-post-id="${postId}"]`);
+    
+    if (!checkbox || !label || !postCard) return;
+    
+    if (isChecked) {
+        // Agregar a selección
+        if (!selectedPosts.includes(postId)) {
+            selectedPosts.push(postId);
+        }
+        postCard.classList.add('selected');
+        label.classList.add('checked');
+        label.innerHTML = '✓'; // Forzar el contenido directamente
+        label.style.background = '#27ae60';
+        label.style.borderColor = '#27ae60';
+        label.style.color = 'white';
+    } else {
+        // Remover de selección
+        selectedPosts = selectedPosts.filter(id => id !== postId);
+        postCard.classList.remove('selected');
+        label.classList.remove('checked');
+        label.innerHTML = ''; // Limpiar contenido
+        label.style.background = 'white';
+        label.style.borderColor = '#bdc3c7';
+        label.style.color = 'transparent';
+    }
+}
+
+// ===== TOGGLE SELECCIÓN DE POST - VERSIÓN SIMPLIFICADA =====
+function togglePostSelection(postId) {
+    const checkbox = document.getElementById(`post-${postId}`);
+    if (checkbox) {
+        updateCheckboxVisual(postId, checkbox.checked);
+        updateSelectedPostsUI();
+    }
+}
+
+// ===== ACTUALIZAR UI DE POSTS SELECCIONADOS - CORREGIDA =====
+function updateSelectedPostsUI() {
+    const selectedSection = document.getElementById('selectedPostsSection');
+    const selectedList = document.getElementById('selectedPostsList');
+    const selectedCount = document.getElementById('selectedCount');
+    const addPostsBtn = document.getElementById('addPostsBtn');
+    
+    console.log('🔄 Actualizando UI de seleccionados:', selectedPosts.length);
+    
+    if (selectedCount) selectedCount.textContent = selectedPosts.length;
+    
+    // Mostrar/ocultar sección de seleccionados
+    if (selectedPosts.length > 0) {
+        if (selectedSection) selectedSection.style.display = 'block';
+        
+        // Actualizar lista de seleccionados
+        if (selectedList) {
+            selectedList.innerHTML = selectedPosts.map(postId => {
+                const postCard = document.querySelector(`[data-post-id="${postId}"]`);
+                let postText = 'Publicación';
+                
+                if (postCard) {
+                    const previewElement = postCard.querySelector('.post-preview-text');
+                    postText = previewElement ? previewElement.textContent : 'Publicación';
+                }
+                
+                return `
+                    <div class="selected-post-item" data-post-id="${postId}">
+                        <span class="selected-post-text">${postText.substring(0, 50)}${postText.length > 50 ? '...' : ''}</span>
+                        <button class="btn-remove-selected" onclick="removeSelectedPost('${postId}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Habilitar botón
+        if (addPostsBtn) addPostsBtn.disabled = false;
+    } else {
+        if (selectedSection) selectedSection.style.display = 'none';
+        if (addPostsBtn) addPostsBtn.disabled = true;
+    }
+}
+
+// ===== GESTIÓN DE SELECCIÓN MÚLTIPLE =====
+let managedSelectedPosts = [];
+
+function toggleManagedPostSelection(postId) {
+    const checkbox = document.getElementById(`manage-post-${postId}`);
+    const postItem = document.querySelector(`.managed-post-item[data-post-id="${postId}"]`);
+    
+    if (checkbox.checked) {
+        if (!managedSelectedPosts.includes(postId)) {
+            managedSelectedPosts.push(postId);
+            postItem.classList.add('selected');
+        }
+    } else {
+        managedSelectedPosts = managedSelectedPosts.filter(id => id !== postId);
+        postItem.classList.remove('selected');
+    }
+    
+    updateManagedSelectionUI();
+}
+
+function selectAllManagedPosts() {
+    const checkboxes = document.querySelectorAll('.managed-post-checkbox input[type="checkbox"]');
+    managedSelectedPosts = [];
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const postId = checkbox.id.replace('manage-post-', '');
+        if (!managedSelectedPosts.includes(postId)) {
+            managedSelectedPosts.push(postId);
+        }
+        checkbox.closest('.managed-post-item').classList.add('selected');
+    });
+    
+    updateManagedSelectionUI();
+}
+
+// ===== LIMPIAR SELECCIÓN - VERSIÓN CORREGIDA =====
+function clearSelection() {
+    console.log('🧹 Limpiando selección...');
+    
+    // Desmarcar todos los checkboxes
+    const checkboxes = document.querySelectorAll('.managed-post-checkbox input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Remover clase selected de todos los items
+    const postItems = document.querySelectorAll('.managed-post-item');
+    postItems.forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // Limpiar el array
+    managedSelectedPosts = [];
+    
+    // Actualizar UI
+    updateManagedSelectionUI();
+    
+    console.log('✅ Selección limpiada');
+}
+
+function updateManagedSelectionUI() {
+    const selectedCount = document.getElementById('selectedPostsCount');
+    const removeBtn = document.getElementById('removeSelectedBtn');
+    const selectionInfo = document.getElementById('selectionInfo');
+    
+    if (selectedCount) selectedCount.textContent = managedSelectedPosts.length;
+    
+    if (managedSelectedPosts.length > 0) {
+        if (removeBtn) removeBtn.disabled = false;
+        if (selectionInfo) selectionInfo.style.display = 'flex';
+    } else {
+        if (removeBtn) removeBtn.disabled = true;
+        if (selectionInfo) selectionInfo.style.display = 'none';
+    }
+}
+
+// ===== ELIMINAR POSTS SELECCIONADOS =====
+// ===== ELIMINAR POSTS SELECCIONADOS - VERSIÓN MEJORADA CON MANEJO DE ERRORES =====
+async function removeSelectedPosts(collectionId) {
+    if (managedSelectedPosts.length === 0) {
+        showCollectionToast('❌ No hay posts seleccionados', 'error');
+        return;
+    }
+    
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${managedSelectedPosts.length} posts de la colección?`)) {
+        return;
+    }
+    
+    try {
+        showCollectionToast(`⏳ Eliminando ${managedSelectedPosts.length} posts...`, 'info');
+        
+        const addBtn = document.getElementById('removeSelectedBtn');
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+        
+        // En la función removeSelectedPosts, reemplazar el bloque de eliminación:
+        for (let i = 0; i < managedSelectedPosts.length; i++) {
+            const postId = managedSelectedPosts[i];
+            
+            try {
+                console.log(`🗑️ Eliminando post ${i + 1}/${managedSelectedPosts.length}:`, postId);
+                
+                const result = await removePostWithRetry(collectionId, postId, 2);
+                
+                if (result.success) {
+                    successCount++;
+                    console.log(`✅ Post ${postId} eliminado correctamente`);
+                    removePostFromDOM(postId);
+                } else {
+                    errorCount++;
+                    errors.push(`Post ${postId}: ${result.error}`);
+                    console.error(`❌ Error eliminando post ${postId}:`, result.error);
+                }
+                
+                // Pequeño delay entre eliminaciones
+                if (i < managedSelectedPosts.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+            } catch (error) {
+                errorCount++;
+                errors.push(`Post ${postId}: ${error.message}`);
+                console.error(`❌ Error eliminando post ${postId}:`, error);
+            }
+        }
+        
+        // Actualizar UI
+        managedSelectedPosts = [];
+        updateManagedSelectionUI();
+        updatePostCounters(collectionId);
+        
+        // Restaurar botón
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<i class="fas fa-trash"></i> Eliminar Seleccionados';
+        }
+        
+        // Mostrar resultados
+        if (errorCount > 0) {
+            const errorMessage = errors.length > 3 ? 
+                `${errors.slice(0, 3).join(', ')}... y ${errors.length - 3} más` : 
+                errors.join(', ');
+            
+            showCollectionToast(`✅ ${successCount} eliminados, ❌ ${errorCount} errores: ${errorMessage}`, 'warning');
+        } else {
+            showCollectionToast(`✅ ${successCount} posts eliminados exitosamente`, 'success');
+        }
+        
+        // Verificar si quedan posts
+        setTimeout(() => {
+            const remainingPosts = document.querySelectorAll('.managed-post-item');
+            if (remainingPosts.length === 0) {
+                closeManagePostsModal();
+                viewCollection(collectionId);
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error general eliminando posts seleccionados:', error);
+        showCollectionToast('❌ Error al eliminar los posts', 'error');
+        
+        // Restaurar botón en caso de error
+        const addBtn = document.getElementById('removeSelectedBtn');
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<i class="fas fa-trash"></i> Eliminar Seleccionados';
+        }
+    }
+}
+
+// ===== FUNCIÓN AUXILIAR PARA REMOVER POSTS DEL DOM =====
+function removePostFromDOM(postId) {
+    // Remover de la vista de gestión
+    const managedElement = document.querySelector(`.managed-post-item[data-post-id="${postId}"]`);
+    if (managedElement) {
+        managedElement.style.opacity = '0';
+        managedElement.style.transform = 'translateX(-20px)';
+        setTimeout(() => {
+            managedElement.remove();
+        }, 300);
+    }
+    
+    // Remover de la vista de detalle
+    const postElement = document.querySelector(`.collection-post-item[data-post-id="${postId}"]`);
+    if (postElement) {
+        postElement.style.opacity = '0';
+        postElement.style.transform = 'scale(0.8)';
+        setTimeout(() => {
+            postElement.remove();
+        }, 300);
+    }
+}
+
+// ===== FILTRAR POSTS GESTIONADOS =====
+function filterManagedPosts() {
+    const searchTerm = document.getElementById('manageSearchInput').value.toLowerCase();
+    const postItems = document.querySelectorAll('.managed-post-item');
+    
+    postItems.forEach(item => {
+        const postText = item.querySelector('.managed-post-text').textContent.toLowerCase();
+        const matchesSearch = postText.includes(searchTerm);
+        
+        if (matchesSearch) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// ===== CERRAR MODAL DE GESTIÓN =====
+function closeManagePostsModal() {
+    const modal = document.getElementById('managePostsModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+    managedSelectedPosts = [];
+}
+
+
+// ===== FILTRAR POSTS =====
+function filterPosts() {
+    const searchTerm = document.getElementById('searchPostsInput').value.toLowerCase();
+    const activeFilter = document.querySelector('.filter-btn.active');
+    
+    if (!activeFilter) {
+        console.error('❌ No hay filtro activo');
+        return;
+    }
+    
+    const filterType = activeFilter.dataset.filter || 'all';
+    const postCards = document.querySelectorAll('.post-selection-card');
+    
+    console.log('🔍 Filtrando posts:', { searchTerm, filterType, totalPosts: postCards.length });
+    
+    let visibleCount = 0;
+    
+    postCards.forEach(card => {
+        const postText = card.querySelector('.post-preview-text')?.textContent.toLowerCase() || '';
+        const postType = card.dataset.postType || 'texto';
+        
+        const matchesSearch = postText.includes(searchTerm);
+        const matchesFilter = filterType === 'all' || 
+                            (filterType === 'images' && postType === 'imagen') ||
+                            (filterType === 'videos' && postType === 'video') ||
+                            (filterType === 'audio' && postType === 'audio');
+        
+        if (matchesSearch && matchesFilter) {
+            card.style.display = 'flex';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    console.log(`✅ Posts visibles después de filtrar: ${visibleCount}`);
+}
+
+// ===== ESTABLECER FILTRO =====
+function setPostsFilter(filter) {
+    console.log('🎯 Aplicando filtro:', filter);
+    
+    // Actualizar botones activos
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Agregar data-filter a los botones si no existe
+    document.querySelectorAll('.filter-btn').forEach((btn, index) => {
+        if (!btn.dataset.filter) {
+            const filters = ['all', 'images', 'videos', 'audio'];
+            btn.dataset.filter = filters[index] || 'all';
+        }
+    });
+    
+    // Aplicar filtro
+    filterPosts();
+}
+
+// ===== AGREGAR POSTS SELECCIONADOS A COLECCIÓN - VERSIÓN MEJORADA =====
+async function addSelectedPostsToCollection(collectionId) {
+    if (selectedPosts.length === 0) {
+        showCollectionToast('❌ Selecciona al menos un post', 'error');
+        return;
+    }
+    
+    const addBtn = document.getElementById('addPostsBtn');
+    const originalText = addBtn.innerHTML;
+    
+    try {
+        // Deshabilitar botón
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
+        
+        const response = await fetch(`${API_URL}/collections/${collectionId}/posts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                postIds: selectedPosts
+            })
+        });
+        
+        const result = await response.json();
+        
+        // En la parte de éxito de addSelectedPostsToCollection, reemplazar:
+        if (result.success) {
+            showCollectionToast(`✅ ${selectedPosts.length} posts agregados a la colección`, 'success');
+            
+            // Usar la nueva función de actualización
+            refreshAfterAddingPosts(collectionId);
+            
+        } else {
+            showCollectionToast(`❌ Error: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        console.error('Error agregando posts a colección:', error);
+        showCollectionToast('❌ Error al agregar posts', 'error');
+    } finally {
+        // Rehabilitar botón
+        addBtn.disabled = false;
+        addBtn.innerHTML = originalText;
+    }
+}
+
+// ===== ACTUALIZAR TODAS LAS VISTAS DE COLECCIÓN =====
+async function updateAllCollectionViews(collectionId) {
+    try {
+        console.log('🔄 Actualizando todas las vistas para colección:', collectionId);
+        
+        // 1. Recargar los datos de la colección desde el servidor
+        const response = await fetch(`${API_URL}/collections/${collectionId}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        const updatedCollection = result.data;
+        
+        // 2. Actualizar en el array currentCollections
+        const collectionIndex = currentCollections.findIndex(c => c._id === collectionId);
+        if (collectionIndex !== -1) {
+            currentCollections[collectionIndex] = updatedCollection;
+        }
+        
+        // 3. Actualizar la vista de detalle si está abierta
+        const detailModal = document.getElementById('collectionDetailModal');
+        if (detailModal) {
+            console.log('🔄 Actualizando modal de detalle...');
+            showCollectionDetailModal(updatedCollection);
+        }
+        
+        // 4. Actualizar la vista de gestión si está abierta
+        const manageModal = document.getElementById('managePostsModal');
+        if (manageModal) {
+            console.log('🔄 Actualizando modal de gestión...');
+            // Cerrar y reabrir el modal de gestión con los nuevos datos
+            closeManagePostsModal();
+            setTimeout(() => {
+                openManagePostsModal(collectionId);
+            }, 300);
+        }
+        
+        // 5. Actualizar la tarjeta en el grid principal
+        updateCollectionCard(collectionId, updatedCollection);
+        
+        // 6. Si estamos en vista vacía, reemplazar con la vista normal
+        const emptyCollection = document.querySelector('.empty-collection');
+        if (emptyCollection) {
+            console.log('🔄 Reemplazando vista vacía...');
+            replaceEmptyCollectionView(collectionId, updatedCollection);
+        }
+        
+        console.log('✅ Todas las vistas actualizadas');
+        
+    } catch (error) {
+        console.error('Error actualizando vistas:', error);
+        // Fallback: recargar toda la página de colecciones
+        loadUserCollections();
+    }
+}
+
+function replaceEmptyCollectionView(collectionId, updatedCollection) {
+    const emptySection = document.querySelector('.empty-collection');
+    if (emptySection && emptySection.closest('.collection-posts-section')) {
+        const postsSection = emptySection.closest('.collection-posts-section');
+        postsSection.innerHTML = `
+            <div class="collection-posts-header">
+                <h4>Elementos en la colección (${updatedCollection.posts.length})</h4>
+                <button class="btn-secondary btn-small" onclick="openManagePostsModal('${collectionId}')">
+                    <i class="fas fa-cog"></i> Gestionar Posts
+                </button>
+            </div>
+            <div class="collection-posts-grid">
+                ${updatedCollection.posts.map(post => createCollectionPostHTML(post, collectionId)).join('')}
+            </div>
+        `;
+    }
+}
+
+function updateCollectionCard(collectionId, updatedCollection) {
+    const collectionCard = document.querySelector(`[data-collection-id="${collectionId}"]`);
+    if (collectionCard) {
+        console.log('🔄 Actualizando tarjeta de colección...');
+        const newCardHTML = createCollectionCardHTML(updatedCollection);
+        collectionCard.outerHTML = newCardHTML;
+        
+        // Re-inicializar eventos del menú para la nueva tarjeta
+        setTimeout(() => {
+            initializeCollectionMenuEvents();
+        }, 100);
+    }
+}
+
+
+// ===== CERRAR MODAL =====
+function closeAddPostsModal() {
+    const modal = document.getElementById('addPostsModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+    
+    // Resetear selección
+    selectedPosts = [];
+}
+
+
+
 
 // ===== MENÚ DE OPCIONES DE COLECCIÓN =====
 function openCollectionOptions(collectionId, event) {
@@ -595,8 +1521,15 @@ async function createCollectionPost(collection) {
 }
 
 // ===== VER COLECCIÓN DETALLADA =====
-async function viewCollection(collectionId) {
+async function viewCollection(collectionId, event) {
+    // Si el evento viene del menú de opciones, no hacer nada
+    if (event && (event.target.closest('.collection-actions') || event.target.closest('.collection-options-menu'))) {
+        return;
+    }
+    
     try {
+        console.log('👀 Abriendo colección:', collectionId);
+        
         const response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/${collectionId}`);
         const result = await response.json();
         
@@ -612,8 +1545,13 @@ async function viewCollection(collectionId) {
     }
 }
 
-// ===== MODAL DE DETALLE DE COLECCIÓN =====
+// ===== MODAL DE DETALLE DE COLECCIÓN - VERSIÓN MEJORADA =====
 function showCollectionDetailModal(collection) {
+    const existingModal = document.getElementById('collectionDetailModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'collectionDetailModal';
@@ -662,17 +1600,29 @@ function showCollectionDetailModal(collection) {
                     </div>
                     
                     <div class="collection-posts-section">
-                        <h4>Elementos en la colección (${collection.posts.length})</h4>
+                        <div class="collection-posts-header">
+                            <h4>Elementos en la colección (${collection.posts.length})</h4>
+                            ${collection.posts.length > 0 ? `
+                                <button class="btn-secondary btn-small" onclick="openManagePostsModal('${collection._id}')">
+                                    <i class="fas fa-cog"></i> Gestionar Posts
+                                </button>
+                            ` : ''}
+                        </div>
                         
                         ${collection.posts.length > 0 ? `
                             <div class="collection-posts-grid">
-                                ${collection.posts.map(post => createCollectionPostHTML(post)).join('')}
+                                ${collection.posts.map(post => createCollectionPostHTML(post, collection._id)).join('')}
                             </div>
                         ` : `
                             <div class="empty-collection">
                                 <i class="fas fa-inbox"></i>
                                 <p>Esta colección está vacía</p>
                                 <small>Agrega publicaciones desde tu perfil o el feed</small>
+                                <br>
+                                <br>
+                                <button class="btn-primary" onclick="addPostsToCollection('${collection._id}')">
+                                    <i class="fas fa-plus"></i> Agregar Posts
+                                </button>
                             </div>
                         `}
                     </div>
@@ -684,6 +1634,289 @@ function showCollectionDetailModal(collection) {
     document.body.appendChild(modal);
     modal.style.display = 'flex';
     document.body.classList.add('modal-open');
+    
+    // Guardar la colección actual
+    currentCollection = collection;
+}
+
+// ===== ELIMINAR POST DE COLECCIÓN - VERSIÓN COMPLETAMENTE CORREGIDA =====
+async function removePostFromCollection(collectionId, postId, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
+    console.log('🗑️ Intentando eliminar post de colección:', { collectionId, postId });
+    
+    try {
+        if (!confirm('¿Estás seguro de que quieres eliminar este post de la colección?')) {
+            return;
+        }
+        
+        showCollectionToast('⏳ Eliminando post de la colección...', 'info');
+        
+        const response = await fetch(`${API_URL}/collections/${collectionId}/posts/${postId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showCollectionToast('✅ Post eliminado de la colección', 'success');
+            
+            // Remover del DOM
+            removePostFromDOM(postId);
+            
+            // Actualizar contadores
+            updatePostCounters(collectionId);
+            
+            // Verificar si estamos en modal de gestión y actualizar
+            const manageModal = document.getElementById('managePostsModal');
+            if (manageModal) {
+                // Remover del array de selección si estaba seleccionado
+                managedSelectedPosts = managedSelectedPosts.filter(id => id !== postId);
+                updateManagedSelectionUI();
+                
+                // Verificar si quedan posts
+                const remainingPosts = document.querySelectorAll('.managed-post-item');
+                if (remainingPosts.length === 0) {
+                    setTimeout(() => {
+                        closeManagePostsModal();
+                        viewCollection(collectionId);
+                    }, 1000);
+                }
+            }
+            
+            // Verificar si estamos en vista detalle
+            const detailModal = document.getElementById('collectionDetailModal');
+            if (detailModal) {
+                const remainingPosts = document.querySelectorAll('.collection-post-item');
+                if (remainingPosts.length === 0) {
+                    showEmptyCollectionState(collectionId);
+                }
+            }
+            
+        } else {
+            // Manejar errores específicos del servidor
+            let errorMessage = 'Error desconocido';
+            if (result.error && result.error.includes('No matching document found')) {
+                errorMessage = 'Error de sincronización. Por favor, recarga la página e intenta nuevamente.';
+            } else if (result.error) {
+                errorMessage = result.error;
+            }
+            
+            showCollectionToast(`❌ ${errorMessage}`, 'error');
+            console.error('Error del servidor:', result.error);
+        }
+        
+    } catch (error) {
+        console.error('Error eliminando post de colección:', error);
+        
+        let userMessage = 'Error al eliminar el post';
+        if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+            userMessage = 'Error del servidor. Por favor, intenta nuevamente.';
+        } else if (error.message.includes('No matching document found')) {
+            userMessage = 'Error de sincronización. Recarga la página e intenta nuevamente.';
+        }
+        
+        showCollectionToast(`❌ ${userMessage}`, 'error');
+    }
+}
+
+// ===== MODAL PARA GESTIONAR POSTS EN COLECCIÓN - VERSIÓN MEJORADA =====
+function openManagePostsModal(collectionId) {
+    // Cerrar modal existente si hay uno
+    closeManagePostsModal();
+    
+    const collection = currentCollections.find(c => c._id === collectionId);
+    if (!collection) {
+        console.error('❌ Colección no encontrada:', collectionId);
+        return;
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'managePostsModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 1000px; height: 90vh;">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-cog"></i> 
+                    Gestionar Posts en "${collection.nombre}"
+                </h3>
+                <span class="close-modal" onclick="closeManagePostsModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="height: calc(100% - 120px); display: flex; flex-direction: column;">
+                <div class="manage-posts-container" style="flex: 1; display: flex; flex-direction: column;">
+                    <!-- Estadísticas rápidas -->
+                    <div class="posts-stats">
+                        <div class="stat-card">
+                            <i class="fas fa-images"></i>
+                            <span class="stat-number">${collection.posts.filter(p => p.tipoContenido === 'imagen').length}</span>
+                            <span class="stat-label">Imágenes</span>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-video"></i>
+                            <span class="stat-number">${collection.posts.filter(p => p.tipoContenido === 'video').length}</span>
+                            <span class="stat-label">Videos</span>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-music"></i>
+                            <span class="stat-number">${collection.posts.filter(p => p.tipoContenido === 'audio').length}</span>
+                            <span class="stat-label">Audios</span>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-file-alt"></i>
+                            <span class="stat-number">${collection.posts.filter(p => !p.tipoContenido || p.tipoContenido === 'texto').length}</span>
+                            <span class="stat-label">Texto</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Búsqueda y acciones -->
+                    <div class="manage-actions">
+                        <div class="search-input-with-icon">
+                            <i class="fas fa-search"></i>
+                            <input 
+                                type="text" 
+                                id="manageSearchInput" 
+                                placeholder="Buscar posts en esta colección..."
+                                onkeyup="filterManagedPosts()"
+                            >
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn-primary" onclick="addPostsToCollection('${collectionId}')">
+                                <i class="fas fa-plus"></i> Agregar Posts
+                            </button>
+                            <button class="btn-secondary" onclick="selectAllManagedPosts()">
+                                <i class="fas fa-check-square"></i> Seleccionar Todos
+                            </button>
+                            <button class="btn-danger" id="removeSelectedBtn" onclick="removeSelectedPosts('${collectionId}')" disabled>
+                                <i class="fas fa-trash"></i> Eliminar Seleccionados
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de posts con checkboxes -->
+                    <div class="managed-posts-list" id="managedPostsList">
+                        ${collection.posts.length > 0 ? 
+                            collection.posts.map(post => createManagedPostItem(post, collectionId)).join('') 
+                            : `
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <h3>No hay posts en esta colección</h3>
+                                <p>Agrega algunos posts para comenzar a gestionarlos.</p>
+                                <button class="btn-primary" onclick="addPostsToCollection('${collectionId}')">
+                                    <i class="fas fa-plus"></i> Agregar Posts
+                                </button>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <!-- Contador de seleccionados -->
+                    <div class="selection-info" id="selectionInfo" style="display: none;">
+                        <i class="fas fa-check-circle"></i>
+                        <span id="selectedPostsCount">0</span> posts seleccionados
+                        <button class="btn-text" onclick="clearSelection()">Limpiar selección</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    
+    // Resetear selección
+    managedSelectedPosts = [];
+    updateManagedSelectionUI();
+}
+
+function createManagedPostItem(post, collectionId) {
+    const isImage = post.tipoContenido === 'imagen' && post.imagen;
+    const isVideo = post.tipoContenido === 'video' && post.video;
+    const isAudio = post.tipoContenido === 'audio' && post.audio;
+    
+    let mediaPreview = '';
+    let typeIcon = 'fas fa-file-alt';
+    
+    if (isImage) {
+        mediaPreview = `<img src="${post.imagen}" alt="Imagen" class="managed-post-preview">`;
+        typeIcon = 'fas fa-image';
+    } else if (isVideo) {
+        mediaPreview = `
+            <div class="managed-video-preview">
+                <i class="fas fa-play"></i>
+            </div>
+        `;
+        typeIcon = 'fas fa-video';
+    } else if (isAudio) {
+        mediaPreview = `
+            <div class="managed-audio-preview">
+                <i class="fas fa-music"></i>
+            </div>
+        `;
+        typeIcon = 'fas fa-music';
+    } else {
+        mediaPreview = `
+            <div class="managed-text-preview">
+                <p>${post.contenido ? post.contenido.substring(0, 80) + (post.contenido.length > 80 ? '...' : '') : 'Publicación'}</p>
+            </div>
+        `;
+    }
+    
+    const timeAgo = getTimeAgo(new Date(post.fecha_publicacion));
+    const contentPreview = post.contenido ? 
+        post.contenido.substring(0, 120) + (post.contenido.length > 120 ? '...' : '') : 
+        'Publicación';
+    
+    return `
+        <div class="managed-post-item" data-post-id="${post._id}" onclick="toggleManagedPostSelectionByCard('${post._id}')">
+            <div class="managed-post-checkbox" onclick="event.stopPropagation()">
+                <input type="checkbox" id="manage-post-${post._id}" onchange="toggleManagedPostSelection('${post._id}')">
+                <label for="manage-post-${post._id}"></label>
+            </div>
+            
+            <div class="managed-post-content">
+                <div class="managed-post-preview-container">
+                    ${mediaPreview}
+                    <div class="managed-post-type">
+                        <i class="${typeIcon}"></i>
+                    </div>
+                </div>
+                
+                <div class="managed-post-info">
+                    <p class="managed-post-text">${contentPreview}</p>
+                    <div class="managed-post-meta">
+                        <span class="post-date">
+                            <i class="fas fa-clock"></i> ${timeAgo}
+                        </span>
+                        <span class="post-stats">
+                            <i class="fas fa-heart"></i> ${post.likes?.length || 0}
+                            <i class="fas fa-comment"></i> ${post.comentarios?.length || 0}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="managed-post-actions" onclick="event.stopPropagation()">
+                <button class="btn-icon btn-view" onclick="viewPost('${post._id}')" title="Ver post">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn-icon btn-remove" onclick="removePostFromCollection('${collectionId}', '${post._id}', event)" title="Eliminar de colección">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 function createCollectionPostHTML(post) {
@@ -740,6 +1973,52 @@ function closeCollectionDetailModal() {
     }
 }
 
+// ===== ELIMINACIÓN CON REINTENTO =====
+async function removePostWithRetry(collectionId, postId, maxRetries = 2) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🔄 Intento ${attempt} de eliminar post ${postId}`);
+            
+            const response = await fetch(`${API_URL}/collections/${collectionId}/posts/${postId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log(`✅ Post ${postId} eliminado en intento ${attempt}`);
+                return { success: true };
+            } else {
+                throw new Error(result.error || 'Error desconocido del servidor');
+            }
+            
+        } catch (error) {
+            lastError = error;
+            console.warn(`❌ Intento ${attempt} fallido:`, error.message);
+            
+            // Esperar antes del siguiente intento (backoff exponencial)
+            if (attempt < maxRetries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    return { 
+        success: false, 
+        error: lastError?.message || 'Error después de todos los reintentos' 
+    };
+}
+
 // ===== FUNCIONES DE UTILIDAD =====
 function getTimeAgo(date) {
     const now = new Date();
@@ -755,6 +2034,80 @@ function getTimeAgo(date) {
     if (days < 7) return `Hace ${days} d`;
     
     return date.toLocaleDateString();
+}
+
+// ===== ACTUALIZAR CONTADORES - VERSIÓN MÁS ROBUSTA =====
+function updatePostCounters(collectionId) {
+    try {
+        // Contar posts en el DOM actual
+        const postElements = document.querySelectorAll('.collection-post-item');
+        const managedElements = document.querySelectorAll('.managed-post-item');
+        const currentCount = Math.max(postElements.length, managedElements.length);
+        
+        // Actualizar contador en el modal de detalle
+        const postsCountElement = document.querySelector('.collection-posts-header h4');
+        if (postsCountElement) {
+            postsCountElement.textContent = `Elementos en la colección (${currentCount})`;
+        }
+        
+        // Actualizar contador en las tarjetas de colección
+        const collectionCard = document.querySelector(`[data-collection-id="${collectionId}"]`);
+        if (collectionCard) {
+            const statElement = collectionCard.querySelector('.collection-stats .stat:first-child');
+            if (statElement) {
+                statElement.innerHTML = `<i class="fas fa-image"></i> ${currentCount} ${currentCount === 1 ? 'elemento' : 'elementos'}`;
+            }
+        }
+        
+        // Actualizar estadísticas en el modal de gestión si está abierto
+        const manageModal = document.getElementById('managePostsModal');
+        if (manageModal) {
+            updateManageStats(collectionId);
+        }
+        
+        console.log(`🔢 Contadores actualizados: ${currentCount} posts`);
+        
+    } catch (error) {
+        console.error('Error actualizando contadores:', error);
+    }
+}
+
+function updateManageStats(collectionId) {
+    const collection = currentCollections.find(c => c._id === collectionId);
+    if (!collection) return;
+    
+    const stats = {
+        images: collection.posts.filter(p => p.tipoContenido === 'imagen').length,
+        videos: collection.posts.filter(p => p.tipoContenido === 'video').length,
+        audio: collection.posts.filter(p => p.tipoContenido === 'audio').length,
+        text: collection.posts.filter(p => !p.tipoContenido || p.tipoContenido === 'texto').length
+    };
+    
+    // Actualizar las tarjetas de estadísticas
+    const statCards = document.querySelectorAll('.stat-card');
+    if (statCards.length === 4) {
+        statCards[0].querySelector('.stat-number').textContent = stats.images;
+        statCards[1].querySelector('.stat-number').textContent = stats.videos;
+        statCards[2].querySelector('.stat-number').textContent = stats.audio;
+        statCards[3].querySelector('.stat-number').textContent = stats.text;
+    }
+}
+
+// ===== MOSTRAR ESTADO VACÍO =====
+function showEmptyCollectionState(collectionId) {
+    const postsSection = document.querySelector('.collection-posts-section');
+    if (postsSection) {
+        postsSection.innerHTML = `
+            <div class="empty-collection">
+                <i class="fas fa-inbox"></i>
+                <p>Esta colección está vacía</p>
+                <small>Agrega publicaciones desde tu perfil o el feed</small>
+                <button class="btn-primary" onclick="addPostsToCollection('${collectionId}')">
+                    <i class="fas fa-plus"></i> Agregar Posts
+                </button>
+            </div>
+        `;
+    }
 }
 
 // FUNCIÓN TOAST CORREGIDA - SIN RECURSIÓN
@@ -786,6 +2139,19 @@ function showCollectionToast(message, type = 'success') {
     }
 }
 
+// ===== INICIALIZAR CHECKBOXES AL CARGAR POSTS =====
+function initializeCheckboxes() {
+    console.log('🔧 Inicializando checkboxes...');
+    
+    const checkboxes = document.querySelectorAll('#addPostsModal .post-selection-checkbox input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        const postId = checkbox.id.replace('post-', '');
+        updateCheckboxVisual(postId, checkbox.checked);
+    });
+    
+    console.log(`✅ ${checkboxes.length} checkboxes inicializados`);
+}
+
 // Función para inicializar eventos de los menús de colecciones
 function initializeCollectionMenuEvents() {
     console.log('🎯 Inicializando eventos de menús de colecciones...');
@@ -802,26 +2168,104 @@ function initializeCollectionMenuEvents() {
     console.log('✅ Eventos de menús de colecciones inicializados');
 }
 
+// ===== REMOVER POST SELECCIONADO - NUEVA FUNCIÓN =====
+function removeSelectedPost(postId) {
+    console.log('🗑️ Removiendo post de selección:', postId);
+    
+    // Encontrar el checkbox y desmarcarlo
+    const checkbox = document.getElementById(`post-${postId}`);
+    if (checkbox) {
+        checkbox.checked = false;
+        togglePostSelection(postId);
+    } else {
+        console.error('❌ Checkbox no encontrado para post:', postId);
+        
+        // Remover directamente de la selección como fallback
+        selectedPosts = selectedPosts.filter(id => id !== postId);
+        updateSelectedPostsUI();
+        
+        // También remover la clase selected del card
+        const postCard = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postCard) {
+            postCard.classList.remove('selected');
+        }
+    }
+}
+
+// ===== NUEVAS FUNCIONES PARA SELECCIÓN POR CARD =====
+function togglePostSelectionByCard(postId) {
+    const checkbox = document.getElementById(`post-${postId}`);
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        updateCheckboxVisual(postId, checkbox.checked);
+        updateSelectedPostsUI();
+    }
+}
+
+function toggleManagedPostSelectionByCard(postId) {
+    const checkbox = document.getElementById(`manage-post-${postId}`);
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        
+        if (checkbox.checked) {
+            if (!managedSelectedPosts.includes(postId)) {
+                managedSelectedPosts.push(postId);
+                checkbox.closest('.managed-post-item').classList.add('selected');
+            }
+        } else {
+            managedSelectedPosts = managedSelectedPosts.filter(id => id !== postId);
+            checkbox.closest('.managed-post-item').classList.remove('selected');
+        }
+        
+        updateManagedSelectionUI();
+    }
+}
+
+
+
 // ===== HACER FUNCIONES GLOBALES =====
+// ===== HACER FUNCIONES GLOBALES - LISTA LIMPIA =====
+window.safelyCloseModal = safelyCloseModal;
+window.closeDeleteCollectionModal = closeDeleteCollectionModal;
+window.closeCreateCollectionModal = closeCreateCollectionModal;
+window.closeCollectionDetailModal = closeCollectionDetailModal;
+window.closeAddPostsModal = closeAddPostsModal;
+window.closeManagePostsModal = closeManagePostsModal;
+window.updateUIAfterPostRemoval = updateUIAfterPostRemoval;
+window.showEmptyCollectionState = showEmptyCollectionState;
 window.initializeCollections = initializeCollections;
 window.openCreateCollectionModal = openCreateCollectionModal;
 window.viewCollection = viewCollection;
-window.closeCreateCollectionModal = closeCreateCollectionModal;
-window.closeCollectionDetailModal = closeCollectionDetailModal;
 window.editCollection = editCollection;
 window.confirmDeleteCollection = confirmDeleteCollection;
 window.deleteCollection = deleteCollection;
-window.closeDeleteCollectionModal = closeDeleteCollectionModal;
 window.addPostsToCollection = addPostsToCollection;
-window.openCollectionOptions = openCollectionOptions;
 window.openCollectionOptions = openCollectionOptions;
 window.closeAllCollectionMenus = closeAllCollectionMenus;
-window.editCollection = editCollection;
-window.addPostsToCollection = addPostsToCollection;
-window.confirmDeleteCollection = confirmDeleteCollection;
-window.deleteCollection = deleteCollection;
-window.viewCollection = viewCollection;
 window.initializeCollectionMenuEvents = initializeCollectionMenuEvents;
+window.togglePostSelection = togglePostSelection;
+window.removeSelectedPost = removeSelectedPost;
+window.filterPosts = filterPosts;
+window.setPostsFilter = setPostsFilter;
+window.addSelectedPostsToCollection = addSelectedPostsToCollection;
+window.removePostFromCollection = removePostFromCollection;
+window.openManagePostsModal = openManagePostsModal;
+window.toggleManagedPostSelection = toggleManagedPostSelection;
+window.selectAllManagedPosts = selectAllManagedPosts;
+window.clearSelection = clearSelection;
+window.removeSelectedPosts = removeSelectedPosts;
+window.filterManagedPosts = filterManagedPosts;
+window.updatePostCounters = updatePostCounters;
+window.updateManageStats = updateManageStats;
+window.removePostFromDOM = removePostFromDOM;
+window.removePostWithRetry = removePostWithRetry;
+window.updateAllCollectionViews = updateAllCollectionViews;
+window.updateCollectionCard = updateCollectionCard;
+window.replaceEmptyCollectionView = replaceEmptyCollectionView;
+window.refreshAfterAddingPosts = refreshAfterAddingPosts;
+window.togglePostSelectionByCard = togglePostSelectionByCard;
+window.toggleManagedPostSelectionByCard = toggleManagedPostSelectionByCard;
+window.viewCollection = viewCollection;
 
 // ===== FUNCIÓN DE DIAGNÓSTICO =====
 function debugCollectionMenus() {
@@ -852,3 +2296,125 @@ function debugCollectionMenus() {
 
 // Llamar al diagnóstico después de cargar las colecciones
 setTimeout(debugCollectionMenus, 1000);
+
+// ===== DIAGNÓSTICO DEL MODAL =====
+function diagnoseAddPostsModal() {
+    console.log('🔍 DIAGNÓSTICO DEL MODAL AGREGAR POSTS:');
+    
+    const modal = document.getElementById('addPostsModal');
+    console.log('✅ Modal presente:', !!modal);
+    
+    const grid = document.getElementById('postsSelectionGrid');
+    console.log('✅ Grid presente:', !!grid);
+    
+    const posts = document.querySelectorAll('.post-selection-card');
+    console.log('✅ Posts en grid:', posts.length);
+    
+    const checkboxes = document.querySelectorAll('.post-selection-checkbox input');
+    console.log('✅ Checkboxes:', checkboxes.length);
+    
+    console.log('✅ Posts seleccionados:', selectedPosts);
+    
+    // Verificar event listeners
+    posts.forEach((post, index) => {
+        const postId = post.dataset.postId;
+        const checkbox = document.getElementById(`post-${postId}`);
+        console.log(`📋 Post ${index}:`, {
+            id: postId,
+            checkboxExists: !!checkbox,
+            checkboxChecked: checkbox ? checkbox.checked : 'N/A'
+        });
+    });
+}
+
+// Hacerla global para poder llamarla desde la consola
+window.diagnoseAddPostsModal = diagnoseAddPostsModal;
+
+// ===== DIAGNÓSTICO DE CHECKBOXES =====
+function diagnoseCheckboxes() {
+    console.log('🔍 DIAGNÓSTICO DE CHECKBOXES:');
+    
+    const checkboxes = document.querySelectorAll('#addPostsModal .post-selection-checkbox input[type="checkbox"]');
+    console.log(`✅ Checkboxes encontrados: ${checkboxes.length}`);
+    
+    checkboxes.forEach((checkbox, index) => {
+        const postId = checkbox.id.replace('post-', '');
+        const label = document.querySelector(`label[for="post-${postId}"]`);
+        
+        console.log(`📋 Checkbox ${index}:`, {
+            id: checkbox.id,
+            checked: checkbox.checked,
+            labelExists: !!label,
+            labelContent: label ? window.getComputedStyle(label, '::after').content : 'N/A',
+            postCard: document.querySelector(`[data-post-id="${postId}"]`) ? 'EXISTE' : 'NO EXISTE'
+        });
+        
+        // Verificar estilos computados
+        if (label) {
+            const styles = window.getComputedStyle(label, '::after');
+            console.log(`🎨 Estilos ::after:`, {
+                content: styles.content,
+                opacity: styles.opacity,
+                visibility: styles.visibility
+            });
+        }
+    });
+}
+
+// Hacerla global
+window.diagnoseCheckboxes = diagnoseCheckboxes;
+
+// ===== FORZAR ACTUALIZACIÓN DE TODOS LOS CHECKBOXES =====
+function forceAllCheckboxes() {
+    console.log('🔄 Forzando actualización de TODOS los checkboxes...');
+    
+    const checkboxes = document.querySelectorAll('#addPostsModal .post-selection-checkbox input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        const postId = checkbox.id.replace('post-', '');
+        updateCheckboxVisual(postId, checkbox.checked);
+    });
+    
+    console.log(`✅ ${checkboxes.length} checkboxes actualizados`);
+}
+
+window.forceAllCheckboxes = forceAllCheckboxes;
+// SCRIPT DE EMERGENCIA - Ejecutar automáticamente
+setTimeout(() => {
+    if (document.getElementById('addPostsModal')) {
+        console.log('🚀 Modal de agregar posts detectado - inicializando checkboxes...');
+        initializeCheckboxes();
+        
+        // Forzar actualización cada segundo durante 5 segundos (solo para debug)
+        let attempts = 0;
+        const interval = setInterval(() => {
+            if (attempts >= 5) {
+                clearInterval(interval);
+                return;
+            }
+            forceAllCheckboxes();
+            attempts++;
+        }, 1000);
+    }
+}, 500);
+
+// ===== DEBUG DE COLECCIÓN =====
+function debugCollection(collectionId) {
+    const collection = currentCollections.find(c => c._id === collectionId);
+    if (!collection) {
+        console.error('❌ Colección no encontrada:', collectionId);
+        return;
+    }
+    
+    console.log('🔍 DEBUG COLECCIÓN:', {
+        id: collection._id,
+        nombre: collection.nombre,
+        postsCount: collection.posts.length,
+        posts: collection.posts.map(p => ({
+            id: p._id,
+            tipo: p.tipoContenido,
+            contenido: p.contenido?.substring(0, 50)
+        }))
+    });
+}
+
+window.debugCollection = debugCollection;
