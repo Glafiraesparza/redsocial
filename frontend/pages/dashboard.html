@@ -96,17 +96,18 @@
         <textarea id="postContent" placeholder="¿Qué estás pensando?" maxlength="500"></textarea>
         
         <div class="post-actions">
+                <!-- POR ESTO: -->
             <div class="media-type-selector">
-                <button type="button" class="media-type-btn active" onclick="changeMediaType('imagen')">
-                    <i class="fas fa-image"></i> Imagen
-                </button>
-                <button type="button" class="media-type-btn" onclick="changeMediaType('audio')">
-                    <i class="fas fa-music"></i> Audio
-                </button>
-                <button type="button" class="media-type-btn" onclick="changeMediaType('video')">
-                    <i class="fas fa-video"></i> Video
-                </button>
-            </div>
+                    <button type="button" class="media-type-btn" data-type="imagen">
+                        <i class="fas fa-image"></i> Imagen
+                    </button>
+                    <button type="button" class="media-type-btn" data-type="audio">
+                        <i class="fas fa-music"></i> Audio
+                    </button>
+                    <button type="button" class="media-type-btn" data-type="video">
+                        <i class="fas fa-video"></i> Video
+                    </button>
+                </div>
 
             <div class="post-submit">
                 <span id="charCount">0/500</span>
@@ -122,24 +123,28 @@
         <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
 
         <!-- CONTENEDORES DE UPLOAD - AGREGAR ESTOS -->
-        <div id="imageUpload" class="media-upload-container">
-            <label for="postImage" class="btn-media-label">
+        <!-- CONTENEDORES DE UPLOAD - USAR BUTTONS EN LUGAR DE LABELS -->
+        <div id="imageUpload" class="media-upload-container" style="display: none;">
+            <button type="button" class="btn-media-label" onclick="document.getElementById('postImage').click()">
                 <i class="fas fa-upload"></i> Seleccionar Imagen
-            </label>
+            </button>
+            <input type="file" id="postImage" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
             <div id="imagePreview" class="image-preview"></div>
         </div>
 
         <div id="audioUpload" class="media-upload-container" style="display: none;">
-            <label for="postAudio" class="btn-media-label">
+            <button type="button" class="btn-media-label" onclick="document.getElementById('postAudio').click()">
                 <i class="fas fa-upload"></i> Seleccionar Audio
-            </label>
+            </button>
+            <input type="file" id="postAudio" accept="audio/*" style="display: none;" onchange="handleAudioUpload(event)">
             <div id="audioPreview" class="audio-preview"></div>
         </div>
 
         <div id="videoUpload" class="media-upload-container" style="display: none;">
-            <label for="postVideo" class="btn-media-label">
+            <button type="button" class="btn-media-label" onclick="document.getElementById('postVideo').click()">
                 <i class="fas fa-upload"></i> Seleccionar Video
-            </label>
+            </button>
+            <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
             <div id="videoPreview" class="video-preview"></div>
         </div>
     </div>

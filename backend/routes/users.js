@@ -4,6 +4,61 @@ const User = require('../models/User');
 const router = express.Router();
 const Notification = require('../models/Notification');
 
+// LOGIN - Autenticar usuario
+router.post('/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        console.log('🔐 Intentando login para usuario:', username);
+
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Usuario y contraseña son requeridos'
+            });
+        }
+
+        // Buscar usuario por username
+        const user = await User.findOne({ username: username });
+        
+        if (!user) {
+            console.log('❌ Usuario no encontrado:', username);
+            return res.status(401).json({
+                success: false,
+                error: 'Usuario o contraseña incorrectos'
+            });
+        }
+
+        // Verificar contraseña (comparación directa ya que no está hasheada)
+        if (user.password !== password) {
+            console.log('❌ Contraseña incorrecta para usuario:', username);
+            return res.status(401).json({
+                success: false,
+                error: 'Usuario o contraseña incorrectos'
+            });
+        }
+
+        console.log('✅ Login exitoso para:', username);
+
+        // Crear objeto de usuario sin la contraseña para enviar al frontend
+        const userWithoutPassword = user.toObject();
+        delete userWithoutPassword.password;
+
+        res.json({
+            success: true,
+            message: 'Login exitoso',
+            user: userWithoutPassword
+        });
+
+    } catch (error) {
+        console.error('❌ Error en login:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al autenticar'
+        });
+    }
+});
+
 // CREATE - Crear usuario
 router.post('/', async (req, res) => {
     try {
@@ -866,7 +921,62 @@ router.post('/:userId/can-view-profile', async (req, res) => {
     }
 });
 
+// VERIFICAR BLOQUEO PARA MENSAJES
+router.get('/check-block-status/:currentUserId/:otherUserId', async (req, res) => {
+    try {
+        const { currentUserId, otherUserId } = req.params;
 
+        console.log(`🔍 Verificando estado de bloqueo entre ${currentUserId} y ${otherUserId}`);
+
+        const [currentUser, otherUser] = await Promise.all([
+            User.findById(currentUserId),
+            User.findById(otherUserId)
+        ]);
+
+        if (!currentUser || !otherUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar si el usuario actual bloqueó al otro
+        const iBlockedThem = currentUser.usuarios_bloqueados.includes(otherUserId);
+        // Verificar si el otro usuario bloqueó al actual
+        const theyBlockedMe = otherUser.usuarios_bloqueados.includes(currentUserId);
+
+        const isBlocked = iBlockedThem || theyBlockedMe;
+        
+        let status = null;
+        if (isBlocked) {
+            if (iBlockedThem && theyBlockedMe) {
+                status = 'bloqueo_mutuo';
+            } else if (iBlockedThem) {
+                status = 'tu_has_bloqueado';
+            } else {
+                status = 'te_han_bloqueado';
+            }
+        }
+
+        console.log(`📊 Estado de bloqueo:`, { isBlocked, status });
+
+        res.json({
+            success: true,
+            data: {
+                isBlocked,
+                status,
+                blockedBy: iBlockedThem ? 'you' : theyBlockedMe ? 'them' : null
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error verificando estado de bloqueo:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al verificar bloqueo'
+        });
+    }
+});
 
 
 module.exports = router;

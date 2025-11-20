@@ -13,7 +13,7 @@ function initializeApp() {
     initializeModals();
     initializeForms();
     initializeNavbar();
-    initializeDateLimits(); // Para límites de fecha de nacimiento
+    initializeDateLimits();
 }
 
 // Funciones para modales - VERSIÓN MEJORADA
@@ -41,14 +41,12 @@ function openModal(type) {
     const modal = document.getElementById(`${type}Modal`);
     if (modal) {
         modal.style.display = 'flex';
-        document.body.classList.add('modal-open'); // Agregar clase al body
+        document.body.classList.add('modal-open');
         
-        // Pequeño delay para la animación
         setTimeout(() => {
             modal.style.opacity = '1';
         }, 10);
         
-        // Enfocar el primer input
         setTimeout(() => {
             const firstInput = modal.querySelector('input');
             if (firstInput) firstInput.focus();
@@ -91,41 +89,40 @@ document.addEventListener('click', function(event) {
 });
 
 // Configurar límites para fecha de nacimiento
-// En tu auth.js, actualiza la función initializeDateLimits
 function initializeDateLimits() {
     const fechaNacimientoInput = document.getElementById('regFechaNacimiento');
     
-    if (fechaNacimientoInput && typeof flatpickr !== 'undefined') {
-        // Usar Flatpickr para mejor experiencia
-        flatpickr(fechaNacimientoInput, {
-            locale: "es",
-            dateFormat: "Y-m-d",
-            maxDate: new Date().fp_incYears(-13), // Mínimo 13 años
-            minDate: new Date().fp_incYears(-100), // Máximo 100 años
-            position: "auto",
-            static: true,
-            monthSelectorType: "dropdown",
-            yearSelectorType: "dropdown",
-            prevArrow: '<i class="fas fa-chevron-left"></i>',
-            nextArrow: '<i class="fas fa-chevron-right"></i>',
-            onReady: function(selectedDates, dateStr, instance) {
-                // Agregar clases personalizadas
-                instance.calendarContainer.classList.add('custom-flatpickr');
-            }
-        });
-        
-        // Agregar placeholder personalizado
-        fechaNacimientoInput.setAttribute('placeholder', 'DD/MM/AAAA');
-        
-    } else if (fechaNacimientoInput) {
-        // Fallback si no hay Flatpickr
+    if (fechaNacimientoInput) {
+        // Calcular fechas límite manualmente
         const today = new Date();
         const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate());
         const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
         
+        // Configurar atributos nativos del input
         fechaNacimientoInput.max = maxDate.toISOString().split('T')[0];
         fechaNacimientoInput.min = minDate.toISOString().split('T')[0];
-        fechaNacimientoInput.setAttribute('placeholder', 'DD/MM/AAAA');
+        fechaNacimientoInput.setAttribute('placeholder', 'AAAA-MM-DD');
+        
+        // Solo usar flatpickr si está disponible
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(fechaNacimientoInput, {
+                locale: "es",
+                dateFormat: "Y-m-d",
+                maxDate: maxDate,
+                minDate: minDate,
+                position: "auto",
+                static: true,
+                monthSelectorType: "dropdown",
+                yearSelectorType: "dropdown",
+                prevArrow: '<i class="fas fa-chevron-left"></i>',
+                nextArrow: '<i class="fas fa-chevron-right"></i>',
+                onReady: function(selectedDates, dateStr, instance) {
+                    instance.calendarContainer.classList.add('custom-flatpickr');
+                }
+            });
+        } else {
+            console.log('⚠️ Flatpickr no está disponible, usando input nativo');
+        }
     }
 }
 
@@ -144,7 +141,6 @@ function initializeNavbar() {
         });
     }
     
-    // Cerrar dropdown al hacer clic fuera
     document.addEventListener('click', function() {
         const dropdowns = document.querySelectorAll('.dropdown-content');
         dropdowns.forEach(dropdown => {
@@ -161,6 +157,18 @@ function initializeForms() {
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', handleRegister);
+        
+        // Validación en tiempo real para username
+        const usernameInput = document.getElementById('regUsername');
+        if (usernameInput) {
+            usernameInput.addEventListener('input', validateUsername);
+        }
+        
+        // Validación en tiempo real para nombre
+        const nombreInput = document.getElementById('regNombre');
+        if (nombreInput) {
+            nombreInput.addEventListener('input', validateNombre);
+        }
     }
     
     // Login de usuario
@@ -174,6 +182,91 @@ function initializeForms() {
     if (confirmPasswordInput) {
         confirmPasswordInput.addEventListener('input', validatePasswordMatch);
     }
+}
+
+// Validar caracteres del username
+function validateUsername() {
+    const usernameInput = document.getElementById('regUsername');
+    const username = usernameInput.value;
+    const invalidChars = /[^a-zA-Z0-9_]/;
+    
+    let isValid = true;
+    let errorMessage = '';
+    
+    // Validar longitud
+    if (username.length > 0 && username.length < 3) {
+        isValid = false;
+        errorMessage = 'El nombre de usuario debe tener al menos 3 caracteres';
+    } else if (username.length > 20) {
+        isValid = false;
+        errorMessage = 'El nombre de usuario no puede tener más de 20 caracteres';
+    }
+    // Validar caracteres inválidos
+    else if (invalidChars.test(username)) {
+        isValid = false;
+        errorMessage = 'El nombre de usuario no puede contener espacios ni caracteres especiales (@, #, $, etc.)';
+    }
+    
+    // Aplicar estilos
+    if (!isValid && username.length > 0) {
+        usernameInput.style.borderColor = '#e74c3c';
+        usernameInput.style.backgroundColor = 'rgba(231, 76, 60, 0.05)';
+        if (errorMessage) {
+            showToast(errorMessage, 'error');
+        }
+    } else if (username.length >= 3 && username.length <= 20 && !invalidChars.test(username)) {
+        usernameInput.style.borderColor = '#2ecc71';
+        usernameInput.style.backgroundColor = 'rgba(46, 204, 113, 0.05)';
+    } else {
+        usernameInput.style.borderColor = '#e9ecef';
+        usernameInput.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+    }
+    
+    return isValid;
+}
+
+// Validar nombre completo
+function validateNombre() {
+    const nombreInput = document.getElementById('regNombre');
+    const nombre = nombreInput.value.trim();
+    
+    let isValid = true;
+    let errorMessage = '';
+    
+    // Validar que no esté vacío
+    if (nombre.length === 0) {
+        isValid = false;
+        errorMessage = 'El nombre completo no puede estar vacío';
+    }
+    // Validar longitud máxima
+    else if (nombre.length > 40) {
+        isValid = false;
+        errorMessage = 'El nombre completo no puede tener más de 40 caracteres';
+    }
+    // Validar que tenga al menos nombre y apellido (opcional pero recomendado)
+    else if (nombre.split(' ').length < 2) {
+        // Esto es solo una sugerencia, no un error
+        nombreInput.style.borderColor = '#f39c12';
+        nombreInput.style.backgroundColor = 'rgba(243, 156, 18, 0.05)';
+        return true;
+    }
+    
+    // Aplicar estilos
+    if (!isValid && nombre.length > 0) {
+        nombreInput.style.borderColor = '#e74c3c';
+        nombreInput.style.backgroundColor = 'rgba(231, 76, 60, 0.05)';
+        if (errorMessage) {
+            showToast(errorMessage, 'error');
+        }
+    } else if (nombre.length > 0 && nombre.length <= 40) {
+        nombreInput.style.borderColor = '#2ecc71';
+        nombreInput.style.backgroundColor = 'rgba(46, 204, 113, 0.05)';
+    } else {
+        nombreInput.style.borderColor = '#e9ecef';
+        nombreInput.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+    }
+    
+    return isValid;
 }
 
 // Validar que las contraseñas coincidan
@@ -198,21 +291,54 @@ async function handleRegister(e) {
     e.preventDefault();
     console.log('📝 Procesando registro...');
     
-    // Obtener valores de los nuevos campos
+    // Validar username primero
+    if (!validateUsername()) {
+        showToast('❌ Por favor corrige el nombre de usuario', 'error');
+        return;
+    }
+    
+    // Validar nombre
+    if (!validateNombre()) {
+        showToast('❌ Por favor corrige el nombre completo', 'error');
+        return;
+    }
+    
     const userData = {
         username: document.getElementById('regUsername').value,
         email: document.getElementById('regEmail').value,
         password: document.getElementById('regPassword').value,
-        nombre: document.getElementById('regNombre').value,
-        // NUEVOS CAMPOS
+        nombre: document.getElementById('regNombre').value.trim(), // trim para quitar espacios extra
         fecha_nacimiento: document.getElementById('regFechaNacimiento').value,
         genero: document.getElementById('regGenero').value
     };
     
-    // Validaciones mejoradas
+    // Validaciones de longitud específicas
+    if (userData.username.length < 3 || userData.username.length > 20) {
+        showToast('❌ El nombre de usuario debe tener entre 3 y 20 caracteres', 'error');
+        return;
+    }
+    
+    if (userData.nombre.length === 0) {
+        showToast('❌ El nombre completo no puede estar vacío', 'error');
+        return;
+    }
+    
+    if (userData.nombre.length > 40) {
+        showToast('❌ El nombre completo no puede tener más de 40 caracteres', 'error');
+        return;
+    }
+    
+    // Resto de validaciones existentes
     if (!userData.username || !userData.email || !userData.password || 
         !userData.nombre || !userData.fecha_nacimiento || !userData.genero) {
         showToast('❌ Por favor completa todos los campos obligatorios', 'error');
+        return;
+    }
+    
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userData.email)) {
+        showToast('❌ Por favor ingresa un email válido', 'error');
         return;
     }
     
@@ -285,6 +411,8 @@ async function handleLogin(e) {
         password: document.getElementById('loginPassword').value
     };
     
+    console.log('🔍 Datos de login:', loginData);
+    
     if (!loginData.username || !loginData.password) {
         showToast('❌ Por favor completa todos los campos', 'error');
         return;
@@ -293,27 +421,29 @@ async function handleLogin(e) {
     try {
         showToast('⏳ Verificando credenciales...', 'info');
         
-        const response = await fetch(`${API_URL}/users`);
+        // Usar el nuevo endpoint de login
+        const response = await fetch(`${API_URL}/users/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(loginData)
+        });
+        
         const result = await response.json();
         
+        console.log('🔍 Respuesta del login:', result);
+        
         if (result.success) {
-            const user = result.data.find(u => 
-                (u.username === loginData.username || u.email === loginData.username)
-            );
+            showToast('✅ ¡Login exitoso!', 'success');
+            closeModal('login');
+            localStorage.setItem('currentUser', JSON.stringify(result.user));
             
-            if (user) {
-                showToast('✅ ¡Login exitoso!', 'success');
-                closeModal('login');
-                localStorage.setItem('currentUser', JSON.stringify(user));
-                
-                setTimeout(() => {
-                    window.location.href = 'pages/dashboard.html';
-                }, 1000);
-            } else {
-                showToast('❌ Usuario o contraseña incorrectos', 'error');
-            }
+            setTimeout(() => {
+                window.location.href = 'pages/dashboard.html';
+            }, 1000);
         } else {
-            showToast('❌ Error al cargar usuarios', 'error');
+            showToast(`❌ ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error en login:', error);
@@ -334,7 +464,6 @@ function showToast(message, type = 'success') {
     
     toastMessage.textContent = message;
     
-    // Cambiar estilo según el tipo
     switch (type) {
         case 'error':
             toast.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
@@ -353,11 +482,9 @@ function showToast(message, type = 'success') {
     
     toast.style.display = 'flex';
     
-    // Auto-ocultar después de 4 segundos
     setTimeout(() => {
         toast.style.display = 'none';
     }, 4000);
 }
 
-// Debug: Verificar que todo esté cargado
 console.log('✅ auth.js cargado correctamente');

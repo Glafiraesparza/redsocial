@@ -59,6 +59,11 @@ function initializeDashboard() {
     initializeMediaTypeButtons();
     
     console.log('✅ Dashboard inicializado correctamente');
+
+    setTimeout(() => {
+        initializeMediaTypeButtons();
+        debugMediaContainers(); // Para verificar
+    }, 500);
 }
 
 
@@ -121,62 +126,71 @@ function initializeEventListeners() {
 function initializeMediaEventListeners() {
     console.log('🔧 Inicializando event listeners de multimedia...');
     
-    // Remover event listeners existentes primero
+    // Los inputs ya están en el HTML con onchange, pero agregamos también addEventListener
     const postImageInput = document.getElementById('postImage');
     const postAudioInput = document.getElementById('postAudio');
     const postVideoInput = document.getElementById('postVideo');
     
-    // Clonar y reemplazar para limpiar event listeners
     if (postImageInput) {
-        const newImageInput = postImageInput.cloneNode(true);
-        postImageInput.parentNode.replaceChild(newImageInput, postImageInput);
+        postImageInput.addEventListener('change', handleImageUpload);
     }
-    
     if (postAudioInput) {
-        const newAudioInput = postAudioInput.cloneNode(true);
-        postAudioInput.parentNode.replaceChild(newAudioInput, postAudioInput);
+        postAudioInput.addEventListener('change', handleAudioUpload);
     }
-    
     if (postVideoInput) {
-        const newVideoInput = postVideoInput.cloneNode(true);
-        postVideoInput.parentNode.replaceChild(newVideoInput, postVideoInput);
+        postVideoInput.addEventListener('change', handleVideoUpload);
     }
     
-    // Agregar nuevos event listeners
-    document.getElementById('postImage').addEventListener('change', handleImageUpload);
-    document.getElementById('postAudio').addEventListener('change', handleAudioUpload);
-    document.getElementById('postVideo').addEventListener('change', handleVideoUpload);
+    console.log('✅ Event listeners de multimedia inicializados');
 }
 
 function initializeMediaTypeButtons() {
     console.log('🔧 Inicializando botones de tipo de medio...');
     
+    // Verificar que los elementos existen primero
+    const buttons = document.querySelectorAll('.media-type-btn');
+    if (buttons.length === 0) {
+        console.error('❌ No se encontraron botones de tipo de medio');
+        return;
+    }
+    
+    console.log(`✅ Encontrados ${buttons.length} botones`);
+    
     // Remover event listeners existentes
-    document.querySelectorAll('.media-type-btn').forEach(btn => {
+    buttons.forEach(btn => {
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
     });
     
-    // Agregar nuevos event listeners usando addEventListener
+    // Agregar nuevos event listeners
     document.querySelectorAll('.media-type-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            const type = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+            e.stopPropagation();
+            
+            const type = this.getAttribute('data-type');
+            console.log('🎯 Botón clickeado, tipo:', type);
+            
+            if (!type) {
+                console.error('❌ Botón sin data-type:', this);
+                return;
+            }
+            
             changeMediaType(type);
         });
     });
     
-    // Establecer imagen como tipo por defecto
-    currentMediaType = 'imagen';
-    document.getElementById('imageUpload').style.display = 'block';
-    document.getElementById('audioUpload').style.display = 'none';
-    document.getElementById('videoUpload').style.display = 'none';
+    // Estado inicial
+    currentMediaType = null;
     
-    // Establecer botón activo
-    const imageBtn = document.querySelector('[onclick*="imagen"]');
-    if (imageBtn) {
-        imageBtn.classList.add('active');
-    }
+    // Ocultar contenedores (con verificación)
+    const containers = ['imageUpload', 'audioUpload', 'videoUpload'];
+    containers.forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+            container.style.display = 'none';
+        }
+    });
     
     console.log('✅ Botones de tipo de medio inicializados');
 }
@@ -811,6 +825,14 @@ function editPost(postId) {
     openModal('edit');
 }
 
+function openFileSelector(type) {
+    const fileInput = document.getElementById(`post${type.charAt(0).toUpperCase() + type.slice(1)}`);
+    if (fileInput) {
+        // Limpiar el valor anterior para permitir seleccionar el mismo archivo otra vez
+        fileInput.value = '';
+        fileInput.click();
+    }
+}
 
 
 // Función para inicializar eventos del modal de edición
@@ -4269,8 +4291,8 @@ function resetPostForm() {
     document.getElementById('audioPreview').innerHTML = '';
     document.getElementById('videoPreview').innerHTML = '';
     
-    // Resetear a tipo imagen por defecto
-    document.getElementById('imageUpload').style.display = 'block';
+    // Resetear a ningún tipo seleccionado
+    document.getElementById('imageUpload').style.display = 'none';
     document.getElementById('audioUpload').style.display = 'none';
     document.getElementById('videoUpload').style.display = 'none';
     
@@ -4278,32 +4300,64 @@ function resetPostForm() {
     document.getElementById('postAudio').value = '';
     document.getElementById('postVideo').value = '';
     
-    currentMediaType = 'imagen';
+    currentMediaType = null;
     
     // Resetear botones activos
     document.querySelectorAll('.media-type-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    document.querySelector('[onclick="changeMediaType(\'imagen\')"]').classList.add('active');
 }
 
 function changeMediaType(type) {
     console.log('🔄 Cambiando tipo de medio a:', type);
     
+    // Si ya está seleccionado este tipo, DESELECCIONAR
+    if (currentMediaType === type) {
+        console.log('ℹ️ Deseleccionando tipo:', type);
+        deselectMediaType();
+        return;
+    }
+    
     currentMediaType = type;
     
-    // Ocultar todos los uploaders
-    document.getElementById('imageUpload').style.display = 'none';
-    document.getElementById('audioUpload').style.display = 'none';
-    document.getElementById('videoUpload').style.display = 'none';
+    // Ocultar todos los uploaders - CON VERIFICACIÓN
+    const containers = {
+        imagen: document.getElementById('imageUpload'),
+        audio: document.getElementById('audioUpload'), 
+        video: document.getElementById('videoUpload')
+    };
     
-    // Limpiar previews
-    document.getElementById('imagePreview').innerHTML = '';
-    document.getElementById('audioPreview').innerHTML = '';
-    document.getElementById('videoPreview').innerHTML = '';
+    // Verificar que todos los contenedores existen
+    Object.values(containers).forEach(container => {
+        if (container) {
+            container.style.display = 'none';
+        } else {
+            console.error('❌ Contenedor no encontrado:', container);
+        }
+    });
     
-    // Mostrar el uploader seleccionado
-    document.getElementById(`${type}Upload`).style.display = 'block';
+    // Limpiar previews - CON VERIFICACIÓN
+    const previews = {
+        imagen: document.getElementById('imagePreview'),
+        audio: document.getElementById('audioPreview'),
+        video: document.getElementById('videoPreview')
+    };
+    
+    Object.values(previews).forEach(preview => {
+        if (preview) {
+            preview.innerHTML = '';
+        }
+    });
+    
+    // Mostrar el uploader seleccionado - CON VERIFICACIÓN
+    const selectedContainer = containers[type];
+    if (selectedContainer) {
+        selectedContainer.style.display = 'block';
+        console.log(`✅ Mostrando contenedor: ${type}Upload`);
+    } else {
+        console.error(`❌ No se pudo encontrar el contenedor: ${type}Upload`);
+        return; // Salir si no existe el contenedor
+    }
     
     // Actualizar botones activos
     document.querySelectorAll('.media-type-btn').forEach(btn => {
@@ -4311,19 +4365,68 @@ function changeMediaType(type) {
     });
     
     // Encontrar y activar el botón correcto
-    const activeButton = Array.from(document.querySelectorAll('.media-type-btn')).find(btn => 
-        btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${type}'`)
-    );
-    
+    const activeButton = document.querySelector(`[data-type="${type}"]`);
     if (activeButton) {
         activeButton.classList.add('active');
+        console.log(`✅ Botón ${type} activado`);
     }
     
-    // Resetear inputs de archivo
-    document.getElementById('postImage').value = '';
-    document.getElementById('postAudio').value = '';
-    document.getElementById('postVideo').value = '';
+    console.log('✅ Tipo de medio cambiado a:', type);
 }
+
+// Nueva función para deseleccionar
+function deselectMediaType() {
+    console.log('🗑️ Deseleccionando tipo de medio');
+    
+    currentMediaType = null;
+    
+    // Ocultar todos los uploaders - CON VERIFICACIÓN
+    const containers = [
+        document.getElementById('imageUpload'),
+        document.getElementById('audioUpload'),
+        document.getElementById('videoUpload')
+    ];
+    
+    containers.forEach(container => {
+        if (container) {
+            container.style.display = 'none';
+        }
+    });
+    
+    // Limpiar previews - CON VERIFICACIÓN
+    const previews = [
+        document.getElementById('imagePreview'),
+        document.getElementById('audioPreview'), 
+        document.getElementById('videoPreview')
+    ];
+    
+    previews.forEach(preview => {
+        if (preview) {
+            preview.innerHTML = '';
+        }
+    });
+    
+    // Resetear botones activos
+    document.querySelectorAll('.media-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Limpiar inputs de archivo - CON VERIFICACIÓN
+    const inputs = [
+        document.getElementById('postImage'),
+        document.getElementById('postAudio'),
+        document.getElementById('postVideo')
+    ];
+    
+    inputs.forEach(input => {
+        if (input) {
+            input.value = '';
+        }
+    });
+    
+    console.log('✅ Tipo de medio deseleccionado');
+}
+
 
 // Funciones para manejar la vista previa de audio y video
 function handleAudioUpload(event) {
