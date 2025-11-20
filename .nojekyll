@@ -1,0 +1,11 @@
+source: "frontend"
+
+exclude:
+  - backend/
+  - node_modules/
+  - backend/node_modules/
+  - .env
+  - .gitignore
+  - README.md
+
+title: "Red Social"
