@@ -1347,37 +1347,107 @@ async function handleLike(postId) {
     }
 }
 
-// ========== FUNCIONALIDAD DE SHARES ==========
+// handleShare:
 async function handleShare(postId) {
     try {
+        console.log('🔄 Intentando compartir publicación:', postId);
+        
         const response = await fetch(`${API_URL}/posts/${postId}/share`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ 
+                userId: currentUser._id 
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            // Actualizar contador en el botón
+            const shareBtn = document.getElementById(`shareBtn-${postId}`);
+            if (shareBtn) {
+                const shareCount = shareBtn.querySelector('span');
+                shareCount.textContent = result.data.sharesCount;
+            }
+            
+            showToast('✅ Publicación compartida exitosamente', 'success');
+            
+            // Recargar el feed
+            setTimeout(() => {
+                if (document.getElementById('feedSection').classList.contains('active')) {
+                    loadFeed();
+                }
+                if (document.getElementById('exploreSection').classList.contains('active')) {
+                    loadExplorePosts();
+                }
+            }, 1000);
+            
+        } else {
+            console.error('❌ Error al compartir:', result.error);
+            
+            // Mostrar mensajes de error específicos
+            if (result.error.includes('bloqueado')) {
+                showToast(`❌ ${result.error}`, 'error');
+            } else if (result.error.includes('Ya compartiste')) {
+                showToast('⚠️ Ya compartiste esta publicación', 'info');
+            } else if (result.error.includes('ya es compartida')) {
+                showToast('⚠️ No puedes compartir una publicación compartida', 'info');
+            } else {
+                showToast(`❌ ${result.error}`, 'error');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error compartiendo publicación:', error);
+        showToast('❌ Error de conexión al compartir', 'error');
+    }
+}
+
+// Función para verificar si ya compartió un post
+async function checkIfShared(postId) {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/shares/check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
         });
         
         const result = await response.json();
-        
-        if (result.success) {
-            const shareBtn = document.getElementById(`shareBtn-${postId}`);
-            const shareCount = shareBtn.querySelector('span');
-            
-            shareCount.textContent = result.data.sharesCount;
-            showToast('✅ Publicación compartida exitosamente', 'success');
-            
-            // Recargar el feed para mostrar el nuevo post compartido
-            setTimeout(() => {
-                loadFeed();
-            }, 1000);
-            
-        } else {
-            showToast(`❌ ${result.error}`, 'error');
-        }
+        return result.success && result.data.hasShared;
     } catch (error) {
-        console.error('Error compartiendo publicación:', error);
-        showToast('❌ Error al compartir la publicación', 'error');
+        console.error('Error verificando share:', error);
+        return false;
     }
 }
+
+// Y agrega esta ruta en el backend:
+router.post('/:postId/shares/check', async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { userId } = req.body;
+
+        const existingShare = await Post.findOne({
+            tipo: 'share',
+            postOriginal: postId,
+            autor: userId
+        });
+
+        res.json({
+            success: true,
+            data: {
+                hasShared: !!existingShare
+            }
+        });
+    } catch (error) {
+        console.error('Error verificando share:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 
 // ========== MODAL DE PUBLICACIÓN ==========
 async function viewPost(postId) {
@@ -2116,6 +2186,42 @@ function showSection(sectionId) {
                 }
             }, 100);
             break;
+        case 'notifications':
+            console.log('🔔 Inicializando notificaciones...');
+                setTimeout(() => {
+                    if (typeof loadNotifications === 'function') {
+                        loadNotifications();
+                    } else {
+                        console.error('❌ loadNotifications no está definido');
+                        // Forzar carga manual
+                        initializeNotificationsFallback();
+                    }
+                }, 100);
+            break;
+    }
+}
+
+// Función de respaldo para notificaciones
+function initializeNotificationsFallback() {
+    console.log('🔄 Usando fallback para notificaciones...');
+    
+    // Verificar si las funciones existen en el scope global
+    if (window.loadNotifications) {
+        window.loadNotifications();
+    } else {
+        console.error('❌ loadNotifications no está disponible en el scope global');
+        // Mostrar mensaje de error al usuario
+        const container = document.getElementById('notificationsList');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error al cargar notificaciones</h3>
+                    <p>Recarga la página o verifica la conexión.</p>
+                    <button class="btn-primary" onclick="location.reload()">Recargar página</button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -2174,47 +2280,217 @@ async function loadUserProfile() {
 async function loadExplore() {
     const exploreContent = document.getElementById('exploreContent');
     
-    try {
-        exploreContent.innerHTML = `
+    exploreContent.innerHTML = `
+        <div class="explore-search-container">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="exploreSearchInput" placeholder="Buscar publicaciones por palabras clave, hashtags (#musica, #arte)...">
+                <button id="searchButton" class="btn-primary">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+                <button id="clearSearch" class="btn-secondary" style="display: none;">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
+            </div>
+            <div class="search-filters">
+                <div class="filter-tags">
+                    <span class="filter-label">Buscar en:</span>
+                    <label class="filter-checkbox" data-tooltip="Buscar en el texto de las publicaciones">
+                        <input type="checkbox" id="searchInText" checked> Texto
+                    </label>
+                    <label class="filter-checkbox" data-tooltip="Buscar en hashtags (#ejemplo)">
+                        <input type="checkbox" id="searchInHashtags" checked> Hashtags
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="search-results-header">
+            <h3 id="resultsTitle"><i class="fas fa-compass"></i> Publicaciones Recientes</h3>
+            <div id="resultsCount" class="results-count"></div>
+        </div>
+        
+        <div class="posts-feed" id="explorePostsFeed">
             <div class="loading-state">
                 <i class="fas fa-spinner fa-spin"></i>
                 <p>Cargando publicaciones...</p>
             </div>
+        </div>
+    `;
+
+    // Inicializar event listeners para búsqueda
+    initializeExploreSearch();
+    
+    // Cargar publicaciones iniciales
+    await loadExplorePosts();
+}
+
+function initializeExploreSearch() {
+    const searchInput = document.getElementById('exploreSearchInput');
+    const searchButton = document.getElementById('searchButton');
+    const clearButton = document.getElementById('clearSearch');
+    
+    // Buscar al hacer click en el botón
+    searchButton.addEventListener('click', performSearch);
+    
+    // Buscar al presionar Enter
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            performSearch();
+        }
+    });
+    
+    // Limpiar búsqueda
+    clearButton.addEventListener('click', clearSearch);
+    
+    // Buscar en tiempo real mientras se escribe (opcional)
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        if (e.target.value.length >= 3) {
+            searchTimeout = setTimeout(performSearch, 500);
+        } else if (e.target.value.length === 0) {
+            clearSearch();
+        }
+    });
+}
+
+function clearSearch() {
+    document.getElementById('exploreSearchInput').value = '';
+    document.getElementById('clearSearch').style.display = 'none';
+    loadExplorePosts();
+}
+
+async function performSearch() {
+    const searchTerm = document.getElementById('exploreSearchInput').value.trim();
+    const searchInText = document.getElementById('searchInText').checked;
+    const searchInHashtags = document.getElementById('searchInHashtags').checked;
+    
+    if (!searchTerm) {
+        showToast('❌ Ingresa un término de búsqueda', 'error');
+        return;
+    }
+    
+    await loadExplorePosts(searchTerm, searchInText, searchInHashtags);
+}
+
+async function loadExplorePosts(searchTerm = '', searchInText = true, searchInHashtags = true) {
+    const explorePostsFeed = document.getElementById('explorePostsFeed');
+    const resultsTitle = document.getElementById('resultsTitle');
+    const resultsCount = document.getElementById('resultsCount');
+    const clearButton = document.getElementById('clearSearch');
+    
+    try {
+        explorePostsFeed.innerHTML = `
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>${searchTerm ? 'Buscando...' : 'Cargando publicaciones...'}</p>
+            </div>
         `;
 
-        const response = await fetch(`${API_URL}/posts?limit=20`);
+        // Construir parámetros de búsqueda
+        const params = new URLSearchParams();
+        
+        if (searchTerm) {
+            params.append('search', searchTerm);
+            params.append('searchInText', searchInText);
+            params.append('searchInHashtags', searchInHashtags);
+        }
+        
+        params.append('limit', '50');
+        params.append('excludeBlocked', 'true');
+        params.append('currentUserId', currentUser._id);
+
+        const response = await fetch(`${API_URL}/posts/explore?${params.toString()}`);
         const result = await response.json();
         
         if (result.success) {
-            exploreContent.innerHTML = `
-                <h3 style="color: #2c3e50; margin-bottom: 1.5rem; font-size: 1.4rem;">
-                    <i class="fas fa-compass"></i> Explorar Publicaciones
-                </h3>
-                <div class="posts-feed" id="explorePostsFeed">
-                    ${result.data.map(post => createPostHTML(post)).join('')}
-                </div>
-            `;
+            const posts = result.data;
             
-            initializePostInteractions('explorePostsFeed', result.data);
+            // Actualizar UI según si hay búsqueda o no
+            if (searchTerm) {
+                resultsTitle.innerHTML = `<i class="fas fa-search"></i> Resultados de búsqueda`;
+                resultsCount.textContent = `${posts.length} ${posts.length === 1 ? 'resultado' : 'resultados'}`;
+                resultsCount.style.display = 'block';
+                clearButton.style.display = 'inline-block';
+            } else {
+                resultsTitle.innerHTML = `<i class="fas fa-compass"></i> Explorar Publicaciones`;
+                resultsCount.textContent = '';
+                resultsCount.style.display = 'none';
+                clearButton.style.display = 'none';
+            }
+            
+            if (posts.length === 0) {
+                explorePostsFeed.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-${searchTerm ? 'search' : 'newspaper'}"></i>
+                        <h3>${searchTerm ? 'No se encontraron resultados' : 'No hay publicaciones para explorar'}</h3>
+                        <p>${searchTerm ? 
+                            'Intenta con otros términos de búsqueda o ajusta los filtros.' : 
+                            'Sigue a más usuarios o publica contenido para ver más publicaciones aquí.'
+                        }</p>
+                    </div>
+                `;
+            } else {
+                explorePostsFeed.innerHTML = posts.map(post => createPostHTML(post)).join('');
+                initializePostInteractions('explorePostsFeed', posts);
+                
+                // Resaltar términos de búsqueda si hay búsqueda activa
+                if (searchTerm) {
+                    highlightSearchTerms(searchTerm);
+                }
+            }
             
         } else {
-            exploreContent.innerHTML = `
+            explorePostsFeed.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-triangle" style="color: #e74c3c; font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <i class="fas fa-exclamation-triangle"></i>
                     <p>Error al cargar las publicaciones</p>
+                    <button class="btn-secondary" onclick="loadExplorePosts()">Reintentar</button>
                 </div>
             `;
         }
     } catch (error) {
         console.error('Error cargando exploración:', error);
-        exploreContent.innerHTML = `
+        explorePostsFeed.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-wifi" style="color: #e74c3c; font-size: 2rem; margin-bottom: 1rem;"></i>
+                <i class="fas fa-wifi"></i>
                 <p>Error de conexión al cargar exploración</p>
+                <button class="btn-secondary" onclick="loadExplorePosts()">Reintentar</button>
             </div>
         `;
     }
 }
+
+function highlightSearchTerms(searchTerm) {
+    const postsFeed = document.getElementById('explorePostsFeed');
+    const searchTerms = searchTerm.toLowerCase().split(' ').filter(term => term.length > 2);
+    
+    if (searchTerms.length === 0) return;
+    
+    // Buscar en contenido de publicaciones
+    const postContents = postsFeed.querySelectorAll('.post-content');
+    postContents.forEach(content => {
+        let html = content.innerHTML;
+        searchTerms.forEach(term => {
+            const regex = new RegExp(`(${term})`, 'gi');
+            html = html.replace(regex, '<mark class="search-highlight">$1</mark>');
+        });
+        content.innerHTML = html;
+    });
+    
+    // Buscar en hashtags
+    const hashtags = postsFeed.querySelectorAll('.hashtag');
+    hashtags.forEach(hashtag => {
+        let html = hashtag.innerHTML;
+        searchTerms.forEach(term => {
+            const regex = new RegExp(`(${term})`, 'gi');
+            html = html.replace(regex, '<mark class="search-highlight">$1</mark>');
+        });
+        hashtag.innerHTML = html;
+    });
+}
+
 
 async function loadUsers() {
     const usersList = document.getElementById('usersList');
@@ -2223,11 +2499,108 @@ async function loadUsers() {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
         
         usersList.innerHTML = `
-            <div class="loading-state">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Cargando usuarios...</p>
+            <div class="users-section-container">
+                <!-- BARRA DE BÚSQUEDA MEJORADA -->
+                <div class="users-search-section">
+                    <div class="search-header">
+                        <h3><i class="fas fa-search"></i> Buscar Usuarios</h3>
+                        <p>Encuentra personas para conectar</p>
+                    </div>
+                    
+                    <div class="search-controls">
+                        <div class="search-input-group">
+                            <div class="search-input-container">
+                                <input 
+                                    type="text" 
+                                    id="usersSearchInput" 
+                                    placeholder="Buscar por nombre, usuario o intereses..." 
+                                    maxlength="100"
+                                >
+                                <i class="fas fa-search search-icon"></i>
+                                <button class="btn-clear-search" id="clearSearchBtn" style="display: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="search-filters">
+                            <div class="filter-group">
+                                <label>Buscar por:</label>
+                                <select id="searchTypeSelect">
+                                    <option value="both">Nombre y Usuario</option>
+                                    <option value="name">Solo Nombre</option>
+                                    <option value="username">Solo Usuario</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="includeInterestsCheckbox">
+                                    <span class="checkmark"></span>
+                                    Incluir búsqueda en intereses
+                                </label>
+                            </div>
+                            
+                            <button class="btn-primary" id="searchUsersBtn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN DE USUARIOS RECOMENDADOS -->
+                <div class="recommended-users-section" id="recommendedUsersSection">
+                    <div class="section-header">
+                        <h4><i class="fas fa-users"></i> Usuarios Recomendados</h4>
+                        <p>Personas con intereses similares a los tuyos</p>
+                    </div>
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando recomendaciones...</p>
+                    </div>
+                </div>
+
+                <!-- LISTA DE USUARIOS -->
+                <div class="all-users-section">
+                    <div class="section-header">
+                        <h4><i class="fas fa-users"></i> Todos los Usuarios</h4>
+                        <p>Conecta con otros usuarios de la comunidad</p>
+                    </div>
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando usuarios...</p>
+                    </div>
+                </div>
             </div>
         `;
+
+        // Inicializar event listeners de búsqueda
+        initializeSearchListeners();
+        
+        // Cargar usuarios recomendados
+        await loadRecommendedUsers();
+        
+        // Cargar todos los usuarios
+        await loadAllUsers();
+
+    } catch (error) {
+        console.error('Error cargando usuarios:', error);
+        const usersList = document.getElementById('usersList');
+        usersList.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar usuarios</p>
+                <button class="btn-primary" onclick="loadUsers()">Reintentar</button>
+            </div>
+        `;
+    }
+}
+
+// Función para cargar todos los usuarios
+async function loadAllUsers() {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        const allUsersSection = document.querySelector('.all-users-section');
 
         const response = await fetch(`${API_URL}/users`);
         const result = await response.json();
@@ -2243,34 +2616,308 @@ async function loadUsers() {
                 })
             );
             
-            usersList.innerHTML = `
+            allUsersSection.innerHTML = `
                 <div class="section-header">
-                    <h3><i class="fas fa-users"></i> Todos los Usuarios</h3>
+                    <h4><i class="fas fa-users"></i> Todos los Usuarios</h4>
                     <p>Conecta con otros usuarios de la comunidad</p>
                 </div>
-                <div class="users-grid" id="usersGrid">
+                <div class="users-grid" id="allUsersGrid">
                     ${usersWithFollowStatus.map(user => createUserCardHTML(user)).join('')}
                 </div>
             `;
             
         } else {
-            usersList.innerHTML = `
-                <div class="empty-state">
+            allUsersSection.innerHTML = `
+                <div class="error-state">
                     <i class="fas fa-exclamation-triangle"></i>
                     <p>Error al cargar usuarios</p>
                 </div>
             `;
         }
     } catch (error) {
-        console.error('Error cargando usuarios:', error);
-        usersList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-wifi"></i>
-                <p>Error de conexión</p>
+        console.error('Error cargando todos los usuarios:', error);
+        const allUsersSection = document.querySelector('.all-users-section');
+        allUsersSection.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar usuarios</p>
             </div>
         `;
     }
 }
+
+// Función para crear tarjeta de usuario recomendado
+function createRecommendedUserCardHTML(user) {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    const isCurrentUser = currentUser._id === user._id;
+    const isFollowing = currentUser.seguidos?.includes(user._id);
+    const commonInterests = user.commonInterests || 0;
+
+    // Encontrar intereses en común
+    const currentUserInterests = currentUser.intereses || [];
+    const userInterests = user.intereses || [];
+    const commonInterestsList = currentUserInterests.filter(interest => 
+        userInterests.includes(interest)
+    ).slice(0, 3); // Mostrar máximo 3 intereses en común
+
+    return `
+        <div class="recommended-user-card" data-user-id="${user._id}">
+            <div class="recommended-badge">
+                <i class="fas fa-heart"></i>
+                ${commonInterests} intereses en común
+            </div>
+            
+            <div class="user-card-header">
+                <div class="user-avatar-medium" onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer;">
+                    ${user.foto_perfil ? 
+                        `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
+                        `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <div class="user-info">
+                    <h4 onclick="navigateToUserProfile('${user._id}')" style="cursor: pointer; color: #3498db;">
+                        ${user.nombre}
+                    </h4>
+                    <p class="user-username">@${user.username}</p>
+                    ${user.biografia ? `<p class="user-bio">${user.biografia}</p>` : ''}
+                </div>
+            </div>
+            
+            ${commonInterestsList.length > 0 ? `
+                <div class="common-interests">
+                    <strong>Intereses en común:</strong>
+                    <div class="interests-tags">
+                        ${commonInterestsList.map(interest => `
+                            <span class="interest-tag-small">${interest}</span>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="user-stats">
+                <div class="stat">
+                    <strong>${user.seguidores?.length || 0}</strong>
+                    <span>Seguidores</span>
+                </div>
+                <div class="stat">
+                    <strong>${user.seguidos?.length || 0}</strong>
+                    <span>Seguidos</span>
+                </div>
+            </div>
+            
+            <div class="user-actions">
+                <button class="btn-view-profile" onclick="navigateToUserProfile('${user._id}')">
+                    <i class="fas fa-eye"></i> Ver Perfil
+                </button>
+                ${!isCurrentUser ? `
+                    <button class="btn-follow ${isFollowing ? 'following' : ''}" 
+                            onclick="toggleFollow('${user._id}')">
+                        <i class="fas ${isFollowing ? 'fa-user-check' : 'fa-user-plus'}"></i>
+                        ${isFollowing ? 'Siguiendo' : 'Seguir'}
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Función para cargar usuarios recomendados
+async function loadRecommendedUsers() {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        const recommendedSection = document.getElementById('recommendedUsersSection');
+
+        // URL CORREGIDA - usar /recommendations/:userId en lugar de /:id/recommendations
+        const recommendationsUrl = `${API_URL}/users/recommendations/${currentUser._id}`;
+        console.log('🔍 URL de recomendaciones:', recommendationsUrl);
+        
+        const response = await fetch(recommendationsUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('📨 Status de respuesta:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log('📊 Resultado de recomendaciones:', result);
+
+        if (result.success) {
+            if (result.data.length === 0) {
+                recommendedSection.innerHTML = `
+                    <div class="section-header">
+                        <h4><i class="fas fa-users"></i> Usuarios Recomendados</h4>
+                        <p>Personas con intereses similares a los tuyos</p>
+                    </div>
+                    <div class="empty-state">
+                        <i class="fas fa-user-friends"></i>
+                        <p>No hay recomendaciones disponibles</p>
+                        <small>Agrega más intereses a tu perfil para obtener mejores recomendaciones</small>
+                    </div>
+                `;
+            } else {
+                recommendedSection.innerHTML = `
+                    <div class="section-header">
+                        <h4><i class="fas fa-users"></i> Usuarios Recomendados</h4>
+                        <p>Personas con intereses similares a los tuyos</p>
+                    </div>
+                    <div class="recommended-users-grid">
+                        ${result.data.map(user => createRecommendedUserCardHTML(user)).join('')}
+                    </div>
+                `;
+            }
+        } else {
+            recommendedSection.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error al cargar recomendaciones</p>
+                    <small>${result.error}</small>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error cargando recomendaciones:', error);
+        const recommendedSection = document.getElementById('recommendedUsersSection');
+        recommendedSection.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error al cargar recomendaciones</p>
+                <small>${error.message}</small>
+            </div>
+        `;
+    }
+}
+
+function initializeSearchListeners() {
+    const searchInput = document.getElementById('usersSearchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const searchBtn = document.getElementById('searchUsersBtn');
+    const includeInterestsCheckbox = document.getElementById('includeInterestsCheckbox');
+
+    // Buscar al hacer clic en el botón
+    searchBtn.addEventListener('click', performUsersSearch);
+
+    // Buscar al presionar Enter
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            performUsersSearch();
+        }
+    });
+
+    // Limpiar búsqueda
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        loadAllUsers(); // Recargar todos los usuarios
+    });
+
+    // Mostrar/ocultar botón de limpiar
+    searchInput.addEventListener('input', () => {
+        clearSearchBtn.style.display = searchInput.value ? 'block' : 'none';
+    });
+
+    // También buscar cuando se cambia el checkbox
+    includeInterestsCheckbox.addEventListener('change', () => {
+        if (searchInput.value.trim()) {
+            performUsersSearch();
+        }
+    });
+}
+
+// EN dashboard.js - FUNCIÓN performUsersSearch() CORREGIDA
+async function performUsersSearch() {
+    const searchInput = document.getElementById('usersSearchInput');
+    const searchTypeSelect = document.getElementById('searchTypeSelect');
+    const includeInterestsCheckbox = document.getElementById('includeInterestsCheckbox');
+    
+    const query = searchInput.value.trim();
+    const searchBy = searchTypeSelect.value;
+    const includeInterests = includeInterestsCheckbox.checked;
+
+    if (!query) {
+        showToast('❌ Por favor ingresa un término de búsqueda', 'error');
+        return;
+    }
+
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('🔍 Buscando usuarios...', 'info');
+
+        // VERIFICAR QUE LA URL ESTÉ CORRECTA
+        const searchUrl = `${API_URL}/users/search`;
+        console.log('🔍 URL de búsqueda:', searchUrl);
+        
+        const response = await fetch(searchUrl, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                currentUserId: currentUser._id,
+                query: query,
+                searchBy: searchBy,
+                includeInterests: includeInterests
+            })
+        });
+
+        console.log('📨 Status de respuesta:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('📊 Resultado de búsqueda:', result);
+
+        if (result.success) {
+            const allUsersSection = document.querySelector('.all-users-section');
+            
+            if (result.data.length === 0) {
+                allUsersSection.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <h4>No se encontraron usuarios</h4>
+                        <p>No hay resultados para "${query}". Intenta con otros términos.</p>
+                        <button class="btn-secondary" onclick="loadAllUsers()">
+                            Ver todos los usuarios
+                        </button>
+                    </div>
+                `;
+            } else {
+                allUsersSection.innerHTML = `
+                    <div class="section-header">
+                        <h4><i class="fas fa-search"></i> Resultados de Búsqueda</h4>
+                        <p>${result.data.length} usuarios encontrados para "${query}"</p>
+                        <button class="btn-secondary btn-small" onclick="loadAllUsers()">
+                            <i class="fas fa-times"></i> Limpiar búsqueda
+                        </button>
+                    </div>
+                    <div class="users-grid" id="searchResultsGrid">
+                        ${result.data.map(user => createUserCardHTML(user)).join('')}
+                    </div>
+                `;
+            }
+            
+            showToast(`✅ ${result.data.length} usuarios encontrados`, 'success');
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error en búsqueda:', error);
+        showToast('❌ Error de conexión al buscar usuarios', 'error');
+    }
+}
+
 
 
 // En createUserCardHTML - SIMPLIFICA el HTML
@@ -3796,7 +4443,6 @@ function viewUserProfile(userId) {
     navigateToUserProfile(userId);
 }
 
-// Modificar la función createPostHTML para hacer los nombres clickeables
 function createPostHTML(post) {
     const isLiked = post.likes.some(like => 
         typeof like === 'object' ? like._id === currentUser._id : like === currentUser._id
@@ -3809,6 +4455,9 @@ function createPostHTML(post) {
     const isSharedPost = post.tipo === 'share';
     const hasOriginalPost = isSharedPost && post.postOriginal;
     const isAuthor = post.autor._id === currentUser._id;
+
+    // NUEVO: Determinar si el post puede ser compartido
+    const canBeShared = !isSharedPost; // Solo posts originales pueden ser compartidos
 
     return `
         <div class="post-card" id="post-${post._id}">
@@ -3966,10 +4615,19 @@ function createPostHTML(post) {
                     <i class="fas fa-comment"></i>
                     <span>${post.comentarios?.length || 0}</span>
                 </button>
-                <button class="post-action" id="shareBtn-${post._id}">
-                    <i class="fas fa-share"></i>
-                    <span>${shareCount}</span>
-                </button>
+                
+                <!-- BOTÓN DE SHARE MEJORADO - DESHABILITADO PARA POSTS COMPARTIDOS -->
+                ${canBeShared ? `
+                    <button class="post-action" id="shareBtn-${post._id}" onclick="handleShare('${post._id}')">
+                        <i class="fas fa-share"></i>
+                        <span>${shareCount}</span>
+                    </button>
+                ` : `
+                    <button class="post-action disabled" id="shareBtn-${post._id}" disabled title="No se pueden compartir publicaciones compartidas">
+                        <i class="fas fa-share disabled-icon"></i>
+                        <span>${shareCount}</span>
+                    </button>
+                `}
             </div>
         </div>
     `;

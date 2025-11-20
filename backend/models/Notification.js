@@ -22,11 +22,6 @@ const notificationSchema = new mongoose.Schema({
     ref: 'Post',
     default: null
   },
-  conversacion: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Conversacion',
-    default: null
-  },
   comentario: {
     type: String,
     default: ''
@@ -38,7 +33,6 @@ const notificationSchema = new mongoose.Schema({
   expiracion: {
     type: Date,
     default: function() {
-      // Las notificaciones expiran después de 30 días
       const date = new Date();
       date.setDate(date.getDate() + 30);
       return date;
@@ -52,14 +46,8 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Índices para mejor performance
 notificationSchema.index({ usuario: 1, leida: 1 });
 notificationSchema.index({ fecha_creacion: -1 });
 notificationSchema.index({ expiracion: 1 }, { expireAfterSeconds: 0 });
-
-// Middleware para limpiar notificaciones expiradas automáticamente
-notificationSchema.pre('find', function() {
-  this.where({ expiracion: { $gt: new Date() } });
-});
 
 module.exports = mongoose.model('Notification', notificationSchema);

@@ -2,6 +2,7 @@
 const express = require('express');
 const User = require('../models/User');
 const router = express.Router();
+const Notification = require('../models/Notification');
 
 // CREATE - Crear usuario
 router.post('/', async (req, res) => {
@@ -35,6 +36,195 @@ router.get('/', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error obteniendo usuarios:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// BÚSQUEDA DE USUARIOS con filtros
+router.post('/search', async (req, res) => {
+    try {
+        const { currentUserId, query, searchBy, includeInterests } = req.body;
+        
+        console.log('🔍 Búsqueda de usuarios:', { query, searchBy, includeInterests });
+
+        if (!currentUserId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere ID del usuario actual'
+            });
+        }
+
+        const currentUser = await User.findById(currentUserId);
+        if (!currentUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario actual no encontrado'
+            });
+        }
+
+        // Construir query de búsqueda
+        let searchQuery = {
+            _id: { $ne: currentUserId } // Excluir al usuario actual
+        };
+
+        // Filtrar usuarios bloqueados y que te han bloqueado
+        const blockedUsers = [
+            ...(currentUser.usuarios_bloqueados || []),
+            ...(currentUser.bloqueado_por || [])
+        ];
+        
+        if (blockedUsers.length > 0) {
+            searchQuery._id.$nin = blockedUsers;
+        }
+
+        // Búsqueda por nombre de usuario o nombre real
+        if (query && query.trim() !== '') {
+            const searchRegex = new RegExp(query.trim(), 'i');
+            
+            if (searchBy === 'username') {
+                searchQuery.username = searchRegex;
+            } else if (searchBy === 'name') {
+                searchQuery.nombre = searchRegex;
+            } else if (searchBy === 'both') {
+                searchQuery.$or = [
+                    { username: searchRegex },
+                    { nombre: searchRegex }
+                ];
+            }
+        }
+
+        // Búsqueda por intereses
+        if (includeInterests && query && query.trim() !== '') {
+            const interestsRegex = new RegExp(query.trim(), 'i');
+            
+            if (searchQuery.$or) {
+                searchQuery.$or.push({ intereses: interestsRegex });
+            } else {
+                searchQuery.$or = [{ intereses: interestsRegex }];
+            }
+        }
+
+        console.log('📋 Query de búsqueda:', JSON.stringify(searchQuery));
+
+        const users = await User.find(searchQuery)
+            .select('nombre username foto_perfil biografia intereses seguidores seguidos')
+            .limit(50);
+
+        console.log(`✅ Encontrados ${users.length} usuarios`);
+
+        res.json({
+            success: true,
+            data: users
+        });
+
+    } catch (error) {
+        console.error('❌ Error en búsqueda de usuarios:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// OBTENER USUARIOS RECOMENDADOS basados en intereses
+router.get('/recommendations/:userId', async (req, res) => {
+    try {
+        const currentUserId = req.params.userId;
+        
+        console.log('🎯 Obteniendo recomendaciones para usuario:', currentUserId);
+
+        const currentUser = await User.findById(currentUserId);
+        if (!currentUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Si el usuario no tiene intereses, devolver usuarios aleatorios
+        if (!currentUser.intereses || currentUser.intereses.length === 0) {
+            console.log('ℹ️ Usuario sin intereses, devolviendo usuarios aleatorios');
+            
+            const randomUsers = await User.find({
+                _id: { 
+                    $ne: currentUserId,
+                    $nin: [
+                        ...(currentUser.usuarios_bloqueados || []),
+                        ...(currentUser.bloqueado_por || [])
+                    ]
+                }
+            })
+            .select('nombre username foto_perfil biografia intereses seguidores seguidos')
+            .limit(10);
+            
+            return res.json({
+                success: true,
+                data: randomUsers
+            });
+        }
+
+        console.log('🔍 Buscando usuarios con intereses similares...');
+
+        // Buscar usuarios con al menos 3 intereses en común
+        const recommendedUsers = await User.aggregate([
+            {
+                $match: {
+                    _id: { 
+                        $ne: currentUser._id,
+                        $nin: [
+                            ...(currentUser.usuarios_bloqueados || []),
+                            ...(currentUser.bloqueado_por || [])
+                        ]
+                    },
+                    intereses: { $in: currentUser.intereses }
+                }
+            },
+            {
+                $addFields: {
+                    commonInterests: {
+                        $size: {
+                            $setIntersection: ["$intereses", currentUser.intereses]
+                        }
+                    }
+                }
+            },
+            {
+                $match: {
+                    commonInterests: { $gte: 3 } // Al menos 3 intereses en común
+                }
+            },
+            {
+                $sort: { commonInterests: -1 } // Ordenar por más intereses en común
+            },
+            {
+                $limit: 15
+            },
+            {
+                $project: {
+                    nombre: 1,
+                    username: 1,
+                    foto_perfil: 1,
+                    biografia: 1,
+                    intereses: 1,
+                    seguidores: 1,
+                    seguidos: 1,
+                    commonInterests: 1
+                }
+            }
+        ]);
+
+        console.log(`✅ ${recommendedUsers.length} usuarios recomendados encontrados`);
+
+        res.json({
+            success: true,
+            data: recommendedUsers
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo recomendaciones:', error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -131,6 +321,14 @@ router.post('/:id/follow', async (req, res) => {
 
         console.log(`✅ ${currentUser.username} sigue a ${targetUser.username}`);
 
+        // ✅ CREAR NOTIFICACIÓN DE FOLLOW - VERSIÓN CORRECTA
+        const notification = new Notification({
+            usuario: targetUserId,
+            emisor: currentUserId,
+            tipo: 'follow'
+        });
+        await notification.save();
+
         res.json({
             success: true,
             message: `Ahora sigues a ${targetUser.nombre}`,
@@ -139,6 +337,7 @@ router.post('/:id/follow', async (req, res) => {
                 seguidos: currentUser.seguidos.length
             }
         });
+        
 
     } catch (error) {
         console.error('❌ Error al seguir usuario:', error);
@@ -666,5 +865,8 @@ router.post('/:userId/can-view-profile', async (req, res) => {
         });
     }
 });
+
+
+
 
 module.exports = router;

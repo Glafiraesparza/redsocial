@@ -4,6 +4,7 @@ const express = require('express');
 const Message = require('../models/Message');
 const Conversacion = require('../models/Conversacion');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const router = express.Router();
 
 // OBTENER todas las conversaciones del usuario
@@ -261,6 +262,27 @@ router.post('/mensaje/enviar', async (req, res) => {
             });
         }
 
+        // Obtener la conversación para encontrar el receptor
+        const conversacion = await Conversacion.findById(conversacionId);
+        if (!conversacion) {
+            return res.status(404).json({
+                success: false,
+                error: 'Conversación no encontrada'
+            });
+        }
+
+        // Encontrar el receptor (el que NO es el remitente)
+        const receptorId = conversacion.participantes.find(
+            participant => participant.toString() !== remitenteId
+        );
+
+        console.log('🔍 Buscando receptor:', {
+            conversacionId,
+            remitenteId,
+            participantes: conversacion.participantes,
+            receptorEncontrado: receptorId
+        });
+
         // Crear mensaje
         const mensaje = new Message({
             conversacion: conversacionId,
@@ -269,6 +291,39 @@ router.post('/mensaje/enviar', async (req, res) => {
         });
 
         await mensaje.save();
+
+        // ✅ CREAR NOTIFICACIÓN DE MENSAJE - AGREGAR ESTE BLOQUE
+        if (receptorId) {
+            try {
+                // Verificar bloqueos mutuos antes de crear notificación
+                const receptor = await User.findById(receptorId);
+                const remitente = await User.findById(remitenteId);
+
+                const estaBloqueado = receptor.usuarios_bloqueados.includes(remitenteId);
+                const loHeBloqueado = remitente.usuarios_bloqueados.includes(receptorId);
+
+                if (!estaBloqueado && !loHeBloqueado) {
+                    const notification = new Notification({
+                        usuario: receptorId,
+                        emisor: remitenteId,
+                        tipo: 'message',
+                        comentario: contenido.substring(0, 100) // Preview del mensaje
+                    });
+                    await notification.save();
+                    
+                    console.log(`📨 Notificación de mensaje creada para: ${receptorId}`);
+                    console.log(`👤 De: ${remitenteId} -> Para: ${receptorId}`);
+                } else {
+                    console.log(`🚫 No se creó notificación - Bloqueo detectado:`, {
+                        estaBloqueado,
+                        loHeBloqueado
+                    });
+                }
+            } catch (notifError) {
+                console.error('❌ Error creando notificación:', notifError);
+                // No fallar el envío del mensaje por error en notificación
+            }
+        }
 
         // Actualizar última mensaje en conversación
         await Conversacion.findByIdAndUpdate(conversacionId, {

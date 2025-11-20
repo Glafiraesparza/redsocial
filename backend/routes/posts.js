@@ -3,6 +3,110 @@ const express = require('express');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const router = express.Router();
+const Notification = require('../models/Notification');
+
+// Agrega esta ruta en tu archivo de rutas de posts
+router.get('/explore', async (req, res) => {
+    try {
+        const {
+            search,
+            searchInText,
+            searchInHashtags,
+            excludeBlocked,
+            currentUserId,
+            limit = 50
+        } = req.query;
+
+        let query = {};
+
+        // EXCLUIR USUARIOS BLOQUEADOS - tanto los que yo bloqueé como los que me bloquearon
+        if (excludeBlocked === 'true' && currentUserId) {
+            const currentUser = await User.findById(currentUserId);
+            
+            if (currentUser) {
+                // Usuarios que yo he bloqueado
+                const usersIBlocked = currentUser.usuarios_bloqueados || [];
+                
+                // Usuarios que me han bloqueado (necesitas verificar esto)
+                const usersWhoBlockedMe = await User.find({ 
+                    usuarios_bloqueados: currentUserId 
+                }).select('_id');
+                
+                const blockedUserIds = [
+                    ...usersIBlocked,
+                    ...usersWhoBlockedMe.map(user => user._id)
+                ];
+                
+                if (blockedUserIds.length > 0) {
+                    query.autor = { $nin: blockedUserIds };
+                }
+            }
+        }
+
+        // BÚSQUEDA POR TEXTO Y HASHTAGS
+        if (search && search.trim() !== '') {
+            const searchTerm = search.trim();
+            const searchRegex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            const searchConditions = [];
+
+            // Buscar en texto normal
+            if (searchInText === 'true') {
+                searchConditions.push({ contenido: searchRegex });
+            }
+
+            // Buscar en hashtags
+            if (searchInHashtags === 'true') {
+                // Buscar hashtags exactos (#musica, #arte, etc.)
+                const hashtagSearch = searchTerm.startsWith('#') ? searchTerm : `#${searchTerm}`;
+                const hashtagRegex = new RegExp(hashtagSearch, 'i');
+                searchConditions.push({ contenido: hashtagRegex });
+                
+                // También buscar palabras que puedan ser hashtags
+                if (!searchTerm.startsWith('#')) {
+                    const wordAsHashtagRegex = new RegExp(`#${searchTerm}\\b`, 'i');
+                    searchConditions.push({ contenido: wordAsHashtagRegex });
+                }
+            }
+
+            if (searchConditions.length > 0) {
+                query.$or = searchConditions;
+            }
+        }
+
+        console.log('🔍 Query de búsqueda:', {
+            search: search,
+            query: query,
+            excludeBlocked: excludeBlocked
+        });
+
+        const posts = await Post.find(query)
+            .populate('autor', 'nombre username foto_perfil seguidores seguidos usuarios_bloqueados')
+            .populate({
+                path: 'postOriginal',
+                populate: {
+                    path: 'autor',
+                    select: 'nombre username foto_perfil'
+                }
+            })
+            .sort({ fecha_publicacion: -1 })
+            .limit(parseInt(limit));
+
+        console.log(`✅ Encontradas ${posts.length} publicaciones`);
+
+        res.json({
+            success: true,
+            data: posts,
+            count: posts.length
+        });
+
+    } catch (error) {
+        console.error('❌ Error en búsqueda de exploración:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor al buscar publicaciones'
+        });
+    }
+});
 
 // CREATE - Crear publicación (VERSIÓN ACTUALIZADA PARA MULTIMEDIA)
 router.post('/', async (req, res) => {
@@ -254,45 +358,68 @@ router.get('/feed/:userId', async (req, res) => {
 
 // UPDATE - Like/Unlike publicación
 router.post('/:postId/like', async (req, res) => {
-  try {
-    const { userId } = req.body;
-    const post = await Post.findById(req.params.postId);
+    try {
+        const { postId } = req.params;
+        const { userId } = req.body;
 
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        error: 'Publicación no encontrada'
-      });
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere ID de usuario'
+            });
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                error: 'Publicación no encontrada'
+            });
+        }
+
+        const isLiked = post.likes.includes(userId);
+        let likesCount = post.likes.length;
+
+        if (isLiked) {
+            // Quitar like
+            post.likes = post.likes.filter(like => like.toString() !== userId);
+            likesCount--;
+        } else {
+            // Agregar like
+            post.likes.push(userId);
+            likesCount++;
+            
+            // ✅ CREAR NOTIFICACIÓN - VERSIÓN CORRECTA
+            if (post.autor.toString() !== userId) {
+                const notification = new Notification({
+                    usuario: post.autor,
+                    emisor: userId,
+                    tipo: 'like',
+                    post: postId
+                });
+                await notification.save();
+            }
+        }
+
+        await post.save();
+
+        res.json({
+            success: true,
+            data: {
+                isLiked: !isLiked,
+                likesCount: likesCount
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error dando like:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-
-    const likeIndex = post.likes.indexOf(userId);
-    
-    if (likeIndex > -1) {
-      // Quitar like
-      post.likes.splice(likeIndex, 1);
-    } else {
-      // Agregar like
-      post.likes.push(userId);
-    }
-
-    await post.save();
-    await post.populate('likes', 'username nombre');
-
-    res.json({
-      success: true,
-      data: {
-        likes: post.likes,
-        likesCount: post.likes.length,
-        isLiked: likeIndex === -1 // true si acaba de dar like, false si quitó like
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
 });
+
 
 // READ - Obtener publicación por ID
 router.get('/:id', async (req, res) => {
@@ -329,49 +456,63 @@ router.get('/:id', async (req, res) => {
 
 // COMENTARIOS - Agregar comentario a una publicación
 router.post('/:postId/comentarios', async (req, res) => {
-  try {
-    const { usuario, contenido } = req.body;
-    
-    if (!usuario || !contenido) {
-      return res.status(400).json({
-        success: false,
-        error: 'Usuario y contenido son requeridos'
-      });
+    try {
+        const { postId } = req.params;
+        const { usuario, contenido } = req.body;
+
+        if (!usuario || !contenido) {
+            return res.status(400).json({
+                success: false,
+                error: 'Usuario y contenido son requeridos'
+            });
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                error: 'Publicación no encontrada'
+            });
+        }
+
+        const nuevoComentario = {
+            usuario: usuario,
+            contenido: contenido,
+            fecha: new Date()
+        };
+
+        post.comentarios.push(nuevoComentario);
+        await post.save();
+
+        // ✅ CREAR NOTIFICACIÓN - VERSIÓN CORRECTA
+        if (post.autor.toString() !== usuario) {
+            const notification = new Notification({
+                usuario: post.autor,
+                emisor: usuario,
+                tipo: 'comment',
+                post: postId,
+                comentario: contenido.substring(0, 200) // Limitar longitud
+            });
+            await notification.save();
+        }
+
+        // Popular el comentario para la respuesta
+        await post.populate('comentarios.usuario', 'nombre username foto_perfil');
+
+        const comentarioAgregado = post.comentarios[post.comentarios.length - 1];
+
+        res.json({
+            success: true,
+            data: comentarioAgregado
+        });
+
+    } catch (error) {
+        console.error('❌ Error agregando comentario:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-
-    const post = await Post.findById(req.params.postId);
-    
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        error: 'Publicación no encontrada'
-      });
-    }
-
-    const nuevoComentario = {
-      usuario,
-      contenido,
-      fecha: new Date()
-    };
-
-    post.comentarios.push(nuevoComentario);
-    await post.save();
-
-    // Popular la información del usuario en el comentario
-    await post.populate('comentarios.usuario', 'username nombre foto_perfil');
-
-    const comentarioAgregado = post.comentarios[post.comentarios.length - 1];
-
-    res.status(201).json({
-      success: true,
-      data: comentarioAgregado
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
 });
 
 // COMENTARIOS - Obtener comentarios de una publicación
@@ -402,71 +543,145 @@ router.get('/:postId/comentarios', async (req, res) => {
 
 // ========== RUTAS DE SHARES ==========
 
-// SHARE - Compartir una publicación
-router.post('/:id/share', async (req, res) => {
-  try {
-    const { userId } = req.body;
-    const postId = req.params.id;
+// BACKEND - En routes/posts.js, MODIFICA la ruta de share:
+router.post('/:postId/share', async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { userId } = req.body;
 
-    // Verificar si el post existe
-    const postOriginal = await Post.findById(postId).populate('autor', 'nombre username');
-    if (!postOriginal) {
-      return res.status(404).json({
-        success: false,
-        error: 'Publicación no encontrada'
-      });
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere ID de usuario'
+            });
+        }
+
+        // Verificar si el post existe
+        const postToShare = await Post.findById(postId).populate('autor');
+        
+        if (!postToShare) {
+            return res.status(404).json({
+                success: false,
+                error: 'Publicación no encontrada'
+            });
+        }
+
+        // **NUEVA VALIDACIÓN: No permitir compartir posts que ya son shares**
+        if (postToShare.tipo === 'share') {
+            return res.status(400).json({
+                success: false,
+                error: 'No puedes compartir una publicación que ya es compartida'
+            });
+        }
+
+        // Obtener el post original (si es un share, usar postOriginal, sino el mismo post)
+        const postOriginal = postToShare.tipo === 'share' ? 
+            await Post.findById(postToShare.postOriginal).populate('autor') : 
+            postToShare;
+
+        if (!postOriginal) {
+            return res.status(404).json({
+                success: false,
+                error: 'Publicación original no encontrada'
+            });
+        }
+
+        // Verificar bloqueos con el autor ORIGINAL
+        const currentUser = await User.findById(userId);
+        const originalAuthor = await User.findById(postOriginal.autor._id);
+        
+        if (originalAuthor.usuarios_bloqueados?.includes(userId)) {
+            return res.status(403).json({
+                success: false,
+                error: 'No puedes compartir publicaciones de usuarios que te han bloqueado'
+            });
+        }
+
+        if (currentUser.usuarios_bloqueados?.includes(postOriginal.autor._id)) {
+            return res.status(403).json({
+                success: false,
+                error: 'No puedes compartir publicaciones de usuarios que has bloqueado'
+            });
+        }
+
+        // Verificar si ya compartió esta publicación ORIGINAL
+        const existingShare = await Post.findOne({
+            tipo: 'share',
+            postOriginal: postOriginal._id, // Usar el ID del post original
+            autor: userId
+        });
+
+        if (existingShare) {
+            return res.status(400).json({
+                success: false,
+                error: 'Ya compartiste esta publicación'
+            });
+        }
+
+        // Crear el post de share apuntando al POST ORIGINAL
+        const sharePost = new Post({
+            autor: userId,
+            tipo: 'share',
+            postOriginal: postOriginal._id, // Siempre apuntar al post original
+            fecha_publicacion: new Date(),
+            contenido: '',
+            tipoContenido: 'texto'
+        });
+
+        await sharePost.save();
+
+        // Agregar el share a la publicación ORIGINAL
+        await Post.findByIdAndUpdate(postOriginal._id, {
+            $push: {
+                shares: {
+                    usuario: userId,
+                    fecha: new Date()
+                }
+            }
+        });
+
+        // Crear notificación para el autor ORIGINAL
+        if (postOriginal.autor._id.toString() !== userId) {
+            const notification = new Notification({
+                usuario: postOriginal.autor._id,
+                emisor: userId,
+                tipo: 'share',
+                post: postOriginal._id,
+                postCompartido: sharePost._id
+            });
+            await notification.save();
+        }
+
+        // Obtener conteo actualizado del post ORIGINAL
+        const updatedOriginalPost = await Post.findById(postOriginal._id);
+        const sharesCount = updatedOriginalPost.shares.length;
+
+        // Popular el post para respuesta
+        await sharePost.populate('autor', 'nombre username foto_perfil');
+        await sharePost.populate({
+            path: 'postOriginal',
+            populate: {
+                path: 'autor',
+                select: 'nombre username foto_perfil'
+            }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                sharesCount: sharesCount,
+                shareId: sharePost._id,
+                sharePost: sharePost
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error compartiendo publicación:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-
-    // Verificar si el usuario ya compartió este post
-    const alreadyShared = postOriginal.shares.some(share => 
-      share.usuario.toString() === userId
-    );
-
-    if (alreadyShared) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ya compartiste esta publicación'
-      });
-    }
-
-    // Agregar el share al post original
-    postOriginal.shares.push({
-      usuario: userId,
-      fecha: new Date()
-    });
-
-    await postOriginal.save();
-
-    // Crear nueva publicación como share
-    const sharedPost = new Post({
-      autor: userId,
-      contenido: ` `,
-      tipo: 'share',
-      postOriginal: postId,
-      fecha_publicacion: new Date()
-    });
-
-    await sharedPost.save();
-    
-    // Popular el post compartido para enviar datos completos
-    await sharedPost.populate('autor', 'username nombre foto_perfil');
-    await sharedPost.populate('postOriginal');
-
-    res.json({ 
-      success: true, 
-      data: {
-        sharesCount: postOriginal.shares.length,
-        sharedPost: sharedPost
-      }
-    });
-
-  } catch (error) {
-    console.error('Error compartiendo publicación:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error interno del servidor'
-    });
-  }
 });
 
 // SHARES - Obtener shares de una publicación

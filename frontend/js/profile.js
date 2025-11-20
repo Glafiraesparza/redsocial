@@ -191,6 +191,11 @@ function goToMessages() {
     window.location.href = 'dashboard.html?section=messages';
 }
 
+function goToNotifications() {
+    localStorage.removeItem('viewingUserProfile');
+    window.location.href = 'dashboard.html?section=notifications';
+}
+
 // ===== CARGAR PERFIL DE OTRO USUARIO =====
 async function loadOtherUserProfile(userId) {
     try {

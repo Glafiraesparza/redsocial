@@ -77,6 +77,11 @@
                     <i class="fas fa-comments"></i>
                     <span>Mensajes</span>
                 </button>
+                <button class="nav-item" onclick="showSection('notifications')">
+                    <i class="fas fa-bell"></i>
+                    <span>Notificaciones</span>
+                    <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                </button>
             </nav>
         </div>
 
@@ -249,6 +254,30 @@
     </div>
 </div>
 
+<!-- Notificaciones -->
+<div id="notificationsSection" class="content-section">
+    <div class="section-header">
+        <h2><i class="fas fa-bell"></i> Notificaciones</h2>
+        <div class="notification-actions">
+            <button class="btn-secondary btn-small" onclick="markAllAsRead()">
+                <i class="fas fa-check-double"></i> Marcar todas como leídas
+            </button>
+            <button class="btn-secondary btn-small" onclick="clearAllNotifications()">
+                <i class="fas fa-trash"></i> Limpiar bandeja
+            </button>
+        </div>
+    </div>
+    <div class="notification-info">
+        <small><i class="fas fa-info-circle"></i> Las notificaciones son visibles por 30 días</small>
+    </div>
+    <div id="notificationsList" class="notifications-container">
+        <div class="loading-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Cargando notificaciones...</p>
+        </div>
+    </div>
+</div>
+
     <!-- Modal para ver publicación completa - VERSIÓN LIMPIA -->
     <div id="postModal" class="modal">
         <div class="modal-content modal-large">
@@ -276,16 +305,19 @@
 
 
     <script>
-    console.log("🔴 Antes de cualquier script - currentUser:", window.currentUser);
-    </script>
+    // Verificar que todas las funciones estén cargadas
+    setTimeout(() => {
+        console.log('🔍 Verificando funciones cargadas:');
+        console.log('- loadNotifications:', typeof loadNotifications);
+        console.log('- markAllAsRead:', typeof markAllAsRead);
+        console.log('- clearAllNotifications:', typeof clearAllNotifications);
+        console.log('- currentUser:', typeof currentUser !== 'undefined' ? currentUser._id : 'undefined');
+    }, 1000);
+</script>
+
     <script src="../js/dashboard.js"></script>
-    <script>
-        console.log("🟡 Después de dashboard.js - currentUser:", window.currentUser);
-        console.log("🟡 localStorage currentUser:", localStorage.getItem('currentUser'));
-    </script>
     <script src="../js/messages.js"></script>
-    <script>
-        console.log("🔵 Después de messages.js - currentUser:", window.currentUser);
-    </script>
+    <script src="../js/notifications.js"></script>
+
 </body>
 </html>

@@ -43,7 +43,7 @@ const postSchema = new mongoose.Schema({
   },
   tipoContenido: {
     type: String,
-    enum: ['texto', 'imagen', 'audio', 'video'],
+    enum: ['texto', 'imagen', 'audio', 'video', 'share'], // AGREGAR 'share'
     default: 'texto'
   },
   hashtags: [{
@@ -106,7 +106,15 @@ const postSchema = new mongoose.Schema({
 
 // MODIFICAR el pre-save para validación condicional
 postSchema.pre('save', function(next) {
-  // Validar que haya al menos contenido o algún medio
+  // **EXCEPCIÓN para posts compartidos - no requieren contenido ni multimedia**
+  if (this.tipo === 'share') {
+    // Para shares, el contenido puede estar vacío y no necesita multimedia
+    this.tipoContenido = 'texto'; // Siempre 'texto' para shares
+    this.hashtags = [];
+    return next();
+  }
+  
+  // Validación normal para posts originales
   if (!this.contenido && !this.imagen && !this.audio && !this.video) {
     return next(new Error('El post debe tener contenido textual o un archivo multimedia'));
   }

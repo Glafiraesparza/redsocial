@@ -34,7 +34,7 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/collections', require('./routes/collections'));
-
+app.use('/api/notifications', require('./routes/notifications')); // ← ¡AGREGA ESTA LÍNEA!
 
 // Manejo de errores 404
 app.use((req, res) => {
@@ -50,4 +50,5 @@ app.listen(PORT, () => {
     console.log(`📡 URL: http://localhost:${PORT}`);
     console.log(`🗄️  Base de datos: MongoDB Local`);
     console.log(`🎵 Serviendo: Imágenes, Audio y Video`);
+    console.log(`🔔 Notificaciones: ACTIVADAS`); // ← Mensaje de confirmación
 });
