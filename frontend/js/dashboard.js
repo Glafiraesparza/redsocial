@@ -1895,6 +1895,20 @@ async function handleShareModal(postId) {
     }
 }
 
+function setActiveMobileNav(section) {
+    const navItems = document.querySelectorAll('.mobile-nav-item');
+    navItems.forEach(item => item.classList.remove('active'));
+    
+    // Encuentra el botón correspondiente a la sección
+    const activeButton = Array.from(navItems).find(item => {
+        return item.getAttribute('onclick')?.includes(section);
+    });
+    
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+}
+
 
 // ========== COMENTARIOS ==========
 function initializeComentarioEvents() {

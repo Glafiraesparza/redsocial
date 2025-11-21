@@ -388,6 +388,33 @@
         </div>
     </div>
 
+    <div class="mobile-bottom-nav">
+    <button class="mobile-nav-item active" onclick="goToDashboard()">
+        <i class="fas fa-home"></i>
+        <span>Inicio</span>
+    </button>
+    <button class="mobile-nav-item" onclick="goToMyProfile()">
+        <i class="fas fa-user"></i>
+        <span>Perfil</span>
+    </button>
+    <button class="mobile-nav-item" onclick="goToExplore()">
+        <i class="fas fa-search"></i>
+        <span>Explorar</span>
+    </button>
+    <button class="mobile-nav-item" onclick="goToUsers()">
+        <i class="fas fa-users"></i>
+        <span>Usuarios</span>
+    </button>
+    <button class="mobile-nav-item" onclick="goToMessages()">
+        <i class="fas fa-comments"></i>
+        <span>Mensajes</span>
+    </button>
+    <button class="mobile-nav-item" onclick="goToNotifications()">
+        <i class="fas fa-bell"></i>
+        <span>Alertas</span>
+    </button>
+</div>
+
     <script src="../js/profile.js"></script>
     <script>
         console.log("🟡 Después de dashboard.js - currentUser:", window.currentUser);

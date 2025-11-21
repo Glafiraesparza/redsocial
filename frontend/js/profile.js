@@ -475,18 +475,6 @@ function hideEditButtons() {
         if (option) option.style.display = 'none';
     });
     
-    // Ocultar sección de colecciones o mostrar mensaje
-    const collectionsSection = document.getElementById('collectionsSection');
-    if (collectionsSection) {
-        collectionsSection.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-lock"></i>
-                <h3>Colecciones privadas</h3>
-                <p>Las colecciones son privadas para cada usuario.</p>
-            </div>
-        `;
-    }
-    
     // Remover el botón de nueva colección si existe
     const newCollectionBtn = document.querySelector('.btn-primary[onclick*="createNewCollection"]');
     if (newCollectionBtn) {
@@ -1578,6 +1566,10 @@ window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUse
     window.changePassword = changePassword;
     window.changeEmail = changeEmail;
     window.unblockUser = unblockUser;
+    window.viewCollectionDetails = viewCollectionDetails;
+    window.showCollectionModal = showCollectionModal;
+    window.viewOtherUserCollection = viewOtherUserCollection;
+    window.closeOtherUserCollectionModal = closeOtherUserCollectionModal;
     
     console.log('✅ Funciones globales creadas');
 }
@@ -3457,43 +3449,921 @@ function loadPhotosSection(publicaciones) {
     `).join('');
 }
 
-// Sección de Colecciones
-// ===== SECCIÓN DE COLECCIONES =====
-function loadCollectionsSection() {
+// ===== SECCIÓN DE COLECCIONES CORREGIDA =====
+async function loadCollectionsSection() {
     const collectionsGrid = document.getElementById('collectionsGrid');
     const allCollections = document.getElementById('allCollections');
+    const collectionsSection = document.getElementById('collectionsSection');
     
-    if (!collectionsGrid || !allCollections) return;
+    console.log('🔍 DIAGNÓSTICO COLECCIONES - Elementos encontrados:', {
+        collectionsGrid: !!collectionsGrid,
+        allCollections: !!allCollections,
+        collectionsSection: !!collectionsSection
+    });
 
-    // Mostrar estado de carga temporalmente
+    if (!collectionsGrid) {
+        console.error('❌ collectionsGrid no encontrado');
+        return;
+    }
+
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+    
+    console.log('🔍 Contexto colecciones:', { 
+        isOwnProfile, 
+        viewingUserId, 
+        currentUserId: currentUser._id 
+    });
+
+    // LIMPIAR cualquier contenido previo
+    collectionsGrid.innerHTML = '';
+    
+    // Mostrar estado de carga
     collectionsGrid.innerHTML = `
         <div class="loading-state">
             <i class="fas fa-spinner fa-spin"></i>
             <p>Cargando colecciones...</p>
         </div>
     `;
-    
-    allCollections.innerHTML = '';
 
-    // Intentar cargar colecciones si la función existe
-    if (typeof loadUserCollections === 'function') {
-        loadUserCollections();
-    } else if (typeof initializeCollections === 'function') {
-        initializeCollections();
-    } else {
-        // Si no existen las funciones de colecciones, mostrar mensaje
+    if (allCollections) {
+        allCollections.innerHTML = '';
+    }
+
+    try {
+        if (isOwnProfile) {
+            // Cargar nuestras propias colecciones
+            console.log('📚 Cargando colecciones propias');
+            if (typeof loadUserCollections === 'function') {
+                await loadUserCollections();
+            } else if (typeof initializeCollections === 'function') {
+                await initializeCollections();
+            } else {
+                showDefaultCollectionsMessage(true);
+            }
+        } else {
+            // Cargar colecciones PÚBLICAS del otro usuario
+            console.log('👀 Cargando colecciones públicas de otro usuario:', viewingUserId);
+            await loadAndDisplayOtherUserCollections(viewingUserId);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando colecciones:', error);
+        showCollectionsError();
+    }
+}
+
+// ===== CARGAR Y MOSTRAR COLECCIONES DE OTRO USUARIO =====
+async function loadAndDisplayOtherUserCollections(userId) {
+    try {
+        console.log('🔄 Solicitando colecciones públicas para usuario:', userId);
+        
+        const response = await fetch(`${API_URL}/collections/user/${userId}/public`);
+        
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📨 Respuesta colecciones públicas:', result);
+        
+        if (result.success && result.data && result.data.length > 0) {
+            console.log(`✅ ${result.data.length} colecciones públicas encontradas`);
+            
+            // SIMULAR que son tus propias colecciones pero sin opciones de edición
+            // Esto forzará a usar el mismo formato
+            simulateUserCollections(result.data);
+        } else {
+            console.log('ℹ️ No hay colecciones públicas o respuesta vacía');
+            showEmptyCollectionsState(false);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando colecciones públicas:', error);
+        showCollectionsError();
+    }
+}
+
+// ===== MOSTRAR COLECCIONES DE OTRO USUARIO CON EL MISMO FORMATO =====
+function displayOtherUserCollections(collections) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    const allCollections = document.getElementById('allCollections');
+    
+    if (!collectionsGrid) return;
+
+    console.log('🎨 Mostrando colecciones públicas con mismo formato:', collections.length);
+
+    if (collections.length === 0) {
         collectionsGrid.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-folder-open"></i>
-                <h3>Sistema de colecciones</h3>
-                <p>Las colecciones te permiten organizar tus publicaciones favoritas.</p>
-                <button class="btn-primary" onclick="showCollectionsInfo()">
-                    <i class="fas fa-info"></i> Más información
+                <h3>No hay colecciones públicas</h3>
+                <p>Este usuario no tiene colecciones públicas disponibles.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Usar EXACTAMENTE el mismo formato que tu collections.js
+    collectionsGrid.innerHTML = `
+        <div class="collections-container">
+            <div class="collections-header-main">
+                <h3>Colecciones Públicas (${collections.length})</h3>
+            </div>
+            
+            <div class="collections-grid-main">
+                ${collections.map(collection => createCollectionCardForOtherUser(collection)).join('')}
+            </div>
+        </div>
+    `;
+
+    allCollections.innerHTML = '';
+    
+    // Inicializar eventos después de cargar las colecciones
+    setTimeout(() => {
+        if (typeof initializeCollectionMenuEvents === 'function') {
+            initializeCollectionMenuEvents();
+        }
+    }, 100);
+}
+
+
+function createCollectionsHTML(collections, isOwnProfile = true) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    const collectionsHeader = document.getElementById('collectionsHeader');
+    const allCollections = document.getElementById('allCollections');
+    
+    if (!collectionsGrid) return;
+
+    if (collections.length === 0) {
+        collectionsGrid.innerHTML = `
+            <div class="empty-collections-state">
+                <div class="empty-collections-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+                <h3>No hay colecciones públicas</h3>
+                <p>Este usuario no tiene colecciones públicas disponibles.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Header igual que en tu perfil pero adaptado
+    if (collectionsHeader) {
+        collectionsHeader.innerHTML = `
+            <div class="collections-header-content">
+                <h2 class="collections-title">
+                    <i class="fas fa-folder"></i>
+                    Colecciones Públicas
+                    <span class="collections-count">${collections.length}</span>
+                </h2>
+                ${isOwnProfile ? `
+                    <button class="btn-primary" onclick="createNewCollection()">
+                        <i class="fas fa-plus"></i> Nueva Colección
+                    </button>
+                ` : `
+                `}
+            </div>
+        `;
+    }
+
+    // Crear el grid de colecciones con el mismo formato que usas
+    collectionsGrid.innerHTML = collections.map(collection => 
+        createCollectionCardHTML(collection, isOwnProfile)
+    ).join('');
+
+    allCollections.innerHTML = '';
+}
+
+// ===== CREAR TARJETA DE COLECCIÓN CON EL FORMATO DE TU PERFIL =====
+function createCollectionCardHTML(collection, isOwnProfile = true) {
+    const itemCount = collection.posts?.length || 0;
+    const isPublic = collection.tipo === 'publica';
+    
+    // Obtener imagen de portada (usar la misma lógica que en tu sistema)
+    const coverImage = collection.foto_portada || getCollectionCoverImage(collection);
+    
+    // Obtener icono (usar el mismo que en tu sistema)
+    const collectionIcon = collection.icono || 'fa-folder';
+    const collectionColor = collection.color || '#3498db';
+
+    return `
+        <div class="collection-item" data-collection-id="${collection._id}">
+            <div class="collection-card">
+                <!-- Header de la colección -->
+                <div class="collection-header">
+                    <div class="collection-icon-title">
+                        <div class="collection-icon" style="color: ${collectionColor}">
+                            <i class="fas ${collectionIcon}"></i>
+                        </div>
+                        <h3 class="collection-name">${collection.nombre}</h3>
+                    </div>
+                    
+                    ${isOwnProfile ? `
+                        <!-- Menú de opciones SOLO para tu perfil -->
+                        <div class="collection-options">
+                            <button class="btn-options" onclick="toggleCollectionOptions('${collection._id}', event)">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <div class="collection-options-menu" id="collectionOptions-${collection._id}">
+                                <button class="option-item" onclick="editCollection('${collection._id}')">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                                <button class="option-item delete" onclick="deleteCollection('${collection._id}')">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <!-- Imagen de portada -->
+                <div class="collection-cover">
+                    ${coverImage ? 
+                        `<img src="${coverImage}" alt="${collection.nombre}" class="collection-cover-image">` :
+                        `<div class="collection-cover-placeholder" style="background: ${collectionColor}22">
+                            <i class="fas ${collectionIcon}"></i>
+                        </div>`
+                    }
+                    <div class="collection-visibility-badge ${isPublic ? 'public' : 'private'}">
+                        <i class="fas ${isPublic ? 'fa-globe-americas' : 'fa-lock'}"></i>
+                        ${isPublic ? 'Pública' : 'Privada'}
+                    </div>
+                </div>
+                
+                <!-- Descripción -->
+                ${collection.descripcion ? `
+                    <div class="collection-description">
+                        <p>${collection.descripcion}</p>
+                    </div>
+                ` : ''}
+                
+                <!-- Etiquetas -->
+                ${collection.etiquetas && collection.etiquetas.length > 0 ? `
+                    <div class="collection-tags">
+                        ${collection.etiquetas.map(tag => `
+                            <span class="collection-tag">${tag}</span>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <!-- Estadísticas -->
+                <div class="collection-stats">
+                    <div class="collection-stat">
+                        <i class="fas fa-file"></i>
+                        <span>${itemCount} ${itemCount === 1 ? 'elemento' : 'elementos'}</span>
+                    </div>
+                    <div class="collection-stat">
+                        <i class="fas fa-calendar"></i>
+                        <span>${getTimeAgo(new Date(collection.fecha_actualizacion))}</span>
+                    </div>
+                </div>
+                
+                <!-- Acciones -->
+                <div class="collection-actions">
+                    <button class="btn-view-collection" onclick="viewOtherUserCollection('${collection._id}')">
+                        <i class="fas fa-eye"></i> Ver Colección
+                    </button>
+                    
+                    ${isOwnProfile ? `
+                        <button class="btn-edit-collection" onclick="editCollection('${collection._id}')">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createCollectionCardForOtherUser(collection) {
+    const postCount = collection.posts?.length || 0;
+    const lastUpdated = getTimeAgo(new Date(collection.fecha_actualizacion));
+    
+    // Usar EXACTAMENTE el mismo HTML que en tu collections.js pero sin opciones de edición
+    return `
+        <div class="collection-card" data-collection-id="${collection._id}" onclick="viewOtherUserCollection('${collection._id}')">
+            <div class="collection-header">
+                <div class="collection-icon" style="background-color: ${collection.color};">
+                    <i class="${collection.icono}"></i>
+                </div>
+                <!-- SIN menú de opciones para otros usuarios -->
+            </div>
+            
+            <div class="collection-content">
+                <h4>${collection.nombre}</h4>
+                <p class="collection-desc">${collection.descripcion || 'Sin descripción'}</p>
+                
+                <div class="collection-stats">
+                    <span class="stat">
+                        <i class="fas fa-image"></i>
+                        ${postCount} ${postCount === 1 ? 'elemento' : 'elementos'}
+                    </span>
+                    <span class="stat">
+                        <i class="fas fa-clock"></i>
+                        ${lastUpdated}
+                    </span>
+                </div>
+                
+                ${collection.etiquetas && collection.etiquetas.length > 0 ? `
+                    <div class="collection-tags">
+                        ${collection.etiquetas.slice(0, 3).map(tag => `
+                            <span class="tag">${tag}</span>
+                        `).join('')}
+                        ${collection.etiquetas.length > 3 ? `<span class="tag-more">+${collection.etiquetas.length - 3}</span>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function getCollectionCoverImage(collection) {
+    if (!collection.posts || collection.posts.length === 0) {
+        return null;
+    }
+    
+    // Buscar el primer post que tenga imagen
+    const firstPostWithImage = collection.posts.find(post => 
+        post.imagen || (post.postOriginal && post.postOriginal.imagen)
+    );
+    
+    if (firstPostWithImage) {
+        return firstPostWithImage.imagen || 
+               (firstPostWithImage.postOriginal && firstPostWithImage.postOriginal.imagen);
+    }
+    
+    return null;
+}
+
+// ===== FUNCIÓN PARA VER COLECCIÓN DE OTRO USUARIO =====
+async function viewOtherUserCollection(collectionId) {
+    try {
+        console.log('🔍 Viendo colección de otro usuario:', collectionId);
+        
+        const response = await fetch(`${API_URL}/collections/${collectionId}/public`);
+        const result = await response.json();
+        
+        if (result.success) {
+            showOtherUserCollectionModal(result.data);
+        } else {
+            showToast('❌ No se pudo cargar la colección', 'error');
+        }
+    } catch (error) {
+        console.error('Error viendo colección de otro usuario:', error);
+        showToast('❌ Error al cargar la colección', 'error');
+    }
+}
+
+function showOtherUserCollectionModal(collection) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'otherUserCollectionModal';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>
+                    <div class="collection-icon-small" style="background-color: ${collection.color};">
+                        <i class="${collection.icono}"></i>
+                    </div>
+                    ${collection.nombre}
+                </h3>
+                <span class="close-modal" onclick="closeOtherUserCollectionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="collection-detail">
+                    <div class="collection-info">
+                        <p class="collection-description">${collection.descripcion || 'Sin descripción'}</p>
+                        
+                        <div class="collection-meta">
+                            <span class="meta-item">
+                                <i class="fas fa-user"></i>
+                                Creada por ${collection.usuario.nombre}
+                            </span>
+                            <span class="meta-item">
+                                <i class="fas fa-images"></i>
+                                ${collection.posts.length} elementos
+                            </span>
+                            <span class="meta-item">
+                                <i class="fas fa-clock"></i>
+                                Actualizada ${getTimeAgo(new Date(collection.fecha_actualizacion))}
+                            </span>
+                            <span class="meta-item">
+                                <i class="fas fa-globe"></i>
+                                ${collection.tipo === 'publica' ? 'Pública' : 'Privada'}
+                            </span>
+                        </div>
+                        
+                        ${collection.etiquetas && collection.etiquetas.length > 0 ? `
+                            <div class="collection-tags-detail">
+                                ${collection.etiquetas.map(tag => `
+                                    <span class="tag">${tag}</span>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="collection-posts-section">
+                        <div class="collection-posts-header">
+                            <h4>Elementos en la colección (${collection.posts.length})</h4>
+                        </div>
+                        
+                        ${collection.posts.length > 0 ? `
+                            <div class="collection-posts-grid">
+                                ${collection.posts.map(post => createOtherUserCollectionPostHTML(post)).join('')}
+                            </div>
+                        ` : `
+                            <div class="empty-collection">
+                                <i class="fas fa-inbox"></i>
+                                <p>Esta colección está vacía</p>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+}
+
+function createOtherUserCollectionPostHTML(post) {
+    const isImage = post.tipoContenido === 'imagen' && post.imagen;
+    const isVideo = post.tipoContenido === 'video' && post.video;
+    const isAudio = post.tipoContenido === 'audio' && post.audio;
+    
+    let mediaContent = '';
+    
+    if (isImage) {
+        mediaContent = `<img src="${post.imagen}" alt="Imagen" class="post-thumbnail">`;
+    } else if (isVideo) {
+        mediaContent = `
+            <div class="video-thumbnail">
+                <i class="fas fa-play"></i>
+                <video>
+                    <source src="${post.video}" type="video/mp4">
+                </video>
+            </div>
+        `;
+    } else if (isAudio) {
+        mediaContent = `
+            <div class="audio-thumbnail">
+                <i class="fas fa-music"></i>
+            </div>
+        `;
+    } else {
+        mediaContent = `
+            <div class="text-thumbnail">
+                <i class="fas fa-file-alt"></i>
+                <p>${post.contenido ? post.contenido.substring(0, 100) + (post.contenido.length > 100 ? '...' : '') : 'Publicación'}</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="collection-post-item" onclick="viewPost('${post._id}')">
+            ${mediaContent}
+            <div class="post-overlay">
+                <div class="post-info">
+                    <p class="post-preview">${post.contenido ? post.contenido.substring(0, 50) + (post.contenido.length > 50 ? '...' : '') : 'Publicación'}</p>
+                    <span class="post-date">${getTimeAgo(new Date(post.fecha_publicacion))}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+
+// ===== FUNCIONES AUXILIARES =====
+function showEmptyCollectionsState(isOwnProfile) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    if (collectionsGrid) {
+        if (isOwnProfile) {
+            collectionsGrid.innerHTML = `
+                <div class="empty-collections-state">
+                    <div class="empty-collections-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h3>No tienes colecciones aún</h3>
+                    <p>Crea tu primera colección para organizar tus publicaciones favoritas.</p>
+                    <button class="btn-primary" onclick="createNewCollection()">
+                        <i class="fas fa-plus"></i> Crear Primera Colección
+                    </button>
+                </div>
+            `;
+        } else {
+            collectionsGrid.innerHTML = `
+                <div class="empty-collections-state">
+                    <div class="empty-collections-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h3>No hay colecciones públicas</h3>
+                    <p>Este usuario no tiene colecciones públicas disponibles.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+function showDefaultCollectionsMessage(isOwnProfile) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    if (collectionsGrid) {
+        collectionsGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <h3>${isOwnProfile ? 'Tus colecciones' : 'Colecciones públicas'}</h3>
+                <p>${isOwnProfile ? 
+                    'Las colecciones te permiten organizar tus publicaciones favoritas.' : 
+                    'Las colecciones públicas de este usuario aparecerán aquí.'}
+                </p>
+            </div>
+        `;
+    }
+}
+
+function showCollectionsError() {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    if (collectionsGrid) {
+        collectionsGrid.innerHTML = `
+            <div class="empty-state error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error al cargar</h3>
+                <p>No se pudieron cargar las colecciones.</p>
+                <button class="btn-primary" onclick="loadCollectionsSection()">
+                    <i class="fas fa-redo"></i> Reintentar
                 </button>
             </div>
         `;
     }
 }
+
+function closeOtherUserCollectionModal() {
+    const modal = document.getElementById('otherUserCollectionModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function simulateUserCollections(collections) {
+    // Si existe la función que usas para mostrar colecciones, úsala
+    // pero primero modifica las colecciones para quitar opciones de edición
+    
+    const collectionsWithNoEdit = collections.map(collection => ({
+        ...collection,
+        // Marcar como de otro usuario para que no muestre opciones de edición
+        isOtherUserCollection: true
+    }));
+    
+    // Intentar usar la función existente
+    if (typeof window.userCollections !== 'undefined') {
+        window.userCollections = collectionsWithNoEdit;
+    }
+    
+    if (typeof window.allCollections !== 'undefined') {
+        window.allCollections = collectionsWithNoEdit;
+    }
+    
+    // Llamar a createCollectionsHTML con isOwnProfile = false
+    createCollectionsHTML(collectionsWithNoEdit, false);
+}
+
+
+// ===== CARGAR COLECCIONES DE OTRO USUARIO CON EL MISMO FORMATO =====
+async function loadOtherUserCollectionsWithSameFormat(userId) {
+    try {
+        console.log('🔄 Cargando colecciones públicas del usuario:', userId);
+        
+        const response = await fetch(`${API_URL}/collections/user/${userId}/public`);
+        
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📨 Respuesta colecciones públicas:', result);
+        
+        if (result.success && result.data && result.data.length > 0) {
+            // Usar la misma función de visualización pero indicando que no es nuestro perfil
+            displayCollectionsWithSameUI(result.data, false);
+        } else {
+            // Mostrar estado vacío igual que en nuestro perfil
+            showEmptyCollectionsState(false);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando colecciones públicas:', error);
+        showCollectionsError();
+    }
+}
+
+function displayCollectionsWithSameUI(collections, isOwnProfile = true) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    const allCollections = document.getElementById('allCollections');
+    
+    if (!collectionsGrid || !allCollections) return;
+
+    if (collections.length === 0) {
+        showEmptyCollectionsState(isOwnProfile);
+        return;
+    }
+
+    // Usar el mismo HTML que se usa para nuestras propias colecciones
+    collectionsGrid.innerHTML = `
+        <div class="collections-container">
+            <div class="collections-header-main">
+                <h2 class="collections-title">
+                    <i class="fas fa-folder"></i>
+                    Colecciones
+                    <span class="collections-count">${collections.length}</span>
+                </h2>
+                ${isOwnProfile ? `
+                    <button class="btn-primary" onclick="createNewCollection()">
+                        <i class="fas fa-plus"></i> Nueva Colección
+                    </button>
+                ` : ''}
+            </div>
+            
+            <div class="collections-grid-main">
+                ${collections.map(collection => createCollectionCardSameUI(collection, isOwnProfile)).join('')}
+            </div>
+        </div>
+    `;
+
+    // Inicializar eventos (solo los de visualización, no edición)
+    initializeCollectionViewEvents(isOwnProfile);
+}
+
+// ===== CREAR TARJETA DE COLECCIÓN CON LA MISMA UI =====
+function createCollectionCardSameUI(collection, isOwnProfile = true) {
+    const itemCount = collection.publicaciones?.length || 0;
+    const isPublic = collection.visibilidad === 'publica';
+    
+    // Obtener imagen de portada (usar la misma lógica que en tu perfil)
+    const coverImage = getCollectionCoverImage(collection);
+    
+    // Obtener icono representativo (si existe en tu sistema)
+    const collectionIcon = collection.icono || 'fa-folder';
+    
+    return `
+        <div class="collection-card-same-ui ${isPublic ? 'public' : 'private'}" 
+             data-collection-id="${collection._id}">
+            
+            <!-- Header de la colección - MISMO que en tu perfil -->
+            <div class="collection-header-same">
+                <div class="collection-icon-title">
+                    <div class="collection-icon-same">
+                        <i class="fas ${collectionIcon}"></i>
+                    </div>
+                    <h3 class="collection-name-same">${collection.nombre}</h3>
+                </div>
+                
+                ${isOwnProfile ? `
+                    <!-- Menú de opciones SOLO para nuestro perfil -->
+                    <div class="collection-options">
+                        <button class="btn-options" onclick="toggleCollectionOptions('${collection._id}', event)">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="collection-options-menu" id="collectionOptions-${collection._id}">
+                            <button class="option-item" onclick="editCollection('${collection._id}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="option-item delete" onclick="deleteCollection('${collection._id}')">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+            
+            <!-- Imagen de portada - MISMA que en tu perfil -->
+            <div class="collection-cover-same">
+                ${coverImage ? 
+                    `<img src="${coverImage}" alt="${collection.nombre}" class="collection-cover-image">` :
+                    `<div class="collection-cover-placeholder-same">
+                        <i class="fas ${collectionIcon}"></i>
+                    </div>`
+                }
+                <div class="collection-visibility-same ${isPublic ? 'public' : 'private'}">
+                    <i class="fas ${isPublic ? 'fa-globe-americas' : 'fa-lock'}"></i>
+                    ${isPublic ? 'Pública' : 'Privada'}
+                </div>
+            </div>
+            
+            <!-- Descripción - MISMA que en tu perfil -->
+            ${collection.descripcion ? `
+                <div class="collection-description-same">
+                    <p>${collection.descripcion}</p>
+                </div>
+            ` : ''}
+            
+            <!-- Etiquetas - MISMAS que en tu perfil -->
+            ${collection.etiquetas && collection.etiquetas.length > 0 ? `
+                <div class="collection-tags-same">
+                    ${collection.etiquetas.map(tag => `
+                        <span class="collection-tag">${tag}</span>
+                    `).join('')}
+                </div>
+            ` : ''}
+            
+            <!-- Estadísticas - MISMAS que en tu perfil -->
+            <div class="collection-stats-same">
+                <div class="collection-stat-item">
+                    <i class="fas fa-file"></i>
+                    <span>${itemCount} ${itemCount === 1 ? 'elemento' : 'elementos'}</span>
+                </div>
+                <div class="collection-stat-item">
+                    <i class="fas fa-calendar"></i>
+                    <span>${getTimeAgo(new Date(collection.fecha_creacion))}</span>
+                </div>
+            </div>
+            
+            <!-- Acciones - MISMA que en tu perfil pero sin opciones de edición -->
+            <div class="collection-actions-same">
+                <button class="btn-view-collection-same" onclick="viewCollectionDetails('${collection._id}', ${isOwnProfile})">
+                    <i class="fas fa-eye"></i> Ver Colección
+                </button>
+                
+                ${isOwnProfile ? `
+                    <button class="btn-edit-collection-same" onclick="editCollection('${collection._id}')">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// ===== FUNCIONES AUXILIARES =====
+function showEmptyCollectionsState(isOwnProfile) {
+    const collectionsGrid = document.getElementById('collectionsGrid');
+    if (collectionsGrid) {
+        if (isOwnProfile) {
+            collectionsGrid.innerHTML = `
+                <div class="empty-collections-state">
+                    <div class="empty-collections-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h3>No tienes colecciones aún</h3>
+                    <p>Crea tu primera colección para organizar tus publicaciones favoritas.</p>
+                    <button class="btn-primary" onclick="createNewCollection()">
+                        <i class="fas fa-plus"></i> Crear Primera Colección
+                    </button>
+                </div>
+            `;
+        } else {
+            collectionsGrid.innerHTML = `
+                <div class="empty-collections-state">
+                    <div class="empty-collections-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h3>No hay colecciones públicas</h3>
+                    <p>Este usuario no tiene colecciones públicas disponibles.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+function viewCollectionDetails(collectionId, isOwnProfile = true) {
+    // Usar tu función existente de viewCollection o crear una similar
+    if (typeof viewCollection === 'function') {
+        viewCollection(collectionId);
+    } else {
+        // Función alternativa si no existe viewCollection
+        showCollectionModal(collectionId, isOwnProfile);
+    }
+}
+
+// ===== MODAL DE COLECCIÓN (si no existe tu función viewCollection) =====
+async function showCollectionModal(collectionId, isOwnProfile = true) {
+    try {
+        const endpoint = isOwnProfile ? 
+            `${API_URL}/collections/${collectionId}` :
+            `${API_URL}/collections/${collectionId}/public`;
+            
+        const response = await fetch(endpoint);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Crear modal similar al que usas en tu perfil
+            createCollectionModal(result.data, isOwnProfile);
+        } else {
+            showToast('❌ No se pudo cargar la colección', 'error');
+        }
+    } catch (error) {
+        console.error('Error cargando colección:', error);
+        showToast('❌ Error al cargar la colección', 'error');
+    }
+}
+
+function createCollectionModal(collection, isOwnProfile) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'collectionModal';
+    
+    const items = collection.publicaciones || [];
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-folder"></i> 
+                    ${collection.nombre}
+                    ${isOwnProfile ? `
+                        <div class="collection-modal-actions">
+                            <button class="btn-icon" onclick="editCollection('${collection._id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    ` : ''}
+                </h3>
+                <span class="close-modal" onclick="closeModal('collection')">&times;</span>
+            </div>
+            
+            <div class="modal-body">
+                <div class="collection-modal-content">
+                    ${collection.descripcion ? `
+                        <div class="collection-modal-description">
+                            <p>${collection.descripcion}</p>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="collection-modal-stats">
+                        <span class="stat">
+                            <i class="fas fa-file"></i>
+                            ${items.length} ${items.length === 1 ? 'publicación' : 'publicaciones'}
+                        </span>
+                        <span class="stat">
+                            <i class="fas fa-eye"></i>
+                            ${collection.visibilidad === 'publica' ? 'Pública' : 'Privada'}
+                        </span>
+                    </div>
+                    
+                    <div class="collection-modal-items">
+                        <h4>Publicaciones en la colección</h4>
+                        ${items.length > 0 ? `
+                            <div class="collection-items-list">
+                                ${items.map(item => `
+                                    <div class="collection-modal-item">
+                                        ${createCollectionItemPreview(item)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : `
+                            <div class="empty-state">
+                                <p>No hay publicaciones en esta colección</p>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    openModal('collection');
+}
+
+function createCollectionItemPreview(item) {
+    const isShared = item.tipo === 'share';
+    const actualItem = isShared && item.postOriginal ? item.postOriginal : item;
+    
+    return `
+        <div class="collection-item-preview">
+            <div class="item-preview-content">
+                <p>${actualItem.contenido ? truncateText(actualItem.contenido, 150) : 'Publicación'}</p>
+                <span class="item-date">${getTimeAgo(new Date(item.fecha_publicacion))}</span>
+            </div>
+            <button class="btn-view-item" onclick="viewPost('${item._id}')">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+    `;
+}
+
+
+
+// ===== INICIALIZAR EVENTOS DE VISUALIZACIÓN =====
+function initializeCollectionViewEvents(isOwnProfile) {
+    // Solo inicializar eventos de visualización, no de edición
+    
+    // Evento para ver colección
+    document.querySelectorAll('.btn-view-collection-same').forEach(button => {
+        button.addEventListener('click', function() {
+            const collectionId = this.closest('.collection-card-same-ui').dataset.collectionId;
+            viewCollectionDetails(collectionId, isOwnProfile);
+        });
+    });
+    
+    if (isOwnProfile) {
+        // Solo inicializar eventos de edición si es nuestro perfil
+        initializeCollectionEditEvents();
+    }
+}
+
 
 // Función temporal para mostrar información
 function showCollectionsInfo() {

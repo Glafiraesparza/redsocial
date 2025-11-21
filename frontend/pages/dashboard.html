@@ -122,7 +122,6 @@
         <input type="file" id="postAudio" accept="audio/*" style="display: none;" onchange="handleAudioUpload(event)">
         <input type="file" id="postVideo" accept="video/*" style="display: none;" onchange="handleVideoUpload(event)">
 
-        <!-- CONTENEDORES DE UPLOAD - AGREGAR ESTOS -->
         <!-- CONTENEDORES DE UPLOAD - USAR BUTTONS EN LUGAR DE LABELS -->
         <div id="imageUpload" class="media-upload-container" style="display: none;">
             <button type="button" class="btn-media-label" onclick="document.getElementById('postImage').click()">
@@ -307,6 +306,34 @@
             
         </div>
     </div>
+
+    <div class="mobile-bottom-nav">
+    <button class="mobile-nav-item active" onclick="showSection('feed')">
+        <i class="fas fa-home"></i>
+        <span>Inicio</span>
+    </button>
+    <button class="mobile-nav-item" onclick="window.location.href='profile.html'">
+        <i class="fas fa-user"></i>
+        <span>Perfil</span>
+    </button>
+    <button class="mobile-nav-item" onclick="showSection('explore')">
+        <i class="fas fa-search"></i>
+        <span>Explorar</span>
+    </button>
+    <button class="mobile-nav-item" onclick="showSection('users')">
+        <i class="fas fa-users"></i>
+        <span>Usuarios</span>
+    </button>
+    <button class="mobile-nav-item" onclick="showSection('messages')">
+        <i class="fas fa-comments"></i>
+        <span>Mensajes</span>
+    </button>
+    <button class="mobile-nav-item" onclick="showSection('notifications')">
+        <i class="fas fa-bell"></i>
+        <span>Alertas</span>
+    </button>
+</div>
+
 
 
     <script>

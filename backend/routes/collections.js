@@ -76,6 +76,78 @@ router.get('/usuario/:userId', async (req, res) => {
   }
 });
 
+// READ - Obtener colecciones PÚBLICAS de un usuario específico
+router.get('/user/:userId/public', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    console.log('🔍 Buscando colecciones públicas del usuario:', userId);
+
+    const colecciones = await Collection.find({ 
+      usuario: userId, 
+      tipo: 'publica' 
+    })
+    .populate('usuario', 'nombre username foto_perfil')
+    .populate({
+      path: 'posts',
+      populate: {
+        path: 'autor',
+        select: 'nombre username foto_perfil'
+      }
+    })
+    .sort({ fecha_actualizacion: -1 });
+
+    console.log(`✅ Encontradas ${colecciones.length} colecciones públicas para usuario ${userId}`);
+
+    res.json({
+      success: true,
+      data: colecciones
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo colecciones públicas del usuario:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// READ - Obtener colección pública por ID (para otros usuarios)
+router.get('/:id/public', async (req, res) => {
+  try {
+    const coleccion = await Collection.findOne({ 
+      _id: req.params.id, 
+      tipo: 'publica' 
+    })
+    .populate('usuario', 'nombre username foto_perfil')
+    .populate({
+      path: 'posts',
+      populate: {
+        path: 'autor',
+        select: 'nombre username foto_perfil'
+      }
+    });
+
+    if (!coleccion) {
+      return res.status(404).json({
+        success: false,
+        error: 'Colección no encontrada o no es pública'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: coleccion
+    });
+  } catch (error) {
+    console.error('Error obteniendo colección pública:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // READ - Obtener colección por ID con posts completos
 router.get('/:id', async (req, res) => {
   try {

@@ -122,9 +122,21 @@ function closeManagePostsModal() {
 }
 
 // ===== CREAR TARJETA DE COLECCIÓN MEJORADA - VERSIÓN CORREGIDA =====
+// ===== CREAR TARJETA DE COLECCIÓN MEJORADA - VERSIÓN CORREGIDA =====
 function createCollectionCardHTML(collection) {
     const postCount = collection.posts?.length || 0;
     const lastUpdated = getTimeAgo(new Date(collection.fecha_actualizacion));
+    
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+    
+    console.log('🔍 Contexto colección:', { 
+        isOwnProfile, 
+        viewingUserId, 
+        currentUserId: currentUser._id,
+        collectionId: collection._id
+    });
     
     return `
         <div class="collection-card" data-collection-id="${collection._id}" onclick="viewCollection('${collection._id}')">
@@ -132,22 +144,25 @@ function createCollectionCardHTML(collection) {
                 <div class="collection-icon" style="background-color: ${collection.color};">
                     <i class="${collection.icono}"></i>
                 </div>
-                <div class="collection-actions" onclick="event.stopPropagation()">
-                    <button class="btn-icon" onclick="openCollectionOptions('${collection._id}', event)">
-                        <i class="fas fa-ellipsis-h"></i>
-                    </button>
-                    <div class="collection-options-menu" id="collectionOptions-${collection._id}">
-                        <button class="option-item" onclick="editCollection('${collection._id}')">
-                            <i class="fas fa-edit"></i> Editar
+                ${isOwnProfile ? `
+                    <!-- Mostrar menú de opciones SOLO si es nuestro perfil -->
+                    <div class="collection-actions" onclick="event.stopPropagation()">
+                        <button class="btn-icon" onclick="openCollectionOptions('${collection._id}', event)">
+                            <i class="fas fa-ellipsis-h"></i>
                         </button>
-                        <button class="option-item" onclick="openManagePostsModal('${collection._id}')">
-                            <i class="fas fa-cog"></i> Gestionar Posts
-                        </button>
-                        <button class="option-item delete-option" onclick="confirmDeleteCollection('${collection._id}', '${collection.nombre}')">
-                            <i class="fas fa-trash"></i> Eliminar Colección
-                        </button>
+                        <div class="collection-options-menu" id="collectionOptions-${collection._id}">
+                            <button class="option-item" onclick="editCollection('${collection._id}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="option-item" onclick="openManagePostsModal('${collection._id}')">
+                                <i class="fas fa-cog"></i> Gestionar Posts
+                            </button>
+                            <button class="option-item delete-option" onclick="confirmDeleteCollection('${collection._id}', '${collection.nombre}')">
+                                <i class="fas fa-trash"></i> Eliminar Colección
+                            </button>
+                        </div>
                     </div>
-                </div>
+                ` : ''}
             </div>
             
             <div class="collection-content">
@@ -185,6 +200,10 @@ function createCollectionPostHTML(post, collectionId) {
     const isVideo = post.tipoContenido === 'video' && post.video;
     const isAudio = post.tipoContenido === 'audio' && post.audio;
     
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
+    
     let mediaContent = '';
     
     if (isImage) {
@@ -213,6 +232,22 @@ function createCollectionPostHTML(post, collectionId) {
         `;
     }
     
+    // Si NO es nuestro perfil, renderizar sin el contenedor de botones
+    if (!isOwnProfile) {
+        return `
+            <div class="collection-post-item" data-post-id="${post._id}" onclick="viewPost('${post._id}')">
+                ${mediaContent}
+                <div class="post-overlay">
+                    <div class="post-info">
+                        <p class="post-preview">${post.contenido ? post.contenido.substring(0, 50) + (post.contenido.length > 50 ? '...' : '') : 'Publicación'}</p>
+                        <span class="post-date">${getTimeAgo(new Date(post.fecha_publicacion))}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Si ES nuestro perfil, renderizar con el botón de eliminar
     return `
         <div class="collection-post-item" data-post-id="${post._id}">
             <div class="collection-post-content" onclick="viewPost('${post._id}')">
@@ -1551,6 +1586,10 @@ function showCollectionDetailModal(collection) {
     if (existingModal) {
         existingModal.remove();
     }
+
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
     
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -1602,7 +1641,7 @@ function showCollectionDetailModal(collection) {
                     <div class="collection-posts-section">
                         <div class="collection-posts-header">
                             <h4>Elementos en la colección (${collection.posts.length})</h4>
-                            ${collection.posts.length > 0 ? `
+                            ${isOwnProfile && collection.posts.length > 0 ? `
                                 <button class="btn-secondary btn-small" onclick="openManagePostsModal('${collection._id}')">
                                     <i class="fas fa-cog"></i> Gestionar Posts
                                 </button>
@@ -1618,11 +1657,13 @@ function showCollectionDetailModal(collection) {
                                 <i class="fas fa-inbox"></i>
                                 <p>Esta colección está vacía</p>
                                 <small>Agrega publicaciones desde tu perfil o el feed</small>
-                                <br>
-                                <br>
-                                <button class="btn-primary" onclick="addPostsToCollection('${collection._id}')">
-                                    <i class="fas fa-plus"></i> Agregar Posts
-                                </button>
+                                ${isOwnProfile ? `
+                                    <br>
+                                    <br>
+                                    <button class="btn-primary" onclick="addPostsToCollection('${collection._id}')">
+                                        <i class="fas fa-plus"></i> Agregar Posts
+                                    </button>
+                                ` : ''}
                             </div>
                         `}
                     </div>
@@ -1919,10 +1960,15 @@ function createManagedPostItem(post, collectionId) {
     `;
 }
 
-function createCollectionPostHTML(post) {
+// ===== CREAR HTML DE POST EN COLECCIÓN - ACTUALIZADA CON BOTÓN ELIMINAR =====
+function createCollectionPostHTML(post, collectionId) {
     const isImage = post.tipoContenido === 'imagen' && post.imagen;
     const isVideo = post.tipoContenido === 'video' && post.video;
     const isAudio = post.tipoContenido === 'audio' && post.audio;
+    
+    // Verificar si estamos viendo nuestro propio perfil o el de otro usuario
+    const viewingUserId = localStorage.getItem('viewingUserProfile');
+    const isOwnProfile = !viewingUserId || viewingUserId === currentUser._id;
     
     let mediaContent = '';
     
@@ -1947,20 +1993,27 @@ function createCollectionPostHTML(post) {
         mediaContent = `
             <div class="text-thumbnail">
                 <i class="fas fa-file-alt"></i>
-                <p>${post.contenido.substring(0, 100)}${post.contenido.length > 100 ? '...' : ''}</p>
+                <p>${post.contenido ? post.contenido.substring(0, 100) + (post.contenido.length > 100 ? '...' : '') : 'Publicación'}</p>
             </div>
         `;
     }
     
     return `
-        <div class="collection-post-item" onclick="viewPost('${post._id}')">
-            ${mediaContent}
-            <div class="post-overlay">
-                <div class="post-info">
-                    <p class="post-preview">${post.contenido.substring(0, 50)}${post.contenido.length > 50 ? '...' : ''}</p>
-                    <span class="post-date">${getTimeAgo(new Date(post.fecha_publicacion))}</span>
+        <div class="collection-post-item ${isOwnProfile ? 'with-actions' : 'without-actions'}" data-post-id="${post._id}">
+            <div class="collection-post-content" onclick="viewPost('${post._id}')">
+                ${mediaContent}
+                <div class="post-overlay">
+                    <div class="post-info">
+                        <p class="post-preview">${post.contenido ? post.contenido.substring(0, 50) + (post.contenido.length > 50 ? '...' : '') : 'Publicación'}</p>
+                        <span class="post-date">${getTimeAgo(new Date(post.fecha_publicacion))}</span>
+                    </div>
                 </div>
             </div>
+            ${isOwnProfile ? `
+                <button class="btn-remove-from-collection" onclick="removePostFromCollection('${collectionId}', '${post._id}', event)">
+                    <i class="fas fa-times"></i>
+                </button>
+            ` : ''}
         </div>
     `;
 }

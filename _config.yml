@@ -1,0 +1,14 @@
+# Configuración para GitHub Pages
+source: "frontend" 
+
+# Excluir todo lo que no es frontend
+exclude:
+  - backend/
+  - node_modules/
+  - README.md
+  - .env
+  - .gitignore
+
+# Configuración básica
+title: "Red Social"
+description: "Mi aplicación de red social"
