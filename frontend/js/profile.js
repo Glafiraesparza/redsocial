@@ -528,6 +528,552 @@ function forceHideEditElements() {
     document.head.appendChild(styleElement);
 }
 
+// ===== MODAL DE CONFIGURACIÓN =====
+function openConfigModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'configModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cogs"></i> Configuración</h3>
+                <span class="close-modal" onclick="closeConfigModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="config-tabs">
+                    <div class="config-tab-nav">
+                        <button class="config-tab-btn active" data-tab="account">
+                            <i class="fas fa-user-cog"></i> Cuenta
+                        </button>
+                        <button class="config-tab-btn" data-tab="security">
+                            <i class="fas fa-shield-alt"></i> Seguridad
+                        </button>
+                        <button class="config-tab-btn" data-tab="blocked">
+                            <i class="fas fa-ban"></i> Usuarios Bloqueados
+                        </button>
+                    </div>
+                    
+                    <div class="config-tab-content">
+                        <!-- Pestaña de Cuenta -->
+                        <div id="accountTab" class="config-tab-pane active">
+                            <h4><i class="fas fa-user-edit"></i> Información de la Cuenta</h4>
+
+                            <div class="config-option">
+                                <label>Cambiar nombre de usuario</label>
+                                <div class="config-action">
+                                    <input type="text" id="newUsername" placeholder="Nuevo nombre de usuario" class="config-input">
+                                    <button class="btn-primary btn-small" onclick="changeUsername()">
+                                        <i class="fas fa-save"></i> Cambiar
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="config-option">
+                                <label>Cambiar dirección de correo electrónico</label>
+                                <div class="config-action">
+                                    <input type="email" id="newEmail" placeholder="Nuevo correo electrónico" class="config-input">
+                                    <button class="btn-primary btn-small" onclick="changeEmail()">
+                                        <i class="fas fa-save"></i> Cambiar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pestaña de Seguridad -->
+                        <div id="securityTab" class="config-tab-pane">
+                            <h4><i class="fas fa-lock"></i> Seguridad</h4>
+                            <div class="config-option">
+                                <label>Cambiar contraseña</label>
+                                <div class="config-action">
+                                    <input type="password" id="currentPassword" placeholder="Contraseña actual" class="config-input">
+                                    <input type="password" id="newPassword" placeholder="Nueva contraseña" class="config-input">
+                                    <input type="password" id="confirmPassword" placeholder="Confirmar nueva contraseña" class="config-input">
+                                    <button class="btn-primary btn-small" onclick="changePassword()">
+                                        <i class="fas fa-key"></i> Cambiar Contraseña
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pestaña de Usuarios Bloqueados -->
+                        <div id="blockedTab" class="config-tab-pane">
+                            <h4><i class="fas fa-ban"></i> Usuarios Bloqueados</h4>
+                            <div class="blocked-users-list" id="blockedUsersList">
+                                <div class="loading-state">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <p>Cargando usuarios bloqueados...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    
+    // Inicializar eventos del modal de configuración
+    initializeConfigModalEvents();
+    loadBlockedUsers();
+}
+
+function closeConfigModal() {
+    const modal = document.getElementById('configModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Actualiza la función initializeConfigModalEvents() con validaciones en tiempo real:
+function initializeConfigModalEvents() {
+    // Navegación entre pestañas
+    const tabButtons = document.querySelectorAll('.config-tab-btn');
+    const tabPanes = document.querySelectorAll('.config-tab-pane');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab') + 'Tab';
+            
+            // Remover clase active de todos los botones y paneles
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+            
+            // Agregar clase active al botón y panel seleccionado
+            this.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+    
+    // Validación en tiempo real para username
+    const usernameInput = document.getElementById('newUsername');
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function() {
+            const username = this.value.trim();
+            const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+            
+            // Remover mensajes anteriores
+            const existingMessage = this.parentElement.querySelector('.input-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            if (username) {
+                if (username === currentUser.username) {
+                    this.style.borderColor = '#3498db';
+                    const message = document.createElement('div');
+                    message.className = 'input-message info';
+                    message.innerHTML = '<i class="fas fa-info-circle"></i> Este es tu nombre de usuario actual';
+                    this.parentElement.appendChild(message);
+                } else if (!usernameRegex.test(username)) {
+                    this.style.borderColor = '#e74c3c';
+                    const message = document.createElement('div');
+                    message.className = 'input-message error';
+                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Solo letras, números y _ (3-20 caracteres)';
+                    this.parentElement.appendChild(message);
+                } else {
+                    this.style.borderColor = '#27ae60';
+                    const message = document.createElement('div');
+                    message.className = 'input-message success';
+                    message.innerHTML = '<i class="fas fa-check-circle"></i> Formato válido';
+                    this.parentElement.appendChild(message);
+                }
+            } else {
+                this.style.borderColor = '';
+            }
+        });
+    }
+    
+    // Validación en tiempo real para email
+    const emailInput = document.getElementById('newEmail');
+    if (emailInput) {
+        emailInput.addEventListener('input', function() {
+            const email = this.value.trim().toLowerCase();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            // Remover mensajes anteriores
+            const existingMessage = this.parentElement.querySelector('.input-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            if (email) {
+                if (currentUser.email && email === currentUser.email.toLowerCase()) {
+                    this.style.borderColor = '#3498db';
+                    const message = document.createElement('div');
+                    message.className = 'input-message info';
+                    message.innerHTML = '<i class="fas fa-info-circle"></i> Este es tu correo electrónico actual';
+                    this.parentElement.appendChild(message);
+                } else if (!emailRegex.test(email)) {
+                    this.style.borderColor = '#e74c3c';
+                    const message = document.createElement('div');
+                    message.className = 'input-message error';
+                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Formato de email inválido';
+                    this.parentElement.appendChild(message);
+                } else {
+                    this.style.borderColor = '#27ae60';
+                    const message = document.createElement('div');
+                    message.className = 'input-message success';
+                    message.innerHTML = '<i class="fas fa-check-circle"></i> Formato válido';
+                    this.parentElement.appendChild(message);
+                }
+            } else {
+                this.style.borderColor = '';
+            }
+        });
+    }
+    
+    // Validación en tiempo real para contraseña
+    const newPasswordInput = document.getElementById('newPassword');
+    if (newPasswordInput) {
+        newPasswordInput.addEventListener('input', function() {
+            const password = this.value;
+            
+            // Remover mensajes anteriores
+            const existingMessage = this.parentElement.querySelector('.input-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            if (password) {
+                if (password.length < 6) {
+                    this.style.borderColor = '#e74c3c';
+                    const message = document.createElement('div');
+                    message.className = 'input-message error';
+                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Mínimo 6 caracteres';
+                    this.parentElement.appendChild(message);
+                } else {
+                    this.style.borderColor = '#27ae60';
+                    const message = document.createElement('div');
+                    message.className = 'input-message success';
+                    message.innerHTML = '<i class="fas fa-check-circle"></i> Longitud válida';
+                    this.parentElement.appendChild(message);
+                }
+            } else {
+                this.style.borderColor = '';
+            }
+        });
+    }
+    
+    // Validación para confirmar contraseña
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const newPasswordInputForConfirm = document.getElementById('newPassword');
+    
+    if (confirmPasswordInput && newPasswordInputForConfirm) {
+        confirmPasswordInput.addEventListener('input', function() {
+            const confirmPassword = this.value;
+            const newPassword = newPasswordInputForConfirm.value;
+            
+            // Remover mensajes anteriores
+            const existingMessage = this.parentElement.querySelector('.input-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            if (confirmPassword) {
+                if (confirmPassword !== newPassword) {
+                    this.style.borderColor = '#e74c3c';
+                    const message = document.createElement('div');
+                    message.className = 'input-message error';
+                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Las contraseñas no coinciden';
+                    this.parentElement.appendChild(message);
+                } else {
+                    this.style.borderColor = '#27ae60';
+                    const message = document.createElement('div');
+                    message.className = 'input-message success';
+                    message.innerHTML = '<i class="fas fa-check-circle"></i> Las contraseñas coinciden';
+                    this.parentElement.appendChild(message);
+                }
+            } else {
+                this.style.borderColor = '';
+            }
+        });
+    }
+}
+
+// ===== GESTIÓN DE USUARIOS BLOQUEADOS =====
+async function loadBlockedUsers() {
+    try {
+        const blockedUsersList = document.getElementById('blockedUsersList');
+        if (!blockedUsersList) return;
+
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        const blockedUsersIds = currentUser.usuarios_bloqueados || [];
+
+        if (blockedUsersIds.length === 0) {
+            blockedUsersList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-check"></i>
+                    <h4>No hay usuarios bloqueados</h4>
+                    <p>No has bloqueado a ningún usuario todavía.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Mostrar loading
+        blockedUsersList.innerHTML = `
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando usuarios bloqueados...</p>
+            </div>
+        `;
+
+        // Obtener información de cada usuario bloqueado
+        const usersPromises = blockedUsersIds.map(userId => 
+            fetch(`${API_URL}/users/${userId}`).then(res => res.json())
+        );
+
+        const usersResults = await Promise.all(usersPromises);
+        const blockedUsers = usersResults.filter(result => result.success).map(result => result.data);
+
+        if (blockedUsers.length === 0) {
+            blockedUsersList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-check"></i>
+                    <h4>No hay usuarios bloqueados</h4>
+                    <p>No has bloqueado a ningún usuario todavía.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Mostrar lista de usuarios bloqueados
+        blockedUsersList.innerHTML = blockedUsers.map(user => `
+            <div class="blocked-user-item">
+                <div class="blocked-user-info">
+                    <div class="blocked-user-avatar">
+                        ${user.foto_perfil ? 
+                            `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
+                            `<i class="fas fa-user"></i>`
+                        }
+                    </div>
+                    <div class="blocked-user-details">
+                        <h5>${user.nombre}</h5>
+                        <p>@${user.username}</p>
+                    </div>
+                </div>
+                <button class="btn-primary btn-small" onclick="unblockUser('${user._id}')">
+                    <i class="fas fa-lock-open"></i> Desbloquear
+                </button>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error cargando usuarios bloqueados:', error);
+        const blockedUsersList = document.getElementById('blockedUsersList');
+        if (blockedUsersList) {
+            blockedUsersList.innerHTML = `
+                <div class="empty-state error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h4>Error al cargar</h4>
+                    <p>No se pudieron cargar los usuarios bloqueados.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+async function unblockUser(userId) {
+    try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        
+        showToast('⏳ Desbloqueando usuario...', 'info');
+        
+        const response = await fetch(`${API_URL}/users/${userId}/unblock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: currentUser._id })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Usuario desbloqueado exitosamente', 'success');
+            
+            // Actualizar localStorage
+            currentUser.usuarios_bloqueados = currentUser.usuarios_bloqueados?.filter(id => id !== userId) || [];
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Recargar la lista de usuarios bloqueados
+            loadBlockedUsers();
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error desbloqueando usuario:', error);
+        showToast('❌ Error al desbloquear el usuario', 'error');
+    }
+}
+
+// ===== FUNCIONES DE CONFIGURACIÓN 
+
+async function changeUsername() {
+    const newUsernameInput = document.getElementById('newUsername');
+    const newUsername = newUsernameInput.value.trim();
+    
+    if (!newUsername) {
+        showToast('❌ Por favor ingresa un nombre de usuario', 'error');
+        return;
+    }
+    
+    // Validar si es el mismo username actual
+    if (newUsername === currentUser.username) {
+        showToast('ℹ️ Este ya es tu nombre de usuario actual', 'info');
+        return;
+    }
+    
+    // Validar formato del username
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!usernameRegex.test(newUsername)) {
+        showToast('❌ El nombre de usuario solo puede contener letras, números y guiones bajos (3-20 caracteres)', 'error');
+        return;
+    }
+    
+    try {
+        showToast('⏳ Cambiando nombre de usuario...', 'info');
+        
+        const response = await fetch(`${API_URL}/users/${currentUser._id}/username`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newUsername })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Nombre de usuario cambiado exitosamente', 'success');
+            newUsernameInput.value = '';
+            
+            // Actualizar currentUser en localStorage
+            currentUser.username = newUsername;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Actualizar la interfaz
+            updateProfileHeader(userProfileData.usuario);
+            initializeSidebar();
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error cambiando nombre de usuario:', error);
+        showToast('❌ Error al cambiar el nombre de usuario', 'error');
+    }
+}
+
+async function changeEmail() {
+    const newEmailInput = document.getElementById('newEmail');
+    const newEmail = newEmailInput.value.trim().toLowerCase();
+    
+    if (!newEmail) {
+        showToast('❌ Por favor ingresa un correo electrónico', 'error');
+        return;
+    }
+    
+    // Validar si es el mismo email actual (si existe)
+    if (currentUser.email && newEmail === currentUser.email.toLowerCase()) {
+        showToast('ℹ️ Este ya es tu correo electrónico actual', 'info');
+        return;
+    }
+    
+    // Validación de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+        showToast('❌ Por favor ingresa un correo electrónico válido', 'error');
+        return;
+    }
+    
+    try {
+        showToast('⏳ Cambiando correo electrónico...', 'info');
+        
+        const response = await fetch(`${API_URL}/users/${currentUser._id}/email`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newEmail })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Correo electrónico cambiado exitosamente', 'success');
+            newEmailInput.value = '';
+            
+            // Actualizar currentUser en localStorage
+            currentUser.email = newEmail;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error cambiando correo electrónico:', error);
+        showToast('❌ Error al cambiar el correo electrónico', 'error');
+    }
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    // Validaciones
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showToast('❌ Por favor completa todos los campos', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showToast('❌ La nueva contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showToast('❌ Las contraseñas no coinciden', 'error');
+        return;
+    }
+    
+    // Validar que la nueva contraseña no sea igual a la actual
+    if (currentPassword === newPassword) {
+        showToast('ℹ️ La nueva contraseña debe ser diferente a la actual', 'info');
+        return;
+    }
+    
+    try {
+        showToast('⏳ Cambiando contraseña...', 'info');
+        
+        const response = await fetch(`${API_URL}/users/${currentUser._id}/password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                currentPassword, 
+                newPassword 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅ Contraseña cambiada exitosamente', 'success');
+            
+            // Limpiar campos
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            
+        } else {
+            showToast(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error cambiando contraseña:', error);
+        showToast('❌ Error al cambiar la contraseña', 'error');
+    }
+}
+
 // ===== HACER FUNCIONES GLOBALES =====
 // ===== HACER FUNCIONES GLOBALES - VERSIÓN CORREGIDA =====
 function makeFunctionsGlobal() {
@@ -1023,6 +1569,15 @@ window.showFriendRemoveFollowerConfirmModal = function(userId, userName, userUse
     window.initializeComentarioEvents = initializeComentarioEvents;
     window.loadComentariosModal = loadComentariosModal;
     window.enviarComentarioModal = enviarComentarioModal;
+    // En makeFunctionsGlobal(), agrega:
+    window.openConfigModal = openConfigModal;
+    window.closeConfigModal = closeConfigModal;
+    window.validateNombre = validateNombre;
+    window.validateEdad = validateEdad;
+    window.changeUsername = changeUsername;
+    window.changePassword = changePassword;
+    window.changeEmail = changeEmail;
+    window.unblockUser = unblockUser;
     
     console.log('✅ Funciones globales creadas');
 }
@@ -1573,7 +2128,7 @@ function cancelCoverUpload() {
     console.log('✅ Upload de portada cancelado/reseteado');
 }
 
-// Función para cargar el formulario de edición
+// ===== FUNCIÓN PARA CARGAR FORMULARIO DE EDICIÓN - COMPLETA =====
 async function loadEditProfileForm() {
     try {
         const formContainer = document.getElementById('editProfileForm');
@@ -1600,8 +2155,13 @@ async function loadEditProfileForm() {
                             name="nombre" 
                             value="${user.nombre || ''}" 
                             required
-                            maxlength="50"
+                            maxlength="40"
+                            oninput="validateNombre()"
                         >
+                        <div class="validation-message" id="nombreValidation">
+                            <span id="nombreError" class="error-message"></span>
+                            <span class="char-count">${user.nombre?.length || 0}/40</span>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -1637,13 +2197,18 @@ async function loadEditProfileForm() {
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="editFechaNacimiento">Fecha de nacimiento</label>
+                            <label for="editFechaNacimiento">Fecha de nacimiento *</label>
                             <input 
                                 type="date" 
                                 id="editFechaNacimiento" 
                                 name="fecha_nacimiento" 
                                 value="${user.fecha_nacimiento ? new Date(user.fecha_nacimiento).toISOString().split('T')[0] : ''}"
+                                required
+                                onchange="validateEdad()"
                             >
+                            <div class="validation-message">
+                                <span id="edadError" class="error-message"></span>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -1658,52 +2223,51 @@ async function loadEditProfileForm() {
                     </div>
                 </div>
 
-
-<!-- Intereses -->
-<div class="form-section">
-    <h4><i class="fas fa-heart"></i> Intereses</h4>
-    <p class="form-help">Haz clic en los intereses para seleccionarlos (máximo 10)</p>
-    
-    <div class="intereses-selector">
-        <div class="intereses-grid" id="interesesGrid">
-            ${interesesDisponibles.map(interes => {
-                const isSelected = user.intereses?.includes(interes);
-                return `
-                    <div class="interes-item ${isSelected ? 'selected' : ''}" 
-                         data-interes="${interes}"
-                         onclick="toggleInteres(this, '${interes}')">
-                        <span class="interes-badge">
-                            ${interes}
-                            ${isSelected ? '<i class="fas fa-check"></i>' : ''}
-                        </span>
+                <!-- Intereses -->
+                <div class="form-section">
+                    <h4><i class="fas fa-heart"></i> Intereses</h4>
+                    <p class="form-help">Haz clic en los intereses para seleccionarlos (máximo 10)</p>
+                    
+                    <div class="intereses-selector">
+                        <div class="intereses-grid" id="interesesGrid">
+                            ${interesesDisponibles.map(interes => {
+                                const isSelected = user.intereses?.includes(interes);
+                                return `
+                                    <div class="interes-item ${isSelected ? 'selected' : ''}" 
+                                         data-interes="${interes}"
+                                         onclick="toggleInteres(this, '${interes}')">
+                                        <span class="interes-badge">
+                                            ${interes}
+                                            ${isSelected ? '<i class="fas fa-check"></i>' : ''}
+                                        </span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        
+                        <div class="intereses-seleccionados">
+                            <h5>
+                                <i class="fas fa-check-circle"></i> 
+                                Tus intereses seleccionados: 
+                                <span class="interests-count" id="interestsCount">
+                                    (${user.intereses?.length || 0}/10)
+                                </span>
+                            </h5>
+                            <div class="selected-interests-grid" id="selectedInterests">
+                                ${user.intereses?.map(interes => `
+                                    <div class="selected-interes-item" data-interes="${interes}">
+                                        <span class="interes-badge selected">
+                                            ${interes}
+                                            <i class="fas fa-times" onclick="removeInteres('${interes}')"></i>
+                                        </span>
+                                    </div>
+                                `).join('') || '<p class="no-interests">Aún no has seleccionado intereses</p>'}
+                            </div>
+                        </div>
                     </div>
-                `;
-            }).join('')}
-        </div>
-        
-        <div class="intereses-seleccionados">
-            <h5>
-                <i class="fas fa-check-circle"></i> 
-                Tus intereses seleccionados: 
-                <span class="interests-count" id="interestsCount">
-                    (${user.intereses?.length || 0}/10)
-                </span>
-            </h5>
-            <div class="selected-interests-grid" id="selectedInterests">
-                ${user.intereses?.map(interes => `
-                    <div class="selected-interes-item" data-interes="${interes}">
-                        <span class="interes-badge selected">
-                            ${interes}
-                            <i class="fas fa-times" onclick="removeInteres('${interes}')"></i>
-                        </span>
-                    </div>
-                `).join('') || '<p class="no-interests">Aún no has seleccionado intereses</p>'}
-            </div>
-        </div>
-    </div>
-</div>
+                </div>
 
-                <!-- Acciones del Formulario -->
+                <!-- ACCIONES DEL FORMULARIO - ESTA ES LA PARTE QUE FALTABA -->
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="closeEditProfileModal()">
                         <i class="fas fa-times"></i> Cancelar
@@ -1715,6 +2279,9 @@ async function loadEditProfileForm() {
             </form>
         `;
 
+        // Inicializar intereses seleccionados
+        initializeSelectedInterests(user);
+        
         // Inicializar eventos del formulario
         initializeEditFormEvents();
 
@@ -1723,6 +2290,73 @@ async function loadEditProfileForm() {
         showToast('❌ Error al cargar el formulario', 'error');
     }
 }
+
+// ===== VALIDACIONES DEL FORMULARIO =====
+function validateNombre() {
+    const nombreInput = document.getElementById('editNombre');
+    const nombreError = document.getElementById('nombreError');
+    const charCount = nombreInput.parentElement.querySelector('.char-count');
+    
+    if (!nombreInput || !nombreError) return true;
+    
+    const nombre = nombreInput.value.trim();
+    const isValid = nombre.length > 0 && nombre.length <= 40;
+    
+    // Actualizar contador
+    if (charCount) {
+        charCount.textContent = `${nombre.length}/40`;
+        charCount.style.color = nombre.length > 35 ? '#e74c3c' : nombre.length > 30 ? '#f39c12' : '#7f8c8d';
+    }
+    
+    // Validar y mostrar errores
+    if (nombre.length === 0) {
+        nombreError.textContent = 'El nombre no puede estar vacío';
+        nombreInput.style.borderColor = '#e74c3c';
+        return false;
+    } else if (nombre.length > 40) {
+        nombreError.textContent = 'El nombre no puede tener más de 40 caracteres';
+        nombreInput.style.borderColor = '#e74c3c';
+        return false;
+    } else {
+        nombreError.textContent = '';
+        nombreInput.style.borderColor = '#27ae60';
+        return true;
+    }
+}
+
+function validateEdad() {
+    const fechaInput = document.getElementById('editFechaNacimiento');
+    const edadError = document.getElementById('edadError');
+    
+    if (!fechaInput || !edadError) return true;
+    
+    const fechaNacimiento = new Date(fechaInput.value);
+    const hoy = new Date();
+    const edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+    const mes = hoy.getMonth() - fechaNacimiento.getMonth();
+    
+    // Ajustar edad si aún no ha pasado el mes de cumpleaños
+    const edadReal = mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate()) ? edad - 1 : edad;
+    
+    if (edadReal < 13) {
+        edadError.textContent = 'Debes tener al menos 13 años';
+        fechaInput.style.borderColor = '#e74c3c';
+        return false;
+    } else {
+        edadError.textContent = '';
+        fechaInput.style.borderColor = '#27ae60';
+        return true;
+    }
+}
+
+// Función para validar todo el formulario antes de enviar
+function validateForm() {
+    const isNombreValid = validateNombre();
+    const isEdadValid = validateEdad();
+    
+    return isNombreValid && isEdadValid;
+}
+
 
 // Array global para trackear intereses seleccionados
 let selectedInterests = [];
@@ -2059,9 +2693,21 @@ function updateProfileHeader(usuario) {
     if (!usuario) return;
     
     const profileAvatar = document.getElementById('profileAvatarImg');
-    if (profileAvatar && usuario.foto_perfil) {
-        profileAvatar.src = usuario.foto_perfil;
-        profileAvatar.style.display = 'block';
+    if (profileAvatar) {
+        if (usuario.foto_perfil) {
+            profileAvatar.src = usuario.foto_perfil;
+            profileAvatar.style.display = 'block';
+            profileAvatar.alt = `Foto de perfil de ${usuario.nombre}`;
+        } else {
+            // OCULTAR la imagen si no hay foto de perfil
+            profileAvatar.style.display = 'none';
+            // Mostrar el ícono por defecto que está en el HTML
+            const avatarContainer = profileAvatar.closest('.profile-avatar-large');
+            if (avatarContainer) {
+                // Asegurarse de que se vea el ícono por defecto
+                avatarContainer.classList.add('no-photo');
+            }
+        }
     }
     
     const profileName = document.getElementById('profileUserName');
@@ -2076,7 +2722,12 @@ function updateProfileHeader(usuario) {
 function loadCurrentProfilePhoto() {
     const currentPhoto = document.getElementById('currentProfilePhoto');
     if (currentPhoto && userProfileData && userProfileData.usuario) {
-        currentPhoto.src = userProfileData.usuario.foto_perfil || '';
+        if (userProfileData.usuario.foto_perfil) {
+            currentPhoto.src = userProfileData.usuario.foto_perfil;
+            currentPhoto.style.display = 'block';
+        } else {
+            currentPhoto.style.display = 'none';
+        }
     }
 }
 
@@ -3894,11 +4545,16 @@ function formatDateForDisplay(dateString) {
     return date.toLocaleDateString('es-ES');
 }
 
-// Función para guardar los cambios del perfil
-// Función para guardar los cambios del perfil - VERSIÓN CORREGIDA
+// Función para guardar los cambios del perfil - CON VALIDACIONES
 async function saveProfileChanges() {
     console.log('💾 Intentando guardar cambios del perfil...');
     
+    // Validar formulario antes de enviar
+    if (!validateForm()) {
+        showToast('❌ Por favor corrige los errores en el formulario', 'error');
+        return;
+    }
+
     const form = document.getElementById('profileEditForm');
     if (!form) {
         console.error('❌ Formulario no encontrado');
@@ -3913,18 +4569,10 @@ async function saveProfileChanges() {
     const fechaNacimientoInput = document.getElementById('editFechaNacimiento');
     const generoSelect = document.getElementById('editGenero');
 
-    // Validar que los elementos existen
-    if (!nombreInput) {
-        console.error('❌ Campo nombre no encontrado');
-        showToast('❌ Error: Campo nombre no encontrado', 'error');
-        return;
-    }
-
     const profileData = {
         nombre: nombreInput ? nombreInput.value.trim() : '',
         biografia: biografiaInput ? biografiaInput.value.trim() : '',
         ubicacion: ubicacionInput ? ubicacionInput.value.trim() : '',
-        // CORREGIDO: Usar el formateo correcto para fechas
         fecha_nacimiento: fechaNacimientoInput && fechaNacimientoInput.value ? 
             formatDateForStorage(fechaNacimientoInput.value) : '',
         genero: generoSelect ? generoSelect.value : 'prefiero_no_decir',
@@ -3932,25 +4580,6 @@ async function saveProfileChanges() {
     };
 
     console.log('📦 Datos a enviar:', profileData);
-
-    // Validaciones básicas MEJORADAS
-    if (!profileData.nombre) {
-        showToast('❌ El nombre es obligatorio', 'error');
-        
-        // Resaltar el campo con error
-        if (nombreInput) {
-            nombreInput.style.borderColor = '#e74c3c';
-            nombreInput.focus();
-        }
-        return;
-    }
-
-    if (profileData.nombre.length < 2) {
-        showToast('❌ El nombre debe tener al menos 2 caracteres', 'error');
-        nombreInput.style.borderColor = '#e74c3c';
-        nombreInput.focus();
-        return;
-    }
 
     try {
         showToast('⏳ Guardando cambios...', 'info');

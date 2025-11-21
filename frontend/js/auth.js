@@ -88,7 +88,7 @@ document.addEventListener('click', function(event) {
     }
 });
 
-// Configurar límites para fecha de nacimiento
+// REEMPLAZA ESTA FUNCIÓN COMPLETAMENTE:
 function initializeDateLimits() {
     const fechaNacimientoInput = document.getElementById('regFechaNacimiento');
     
@@ -98,31 +98,72 @@ function initializeDateLimits() {
         const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate());
         const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
         
-        // Configurar atributos nativos del input
+        // Configurar input de fecha nativo con mejoras
+        fechaNacimientoInput.type = 'date';
         fechaNacimientoInput.max = maxDate.toISOString().split('T')[0];
         fechaNacimientoInput.min = minDate.toISOString().split('T')[0];
-        fechaNacimientoInput.setAttribute('placeholder', 'AAAA-MM-DD');
+        fechaNacimientoInput.setAttribute('placeholder', 'Selecciona tu fecha de nacimiento');
         
-        // Solo usar flatpickr si está disponible
-        if (typeof flatpickr !== 'undefined') {
-            flatpickr(fechaNacimientoInput, {
-                locale: "es",
-                dateFormat: "Y-m-d",
-                maxDate: maxDate,
-                minDate: minDate,
-                position: "auto",
-                static: true,
-                monthSelectorType: "dropdown",
-                yearSelectorType: "dropdown",
-                prevArrow: '<i class="fas fa-chevron-left"></i>',
-                nextArrow: '<i class="fas fa-chevron-right"></i>',
-                onReady: function(selectedDates, dateStr, instance) {
-                    instance.calendarContainer.classList.add('custom-flatpickr');
-                }
-            });
-        } else {
-            console.log('⚠️ Flatpickr no está disponible, usando input nativo');
-        }
+        // Agregar estilos CSS personalizados
+        fechaNacimientoInput.style.padding = '12px';
+        fechaNacimientoInput.style.border = '2px solid #e9ecef';
+        fechaNacimientoInput.style.borderRadius = '8px';
+        fechaNacimientoInput.style.fontSize = '16px';
+        fechaNacimientoInput.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        fechaNacimientoInput.style.width = '100%';
+        fechaNacimientoInput.style.cursor = 'pointer';
+        
+        // Efectos hover y focus
+        fechaNacimientoInput.addEventListener('mouseenter', function() {
+            this.style.borderColor = '#3498db';
+            this.style.backgroundColor = 'rgba(52, 152, 219, 0.05)';
+        });
+        
+        fechaNacimientoInput.addEventListener('mouseleave', function() {
+            if (!this.matches(':focus')) {
+                this.style.borderColor = '#e9ecef';
+                this.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+        });
+        
+        fechaNacimientoInput.addEventListener('focus', function() {
+            this.style.borderColor = '#2ecc71';
+            this.style.backgroundColor = 'rgba(46, 204, 113, 0.05)';
+            this.style.outline = 'none';
+        });
+        
+        fechaNacimientoInput.addEventListener('blur', function() {
+            this.style.borderColor = '#e9ecef';
+            this.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        });
+        
+        // Validación en tiempo real
+        fechaNacimientoInput.addEventListener('change', function() {
+            validateBirthDate(this);
+        });
+        
+        console.log('✅ Selector de fecha nativo configurado correctamente');
+    }
+}
+
+// AGREGA ESTA FUNCIÓN DE VALIDACIÓN:
+function validateBirthDate(input) {
+    const selectedDate = new Date(input.value);
+    const today = new Date();
+    const minAgeDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate());
+    const maxAgeDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+    
+    if (selectedDate > minAgeDate) {
+        input.style.borderColor = '#e74c3c';
+        input.style.backgroundColor = 'rgba(231, 76, 60, 0.05)';
+        showToast('❌ Debes tener al menos 13 años para registrarte', 'error');
+    } else if (selectedDate < maxAgeDate) {
+        input.style.borderColor = '#e74c3c';
+        input.style.backgroundColor = 'rgba(231, 76, 60, 0.05)';
+        showToast('❌ Por favor ingresa una fecha de nacimiento válida', 'error');
+    } else {
+        input.style.borderColor = '#2ecc71';
+        input.style.backgroundColor = 'rgba(46, 204, 113, 0.05)';
     }
 }
 

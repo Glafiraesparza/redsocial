@@ -1369,11 +1369,26 @@ async function handleLike(postId) {
     }
 }
 
-// handleShare:
+// handleShare: FUNCIÓN CORREGIDA CON VERIFICACIÓN DE ESTADO
 async function handleShare(postId) {
     try {
         console.log('🔄 Intentando compartir publicación:', postId);
         
+        // VERIFICAR SI YA SE COMPARTIÓ - PREVENIR DUPLICADOS
+        const shareBtn = document.getElementById(`shareBtn-${postId}`);
+        if (shareBtn && (shareBtn.disabled || shareBtn.classList.contains('shared'))) {
+            console.log('⚠️ Esta publicación ya fue compartida');
+            showToast('⚠️ Ya compartiste esta publicación', 'info');
+            return;
+        }
+        
+        // Deshabilitar botón temporalmente para prevenir múltiples clics
+        if (shareBtn) {
+            shareBtn.disabled = true;
+            shareBtn.classList.add('shared');
+            shareBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Cargando...</span>';
+        }
+
         const response = await fetch(`${API_URL}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 
@@ -1389,32 +1404,36 @@ async function handleShare(postId) {
         
         if (result.success) {
             // Actualizar contador en el botón
-            const shareBtn = document.getElementById(`shareBtn-${postId}`);
             if (shareBtn) {
                 const shareCount = shareBtn.querySelector('span');
                 shareCount.textContent = result.data.sharesCount;
+                
+                // Cambiar estilo para indicar que ya fue compartido
+                shareBtn.classList.add('shared');
+                shareBtn.innerHTML = `<i class="fas fa-check"></i> <span>${result.data.sharesCount}</span>`;
             }
             
             showToast('✅ Publicación compartida exitosamente', 'success');
             
-            // Recargar el feed
-            setTimeout(() => {
-                if (document.getElementById('feedSection').classList.contains('active')) {
-                    loadFeed();
-                }
-                if (document.getElementById('exploreSection').classList.contains('active')) {
-                    loadExplorePosts();
-                }
-            }, 1000);
-            
         } else {
             console.error('❌ Error al compartir:', result.error);
+            
+            // Rehabilitar botón en caso de error
+            if (shareBtn) {
+                shareBtn.disabled = false;
+                shareBtn.classList.remove('shared');
+                shareBtn.innerHTML = `<i class="fas fa-share"></i> <span>${shareBtn.querySelector('span').textContent}</span>`;
+            }
             
             // Mostrar mensajes de error específicos
             if (result.error.includes('bloqueado')) {
                 showToast(`❌ ${result.error}`, 'error');
-            } else if (result.error.includes('Ya compartiste')) {
+            } else if (result.error.includes('Ya compartiste') || result.error.includes('ya compartió')) {
                 showToast('⚠️ Ya compartiste esta publicación', 'info');
+                // Marcar como compartido permanentemente
+                if (shareBtn) {
+                    shareBtn.classList.add('shared');
+                }
             } else if (result.error.includes('ya es compartida')) {
                 showToast('⚠️ No puedes compartir una publicación compartida', 'info');
             } else {
@@ -1424,6 +1443,14 @@ async function handleShare(postId) {
     } catch (error) {
         console.error('❌ Error compartiendo publicación:', error);
         showToast('❌ Error de conexión al compartir', 'error');
+        
+        // Rehabilitar botón en caso de error de conexión
+        const shareBtn = document.getElementById(`shareBtn-${postId}`);
+        if (shareBtn) {
+            shareBtn.disabled = false;
+            shareBtn.classList.remove('shared');
+            shareBtn.innerHTML = `<i class="fas fa-share"></i> <span>${shareBtn.querySelector('span').textContent}</span>`;
+        }
     }
 }
 
@@ -1814,6 +1841,17 @@ async function handleLikeModal(postId) {
 
 async function handleShareModal(postId) {
     try {
+        const shareBtnModal = document.getElementById('shareBtnModal');
+        if (shareBtnModal && shareBtnModal.disabled) {
+            showToast('⚠️ Ya compartiste esta publicación', 'info');
+            return;
+        }
+
+        if (shareBtnModal) {
+            shareBtnModal.disabled = true;
+            shareBtnModal.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Compartiendo...';
+        }
+
         const response = await fetch(`${API_URL}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1824,21 +1862,39 @@ async function handleShareModal(postId) {
         
         if (result.success) {
             showToast('✅ Publicación compartida exitosamente', 'success');
+            
+            // Actualizar el botón en el modal
+            if (shareBtnModal) {
+                shareBtnModal.innerHTML = '<i class="fas fa-check"></i> Compartido';
+                shareBtnModal.classList.add('shared');
+            }
+            
             closeModal('post');
             
-            // Recargar el feed para mostrar el nuevo post compartido
-            setTimeout(() => {
-                loadFeed();
-            }, 500);
-            
         } else {
-            showToast(`❌ ${result.error}`, 'error');
+            if (shareBtnModal) {
+                shareBtnModal.disabled = false;
+                shareBtnModal.innerHTML = '<i class="fas fa-share"></i> Compartir';
+            }
+            
+            if (result.error.includes('Ya compartiste') || result.error.includes('ya compartió')) {
+                showToast('⚠️ Ya compartiste esta publicación', 'info');
+            } else {
+                showToast(`❌ ${result.error}`, 'error');
+            }
         }
     } catch (error) {
         console.error('Error compartiendo publicación:', error);
         showToast('❌ Error al compartir la publicación', 'error');
+        
+        const shareBtnModal = document.getElementById('shareBtnModal');
+        if (shareBtnModal) {
+            shareBtnModal.disabled = false;
+            shareBtnModal.innerHTML = '<i class="fas fa-share"></i> Compartir';
+        }
     }
 }
+
 
 // ========== COMENTARIOS ==========
 function initializeComentarioEvents() {
@@ -2619,6 +2675,7 @@ async function loadUsers() {
 }
 
 // Función para cargar todos los usuarios
+// Función para cargar todos los usuarios - VERSIÓN MEJORADA
 async function loadAllUsers() {
     try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
@@ -2647,6 +2704,8 @@ async function loadAllUsers() {
                     ${usersWithFollowStatus.map(user => createUserCardHTML(user)).join('')}
                 </div>
             `;
+            
+            console.log(`✅ ${usersWithFollowStatus.length} usuarios cargados en Todos los usuarios`);
             
         } else {
             allUsersSection.innerHTML = `
@@ -3039,7 +3098,23 @@ function updateSmallFollowButton(userId, isFollowing) {
 
 // ========== UTILIDADES ==========
 
+// Función de respaldo para forzar actualización si algo falla
+function forceUsersRefresh() {
+    if (document.getElementById('usersSection').classList.contains('active')) {
+        console.log('🔄 Forzando actualización de usuarios...');
+        loadUsers();
+    }
+}
 
+// Puedes llamar esta función como respaldo después de seguir
+// Agrega esto al final del bloque success en toggleFollow:
+setTimeout(() => {
+    // Verificar si la actualización funcionó
+    const allUsersGrid = document.getElementById('allUsersGrid');
+    if (!allUsersGrid) {
+        forceUsersRefresh();
+    }
+}, 1000);
 
 function formatPostContent(content) {
     return content.replace(/#[\wáéíóúñ]+/g, '<span class="hashtag">$&</span>');
@@ -3354,9 +3429,6 @@ function closeUserProfileModal() {
     }
 }
 
-
-
-
 async function toggleFollow(userId) {
     try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
@@ -3389,17 +3461,17 @@ async function toggleFollow(userId) {
             }
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
             
-            // Actualizar el botón en la interfaz
-            updateFollowButton(userId, !isFollowing);
+            // ACTUALIZAR AMBAS SECCIONES
+            updateAllUsersSectionButton(userId, !isFollowing);
+            updateRecommendedUsersSectionButton(userId, !isFollowing);
             
             // Actualizar contadores en sidebar
             updateSidebarCounters();
             
         } else {
-            // Manejar error específico de bloqueo
             if (response.status === 403) {
                 showToast(`❌ ${result.error}`, 'error');
-                // Si el usuario está bloqueado, recargar la lista para reflejar el estado actual
+                // Recargar ambas secciones si hay bloqueo
                 setTimeout(() => {
                     if (document.getElementById('usersSection').classList.contains('active')) {
                         loadUsers();
@@ -3412,6 +3484,74 @@ async function toggleFollow(userId) {
     } catch (error) {
         console.error('Error en follow/unfollow:', error);
         showToast('❌ Error de conexión', 'error');
+    }
+}
+
+// Función específica para actualizar botones en la sección "Usuarios Recomendados"
+function updateRecommendedUsersSectionButton(userId, isFollowing) {
+    // Buscar específicamente en la grilla de "Usuarios Recomendados"
+    const recommendedGrid = document.querySelector('.recommended-users-grid');
+    if (!recommendedGrid) {
+        console.log('❌ No se encontró recommended-users-grid, la sección podría no estar cargada');
+        return;
+    }
+    
+    // Buscar la card específica del usuario en recomendados
+    const userCard = recommendedGrid.querySelector(`.recommended-user-card[data-user-id="${userId}"]`);
+    if (userCard) {
+        const followButton = userCard.querySelector('.btn-follow');
+        if (followButton) {
+            updateSingleFollowButton(followButton, isFollowing);
+            console.log('✅ Botón actualizado en Usuarios Recomendados');
+        } else {
+            console.log('❌ No se encontró el botón de seguir en la card de recomendados');
+        }
+    } else {
+        console.log('ℹ️ Usuario no encontrado en la sección de recomendados (puede ser normal)');
+    }
+}
+
+// Función específica para actualizar botones en la sección "Todos los usuarios"
+function updateAllUsersSectionButton(userId, isFollowing) {
+    // Buscar específicamente en la grilla de "Todos los usuarios"
+    const allUsersGrid = document.getElementById('allUsersGrid');
+    if (!allUsersGrid) {
+        console.log('❌ No se encontró allUsersGrid, la sección podría no estar cargada');
+        return;
+    }
+    
+    // Buscar la card específica del usuario
+    const userCard = allUsersGrid.querySelector(`.user-card-main[data-user-id="${userId}"]`);
+    if (userCard) {
+        const followButton = userCard.querySelector('.btn-follow');
+        if (followButton) {
+            updateSingleFollowButton(followButton, isFollowing);
+            console.log('✅ Botón actualizado en Todos los usuarios');
+        } else {
+            console.log('❌ No se encontró el botón de seguir en la card');
+        }
+    } else {
+        console.log('❌ No se encontró la card del usuario en Todos los usuarios');
+        
+        // Si no encontramos la card, forzar recarga de la sección
+        setTimeout(() => {
+            if (document.getElementById('usersSection').classList.contains('active')) {
+                loadAllUsers();
+            }
+        }, 500);
+    }
+}
+
+// Función para actualizar un botón individual
+function updateSingleFollowButton(button, isFollowing) {
+    if (!button) return;
+    
+    if (isFollowing) {
+        button.innerHTML = '<i class="fas fa-user-check"></i> Siguiendo';
+        button.className = 'btn-follow following';
+    } else {
+        button.innerHTML = '<i class="fas fa-user-plus"></i> Seguir';
+        button.className = 'btn-follow';
     }
 }
 

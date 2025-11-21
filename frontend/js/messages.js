@@ -2,28 +2,28 @@
 console.log('📦 messages.js cargado');
 
 const MESSAGES_API = 'http://localhost:3001/api/messages';
+const USERS_API = 'http://localhost:3001/api/users';
 
-// Variables globales específicas de mensajes - DEFINIRLAS AL INICIO
+// Variables globales específicas de mensajes
 let currentConversacion = null;
 let currentUserMessages = null;
 let conversaciones = [];
 let mensajesInterval = null;
-let isMessagesInitialized = false; // DEFINIDA AL INICIO
+let isMessagesInitialized = false;
 let isStartingNewChat = false;
+let isUserBlocked = false;
+let blockStatus = null;
 
 // ========== INICIALIZACIÓN ==========
 function initializeMessages() {
     console.log('💬 Inicializando mensajes...');
     
-    // Evitar inicialización múltiple
     if (isMessagesInitialized) {
         console.log('⚠️ Mensajes ya inicializados, omitiendo...');
         return;
     }
     
-    // Obtener usuario actual de forma segura
     try {
-        // Primero intentar desde dashboard.js, luego desde localStorage
         currentUserMessages = window.currentUser;
         if (!currentUserMessages) {
             const storedUser = localStorage.getItem('currentUser');
@@ -42,24 +42,6 @@ function initializeMessages() {
         return;
     }
     
-    console.log('✅ Usuario para mensajes:', currentUserMessages.nombre);
-    
-    // Verificar que los elementos del DOM existen
-    const messageInput = document.getElementById('newMessageInput');
-    const sendButton = document.getElementById('sendMessageBtn');
-    const conversationsList = document.getElementById('conversationsList');
-    
-    if (!messageInput || !sendButton || !conversationsList) {
-        console.error('❌ Elementos del DOM de mensajes no encontrados');
-        return;
-    }
-    
-    // Habilitar inputs de mensajes
-    messageInput.disabled = false;
-    sendButton.disabled = false;
-    
-    console.log('✅ Inputs de mensajes habilitados');
-    
     // Cargar datos
     loadConversaciones();
     initializeMessagesEventListeners();
@@ -77,13 +59,11 @@ function initializeMessages() {
 function initializeMessagesEventListeners() {
     console.log('🔧 Inicializando event listeners de mensajes...');
     
-    // Buscar conversaciones
     const searchInput = document.getElementById('searchConversations');
     if (searchInput) {
         searchInput.addEventListener('input', filterConversaciones);
     }
     
-    // Nuevo mensaje
     const newMessageInput = document.getElementById('newMessageInput');
     if (newMessageInput) {
         newMessageInput.addEventListener('keydown', function(e) {
@@ -103,13 +83,11 @@ function initializeMessagesEventListeners() {
         });
     }
     
-    // Botón enviar
     const sendButton = document.getElementById('sendMessageBtn');
     if (sendButton) {
         sendButton.addEventListener('click', enviarMensaje);
     }
     
-    // Botón nuevo chat
     const newChatButton = document.querySelector('.btn-new-chat');
     if (newChatButton) {
         newChatButton.addEventListener('click', openNewChatModal);
@@ -118,26 +96,144 @@ function initializeMessagesEventListeners() {
     console.log('✅ Event listeners de mensajes configurados');
 }
 
+// ========== VERIFICACIÓN DE BLOQUEOS ==========
+async function checkBlockStatus(conversacion) {
+    if (!conversacion || !conversacion.participantes || !currentUserMessages) {
+        return { isBlocked: false, status: null };
+    }
+    
+    const otroUsuario = conversacion.participantes.find(p => p._id !== currentUserMessages._id);
+    if (!otroUsuario) {
+        return { isBlocked: false, status: null };
+    }
+    
+    try {
+        console.log('🔍 Verificando estado de bloqueo con usuario:', otroUsuario._id);
+        
+        const response = await fetch(`${USERS_API}/check-block-status/${currentUserMessages._id}/${otroUsuario._id}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Estado de bloqueo:', result.data);
+            return {
+                isBlocked: result.data.isBlocked,
+                status: result.data.status,
+                blockedBy: result.data.blockedBy
+            };
+        }
+    } catch (error) {
+        console.error('❌ Error verificando estado de bloqueo:', error);
+    }
+    
+    return { isBlocked: false, status: null };
+}
+
+function updateUIForBlockedUser(blockStatus) {
+    const messageInput = document.getElementById('newMessageInput');
+    const sendButton = document.getElementById('sendMessageBtn');
+    const charCounter = document.getElementById('charCounter');
+    
+    // Crear o obtener el elemento de mensaje de bloqueo
+    let blockedMessage = document.getElementById('blockedMessage');
+    if (!blockedMessage) {
+        blockedMessage = document.createElement('div');
+        blockedMessage.id = 'blockedMessage';
+        blockedMessage.className = 'blocked-message';
+        
+        // Insertar después del input de mensaje
+        const messageInputContainer = messageInput?.parentElement;
+        if (messageInputContainer) {
+            messageInputContainer.parentNode.insertBefore(blockedMessage, messageInputContainer.nextSibling);
+        }
+    }
+    
+    if (!blockStatus.isBlocked) {
+        // Usuario no bloqueado - habilitar UI
+        if (messageInput) {
+            messageInput.disabled = false;
+            messageInput.placeholder = "Escribe un mensaje...";
+        }
+        if (sendButton) sendButton.disabled = false;
+        if (charCounter) charCounter.style.display = 'block';
+        if (blockedMessage) blockedMessage.style.display = 'none';
+        isUserBlocked = false;
+        return;
+    }
+    
+    // Usuario bloqueado - deshabilitar UI
+    isUserBlocked = true;
+    
+    let messageText = '';
+    let messageType = '';
+    
+    switch (blockStatus.status) {
+        case 'tu_has_bloqueado':
+            messageText = 'No puedes mandar mensajes porque has bloqueado a este usuario';
+            messageType = 'you-blocked';
+            break;
+        case 'te_han_bloqueado':
+            messageText = 'No puedes mandar mensajes porque este usuario te bloqueó';
+            messageType = 'they-blocked';
+            break;
+        case 'bloqueo_mutuo':
+            messageText = 'No puedes mandar mensajes debido a un bloqueo mutuo';
+            messageType = 'mutual-block';
+            break;
+        default:
+            messageText = 'No puedes mandar mensajes a este usuario';
+            messageType = 'generic-block';
+    }
+    
+    // Actualizar UI
+    if (messageInput) {
+        messageInput.disabled = true;
+        messageInput.placeholder = "No puedes enviar mensajes...";
+        messageInput.value = '';
+    }
+    if (sendButton) sendButton.disabled = true;
+    if (charCounter) charCounter.style.display = 'none';
+    
+    // Mostrar mensaje de bloqueo
+    blockedMessage.innerHTML = `
+        <div class="blocked-alert ${messageType}">
+            <i class="fas fa-ban"></i>
+            <span>${messageText}</span>
+        </div>
+    `;
+    blockedMessage.style.display = 'block';
+}
+
 // ========== CONVERSACIONES ==========
+let lastConversacionesHash = '';
+
 async function loadConversaciones() {
     if (!currentUserMessages || !currentUserMessages._id) {
-        console.error('❌ No hay usuario para cargar conversaciones');
+        return;
+    }
+    
+    if (window.isLoadingConversaciones) {
         return;
     }
     
     try {
-        console.log('📋 Cargando conversaciones para:', currentUserMessages._id);
+        window.isLoadingConversaciones = true;
+        
         const response = await fetch(`${MESSAGES_API}/conversaciones/${currentUserMessages._id}`);
         const result = await response.json();
         
         if (result.success) {
-            conversaciones = result.data;
-            displayConversaciones(conversaciones);
-        } else {
-            console.error('❌ Error en respuesta:', result.error);
+            const newHash = JSON.stringify(result.data);
+            if (newHash !== lastConversacionesHash) {
+                conversaciones = result.data;
+                lastConversacionesHash = newHash;
+                displayConversaciones(conversaciones);
+                console.log('✅ Conversaciones actualizadas');
+            }
         }
     } catch (error) {
         console.error('❌ Error cargando conversaciones:', error);
+    } finally {
+        window.isLoadingConversaciones = false;
     }
 }
 
@@ -210,54 +306,6 @@ function createConversacionHTML(conversacion) {
     `;
 }
 
-function filterConversaciones() {
-    const searchTerm = document.getElementById('searchConversations').value.toLowerCase();
-    const filtered = conversaciones.filter(conv => {
-        const otroUsuario = conv.participantes.find(p => p._id !== currentUserMessages._id);
-        return otroUsuario && (
-            otroUsuario.nombre.toLowerCase().includes(searchTerm) || 
-            otroUsuario.username.toLowerCase().includes(searchTerm)
-        );
-    });
-    displayConversaciones(filtered);
-}
-
-// ========== MEJORAR CARGA DE CONVERSACIONES ==========
-let lastConversacionesHash = ''; // 🔥 Track del estado anterior
-
-async function loadConversaciones() {
-    if (!currentUserMessages || !currentUserMessages._id) {
-        return;
-    }
-    
-    if (window.isLoadingConversaciones) {
-        return;
-    }
-    
-    try {
-        window.isLoadingConversaciones = true;
-        
-        const response = await fetch(`${MESSAGES_API}/conversaciones/${currentUserMessages._id}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            // 🔥 DETECCIÓN DE CAMBIOS MÁS EFECTIVA
-            const newHash = JSON.stringify(result.data);
-            if (newHash !== lastConversacionesHash) {
-                conversaciones = result.data;
-                lastConversacionesHash = newHash;
-                displayConversaciones(conversaciones);
-                console.log('✅ Conversaciones actualizadas');
-            }
-        }
-    } catch (error) {
-        console.error('❌ Error cargando conversaciones:', error);
-    } finally {
-        window.isLoadingConversaciones = false;
-    }
-}
-
-
 // ========== MENSAJES ==========
 async function openConversacion(conversacion) {
     currentConversacion = conversacion;
@@ -271,11 +319,20 @@ async function openConversacion(conversacion) {
         currentElement.classList.add('active');
     }
     
+    // Verificar estado de bloqueo ANTES de cargar mensajes
+    blockStatus = await checkBlockStatus(conversacion);
+    console.log('🔍 Estado de bloqueo al abrir conversación:', blockStatus);
+    
+    // Actualizar UI basado en el bloqueo
+    updateUIForBlockedUser(blockStatus);
+    
     // Cargar mensajes
     await loadMensajes(conversacion._id);
     
-    // Marcar como leídos
-    await marcarMensajesLeidos(conversacion._id);
+    // Marcar como leídos solo si no está bloqueado
+    if (!blockStatus.isBlocked) {
+        await marcarMensajesLeidos(conversacion._id);
+    }
     
     // Actualizar conversaciones
     loadConversaciones();
@@ -319,14 +376,10 @@ function displayMensajes(mensajes) {
     container.scrollTop = container.scrollHeight;
 }
 
-// NUEVA FUNCIÓN PARA ACTUALIZAR EL HEADER DEL CHAT
 function updateChatHeader(otroUsuario) {
     console.log('🔄 Actualizando header del chat con usuario:', otroUsuario);
     
-    // Buscar el avatar del header por múltiples selectores
     let chatAvatar = document.querySelector('.chat-user-avatar');
-    
-    // Si no se encuentra, buscar por otras clases comunes
     if (!chatAvatar) {
         chatAvatar = document.querySelector('.chat-header-avatar');
     }
@@ -334,14 +387,12 @@ function updateChatHeader(otroUsuario) {
         chatAvatar = document.querySelector('.current-chat-avatar');
     }
     if (!chatAvatar) {
-        // Buscar por estructura del DOM
         const chatHeader = document.querySelector('.chat-header');
         if (chatHeader) {
             chatAvatar = chatHeader.querySelector('.user-avatar');
         }
     }
     
-    // Actualizar el avatar si se encontró - HACERLO CLICKEABLE
     if (chatAvatar) {
         if (otroUsuario.foto_perfil) {
             chatAvatar.innerHTML = `
@@ -359,12 +410,8 @@ function updateChatHeader(otroUsuario) {
         }
         chatAvatar.style.cursor = 'pointer';
         chatAvatar.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
-        console.log('✅ Avatar actualizado en el header (clickeable)');
-    } else {
-        console.error('❌ No se pudo encontrar el elemento del avatar en el header');
     }
     
-    // Actualizar nombre y username - HACERLOS CLICKEABLES
     const currentChatUser = document.getElementById('currentChatUser');
     const currentChatUsername = document.getElementById('currentChatUsername');
     
@@ -373,9 +420,6 @@ function updateChatHeader(otroUsuario) {
         currentChatUser.style.cursor = 'pointer';
         currentChatUser.style.color = '#3498db';
         currentChatUser.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
-        console.log('✅ Nombre actualizado (clickeable):', otroUsuario.nombre);
-    } else {
-        console.error('❌ Elemento currentChatUser no encontrado');
     }
     
     if (currentChatUsername) {
@@ -383,63 +427,61 @@ function updateChatHeader(otroUsuario) {
         currentChatUsername.style.cursor = 'pointer';
         currentChatUsername.style.color = '#7f8c8d';
         currentChatUsername.setAttribute('onclick', `navigateToUserProfile('${otroUsuario._id}')`);
-        console.log('✅ Username actualizado (clickeable):', otroUsuario.username);
-    } else {
-        console.error('❌ Elemento currentChatUsername no encontrado');
     }
     
-    // AGREGAR EVENTO AL HEADER COMPLETO SI ES NECESARIO
-    const chatHeader = document.querySelector('.chat-header');
-    if (chatHeader && !chatHeader.hasAttribute('data-profile-click-initialized')) {
-        chatHeader.style.cursor = 'pointer';
-        chatHeader.setAttribute('data-profile-click-initialized', 'true');
-        chatHeader.addEventListener('click', function(e) {
-            // Evitar que se active cuando se hace clic en otros elementos del header
-            if (!e.target.closest('.chat-actions') && !e.target.closest('.btn-icon')) {
-                navigateToUserProfile(otroUsuario._id);
-            }
-        });
-    }
+    // Agregar indicador de bloqueo en el header si es necesario
+    updateBlockStatusInHeader(blockStatus);
 }
 
-// FUNCIÓN PARA NAVEGAR AL PERFIL DEL USUARIO
-function navigateToUserProfile(userId) {
-    console.log('🎯 Navegando al perfil de usuario:', userId);
+function updateBlockStatusInHeader(blockStatus) {
+    const chatHeader = document.querySelector('.chat-header');
+    if (!chatHeader) return;
     
-    // Verificar si el usuario está bloqueado antes de navegar
-    if (typeof checkIfUserIsBlocked === 'function') {
-        checkIfUserIsBlocked(userId).then(isBlocked => {
-            if (isBlocked) {
-                if (typeof showBlockedUserModal === 'function') {
-                    showBlockedUserModal(userId);
-                } else {
-                    showMessageToast('❌ No puedes ver este perfil', 'error');
-                }
-                return;
-            }
-            
-            // Guardar el ID del usuario que queremos ver en el localStorage
-            localStorage.setItem('viewingUserProfile', userId);
-            
-            // Redirigir a profile.html
-            window.location.href = 'profile.html';
-        }).catch(error => {
-            console.error('Error verificando bloqueo:', error);
-            // En caso de error, navegar de todos modos
-            localStorage.setItem('viewingUserProfile', userId);
-            window.location.href = 'profile.html';
-        });
-    } else {
-        // Si no existe la función de verificación, navegar directamente
-        localStorage.setItem('viewingUserProfile', userId);
-        window.location.href = 'profile.html';
+    // Remover indicador anterior si existe
+    const existingIndicator = chatHeader.querySelector('.block-status-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    if (blockStatus.isBlocked) {
+        const indicator = document.createElement('div');
+        indicator.className = 'block-status-indicator';
+        
+        let indicatorText = '';
+        let indicatorClass = '';
+        
+        switch (blockStatus.status) {
+            case 'tu_has_bloqueado':
+                indicatorText = 'Has bloqueado a este usuario';
+                indicatorClass = 'you-blocked';
+                break;
+            case 'te_han_bloqueado':
+                indicatorText = 'Este usuario te ha bloqueado';
+                indicatorClass = 'they-blocked';
+                break;
+            case 'bloqueo_mutuo':
+                indicatorText = 'Bloqueo mutuo';
+                indicatorClass = 'mutual-block';
+                break;
+        }
+        
+        indicator.innerHTML = `
+            <span class="block-indicator ${indicatorClass}">
+                <i class="fas fa-ban"></i>
+                ${indicatorText}
+            </span>
+        `;
+        
+        // Insertar después del nombre de usuario
+        const userInfo = chatHeader.querySelector('.chat-user-info');
+        if (userInfo) {
+            userInfo.appendChild(indicator);
+        }
     }
 }
 
 function createMensajeHTML(mensaje) {
     const isOwnMessage = mensaje.remitente._id === currentUserMessages._id;
-    
-    // Obtener el usuario correcto para mostrar la foto
     const usuarioMensaje = isOwnMessage ? currentUserMessages : mensaje.remitente;
     
     return `
@@ -477,6 +519,12 @@ function createMensajeHTML(mensaje) {
 }
 
 async function enviarMensaje() {
+    // Verificar si el usuario está bloqueado antes de enviar
+    if (isUserBlocked) {
+        showMessageToast('❌ No puedes enviar mensajes a este usuario', 'error');
+        return;
+    }
+    
     const input = document.getElementById('newMessageInput');
     const contenido = input.value.trim();
     
@@ -488,6 +536,14 @@ async function enviarMensaje() {
     }
     
     try {
+        // Verificar bloqueo nuevamente antes de enviar (por si acaso)
+        const currentBlockStatus = await checkBlockStatus(currentConversacion);
+        if (currentBlockStatus.isBlocked) {
+            updateUIForBlockedUser(currentBlockStatus);
+            showMessageToast('❌ No puedes enviar mensajes a este usuario', 'error');
+            return;
+        }
+        
         const response = await fetch(`${MESSAGES_API}/mensaje/enviar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -505,7 +561,6 @@ async function enviarMensaje() {
             const charCounter = document.getElementById('charCounter');
             if (charCounter) charCounter.textContent = '0/150';
             
-            // Agregar mensaje a la UI
             const mensajesContainer = document.getElementById('messagesContainer');
             const emptyState = mensajesContainer.querySelector('.empty-messages');
             if (emptyState) {
@@ -515,29 +570,15 @@ async function enviarMensaje() {
             mensajesContainer.innerHTML += createMensajeHTML(result.data);
             mensajesContainer.scrollTop = mensajesContainer.scrollHeight;
             
-            // Actualizar conversaciones
             loadConversaciones();
             
             showMessageToast('✅ Mensaje enviado', 'success');
+        } else {
+            showMessageToast(`❌ ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error enviando mensaje:', error);
         showMessageToast('❌ Error al enviar el mensaje', 'error');
-    }
-}
-
-async function marcarMensajesLeidos(conversacionId) {
-    try {
-        await fetch(`${MESSAGES_API}/mensajes/marcar-leidos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                conversacionId: conversacionId,
-                userId: currentUserMessages._id
-            })
-        });
-    } catch (error) {
-        console.error('Error marcando mensajes como leídos:', error);
     }
 }
 
@@ -548,7 +589,21 @@ async function openNewChatModal() {
         const result = await response.json();
         
         if (result.success) {
-            showNewChatModal(result.data);
+            // Verificar bloqueos para cada usuario antes de mostrar
+            const usuariosConEstado = await Promise.all(
+                result.data.map(async (user) => {
+                    const blockStatus = await checkBlockStatus({
+                        participantes: [currentUserMessages, user]
+                    });
+                    return {
+                        ...user,
+                        isBlocked: blockStatus.isBlocked,
+                        blockStatus: blockStatus.status
+                    };
+                })
+            );
+            
+            showNewChatModal(usuariosConEstado);
         }
     } catch (error) {
         console.error('Error cargando usuarios disponibles:', error);
@@ -587,7 +642,6 @@ function showNewChatModal(usuarios) {
     document.body.appendChild(modal);
     openMessageModal('newChat');
     
-    // Event listeners para búsqueda
     const searchInput = document.getElementById('searchUsersChat');
     if (searchInput) {
         searchInput.addEventListener('input', function() {
@@ -603,18 +657,29 @@ function showNewChatModal(usuarios) {
         });
     }
     
-    // Event listeners para items de usuario
     usuarios.forEach(user => {
         const element = document.getElementById(`user-chat-${user._id}`);
         if (element) {
-            element.addEventListener('click', () => startNewChat(user));
+            element.addEventListener('click', () => {
+                if (user.isBlocked) {
+                    showMessageToast('❌ No puedes chatear con un usuario bloqueado', 'error');
+                    return;
+                }
+                startNewChat(user);
+            });
         }
     });
 }
 
 function createUserChatItemHTML(user) {
+    const blockedBadge = user.isBlocked ? 
+        `<div class="blocked-badge" title="${user.blockStatus === 'tu_has_bloqueado' ? 'Has bloqueado a este usuario' : 'Este usuario te ha bloqueado'}">
+            <i class="fas fa-ban"></i>
+            Bloqueado
+        </div>` : '';
+    
     return `
-        <div class="user-chat-item" id="user-chat-${user._id}">
+        <div class="user-chat-item ${user.isBlocked ? 'blocked-user' : ''}" id="user-chat-${user._id}">
             <div class="user-chat-avatar">
                 ${user.foto_perfil ? 
                     `<img src="${user.foto_perfil}" alt="${user.nombre}">` : 
@@ -622,16 +687,18 @@ function createUserChatItemHTML(user) {
                 }
             </div>
             <div class="user-chat-info">
-                <h4>${user.nombre}</h4>
+                <h4>${user.nombre} ${user.isBlocked ? '🚫' : ''}</h4>
                 <p>@${user.username}</p>
             </div>
             <div class="user-chat-action">
-                <i class="fas fa-chevron-right"></i>
+                ${blockedBadge}
+                ${!user.isBlocked ? '<i class="fas fa-chevron-right"></i>' : ''}
             </div>
         </div>
     `;
 }
 
+// ========== FUNCIONES RESTANTES (sin cambios) ==========
 async function startNewChat(user) {
     if (isStartingNewChat) {
         console.log('⏳ Ya se está iniciando un chat, omitiendo...');
@@ -643,7 +710,6 @@ async function startNewChat(user) {
     try {
         isStartingNewChat = true;
         
-        // Feedback visual
         if (userElement) {
             userElement.style.pointerEvents = 'none';
             userElement.style.opacity = '0.6';
@@ -668,10 +734,8 @@ async function startNewChat(user) {
             closeNewChatModal();
             showMessageToast(result.message, 'success');
             
-            // Pequeño delay para UI
             setTimeout(() => {
                 openConversacion(result.data);
-                // 🔥 ACTUALIZAR CONVERSACIONES DESPUÉS DE CREAR NUEVA
                 setTimeout(() => loadConversaciones(), 1000);
             }, 300);
         } else {
@@ -684,7 +748,6 @@ async function startNewChat(user) {
     } finally {
         isStartingNewChat = false;
         
-        // Restaurar UI
         if (userElement) {
             setTimeout(() => {
                 userElement.style.pointerEvents = 'auto';
@@ -695,16 +758,33 @@ async function startNewChat(user) {
     }
 }
 
-
-function closeNewChatModal() {
-    const modal = document.getElementById('newChatModal');
-    if (modal) {
-        modal.remove();
-        document.body.classList.remove('modal-open');
+async function marcarMensajesLeidos(conversacionId) {
+    try {
+        await fetch(`${MESSAGES_API}/mensajes/marcar-leidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                conversacionId: conversacionId,
+                userId: currentUserMessages._id
+            })
+        });
+    } catch (error) {
+        console.error('Error marcando mensajes como leídos:', error);
     }
 }
 
-// ========== UTILIDADES ==========
+function filterConversaciones() {
+    const searchTerm = document.getElementById('searchConversations').value.toLowerCase();
+    const filtered = conversaciones.filter(conv => {
+        const otroUsuario = conv.participantes.find(p => p._id !== currentUserMessages._id);
+        return otroUsuario && (
+            otroUsuario.nombre.toLowerCase().includes(searchTerm) || 
+            otroUsuario.username.toLowerCase().includes(searchTerm)
+        );
+    });
+    displayConversaciones(filtered);
+}
+
 function getMessageTimeAgo(date) {
     const now = new Date();
     const diff = now - new Date(date);
@@ -721,6 +801,14 @@ function getMessageTimeAgo(date) {
     return new Date(date).toLocaleDateString();
 }
 
+function closeNewChatModal() {
+    const modal = document.getElementById('newChatModal');
+    if (modal) {
+        modal.remove();
+        document.body.classList.remove('modal-open');
+    }
+}
+
 function showMessageToast(message, type = 'success') {
     if (window.showToast && typeof window.showToast === 'function') {
         window.showToast(message, type);
@@ -735,7 +823,6 @@ function openMessageModal(type) {
     }
 }
 
-// ========== LIMPIAR AL SALIR ==========
 function cleanupMessages() {
     if (mensajesInterval) {
         clearInterval(mensajesInterval);
@@ -744,22 +831,32 @@ function cleanupMessages() {
     isMessagesInitialized = false;
 }
 
-// ========== DEBUG ==========
-function debugConversaciones() {
-    console.log('🐛 DEBUG CONVERSACIONES:');
-    console.log('- Total conversaciones:', conversaciones.length);
-    console.log('- Conversaciones actuales:', conversaciones.map(c => ({
-        id: c._id,
-        participantes: c.participantes.map(p => p.nombre),
-        ultimoMensaje: c.ultimo_mensaje ? c.ultimo_mensaje.contenido : 'Ninguno'
-    })));
-    console.log('- CurrentConversacion:', currentConversacion ? currentConversacion._id : 'Ninguna');
-    console.log('- isLoadingConversaciones:', window.isLoadingConversaciones);
-    console.log('- isStartingNewChat:', isStartingNewChat);
+function navigateToUserProfile(userId) {
+    console.log('🎯 Navegando al perfil de usuario:', userId);
+    
+    if (typeof checkIfUserIsBlocked === 'function') {
+        checkIfUserIsBlocked(userId).then(isBlocked => {
+            if (isBlocked) {
+                if (typeof showBlockedUserModal === 'function') {
+                    showBlockedUserModal(userId);
+                } else {
+                    showMessageToast('❌ No puedes ver este perfil', 'error');
+                }
+                return;
+            }
+            
+            localStorage.setItem('viewingUserProfile', userId);
+            window.location.href = 'profile.html';
+        }).catch(error => {
+            console.error('Error verificando bloqueo:', error);
+            localStorage.setItem('viewingUserProfile', userId);
+            window.location.href = 'profile.html';
+        });
+    } else {
+        localStorage.setItem('viewingUserProfile', userId);
+        window.location.href = 'profile.html';
+    }
 }
-
-// Ejecutar en consola para debug
-window.debugMessages = debugConversaciones;
 
 // Hacer funciones disponibles globalmente
 window.initializeMessages = initializeMessages;

@@ -978,5 +978,225 @@ router.get('/check-block-status/:currentUserId/:otherUserId', async (req, res) =
     }
 });
 
+// ===== RUTAS PARA CAMBIAR CONFIGURACIÓN DE USUARIO =====
+
+// CAMBIAR USERNAME
+router.put('/:id/username', async (req, res) => {
+    try {
+        const { newUsername } = req.body;
+        const userId = req.params.id;
+
+        console.log('🔄 Intentando cambiar username:', { userId, newUsername });
+
+        // Validaciones
+        if (!newUsername || newUsername.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'El nombre de usuario no puede estar vacío'
+            });
+        }
+
+        const username = newUsername.trim();
+
+        // Validar formato: solo caracteres alfanuméricos y guión bajo, 3-20 caracteres
+        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        if (!usernameRegex.test(username)) {
+            return res.status(400).json({
+                success: false,
+                error: 'El nombre de usuario solo puede contener letras, números y guiones bajos (3-20 caracteres)'
+            });
+        }
+
+        // Verificar si el usuario existe
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar si el nuevo username ya existe (excluyendo el usuario actual)
+        const existingUser = await User.findOne({ 
+            username: username,
+            _id: { $ne: userId }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este nombre de usuario ya está en uso'
+            });
+        }
+
+        // Guardar el username anterior para el log
+        const oldUsername = user.username;
+
+        // Actualizar username
+        user.username = username;
+        await user.save();
+
+        console.log(`✅ Username cambiado: ${oldUsername} -> ${username}`);
+
+        res.json({
+            success: true,
+            message: 'Nombre de usuario actualizado exitosamente',
+            data: {
+                username: user.username
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando username:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al cambiar el nombre de usuario'
+        });
+    }
+});
+
+// CAMBIAR EMAIL
+router.put('/:id/email', async (req, res) => {
+    try {
+        const { newEmail } = req.body;
+        const userId = req.params.id;
+
+        console.log('🔄 Intentando cambiar email:', { userId, newEmail });
+
+        // Validaciones
+        if (!newEmail || newEmail.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'El correo electrónico no puede estar vacío'
+            });
+        }
+
+        const email = newEmail.trim().toLowerCase();
+
+        // Validar formato de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Por favor ingresa un correo electrónico válido'
+            });
+        }
+
+        // Verificar si el usuario existe
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar si el nuevo email ya existe (excluyendo el usuario actual)
+        const existingUser = await User.findOne({ 
+            email: email,
+            _id: { $ne: userId }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este correo electrónico ya está en uso'
+            });
+        }
+
+        // Guardar el email anterior para el log
+        const oldEmail = user.email;
+
+        // Actualizar email
+        user.email = email;
+        await user.save();
+
+        console.log(`✅ Email cambiado: ${oldEmail} -> ${email}`);
+
+        res.json({
+            success: true,
+            message: 'Correo electrónico actualizado exitosamente',
+            data: {
+                email: user.email
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando email:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al cambiar el correo electrónico'
+        });
+    }
+});
+
+// CAMBIAR PASSWORD
+router.put('/:id/password', async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.params.id;
+
+        console.log('🔄 Intentando cambiar password para usuario:', userId);
+
+        // Validaciones
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: 'Todos los campos son requeridos'
+            });
+        }
+
+        // Validar longitud de nueva contraseña
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: 'La nueva contraseña debe tener al menos 6 caracteres'
+            });
+        }
+
+        // Verificar si el usuario existe
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar contraseña actual (comparación directa ya que no está hasheada)
+        if (user.password !== currentPassword) {
+            return res.status(401).json({
+                success: false,
+                error: 'La contraseña actual es incorrecta'
+            });
+        }
+
+        // Verificar que la nueva contraseña no sea igual a la actual
+        if (currentPassword === newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: 'La nueva contraseña debe ser diferente a la actual'
+            });
+        }
+
+        // Actualizar contraseña
+        user.password = newPassword;
+        await user.save();
+
+        console.log(`✅ Password cambiado exitosamente para usuario: ${user.username}`);
+
+        res.json({
+            success: true,
+            message: 'Contraseña actualizada exitosamente'
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando password:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error del servidor al cambiar la contraseña'
+        });
+    }
+});
 
 module.exports = router;

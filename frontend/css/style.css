@@ -515,6 +515,29 @@ body {
     background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
+#removeSelectedBtn {
+    background: linear-gradient(135deg, #f43434 0%, hsl(0, 100%, 28%) 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+
+}
+#removeSelectedBtn:hover{
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(234, 102, 102, 0.6);
+    background: linear-gradient(135deg, #a70000 0%, #ff3737 100%);
+}
+
 .btn-primary:active {
     transform: translateY(-1px);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
@@ -6062,7 +6085,7 @@ input[type="date"] {
 .collection-actions .btn-icon {
     background: rgba(0,0,0,0.08);
     border: none;
-    border-radius: 6px;
+    border-radius: 25px !important;
     padding: 0.5rem;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -11077,11 +11100,11 @@ body.modal-open {
 }
 
 .btn-icon {
-    color: gray !important;
+    color: black;
     width: 30px;
     height: 30px;
     border: none;
-    border-radius: 4px;
+    border-radius: 25px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -12293,4 +12316,639 @@ input[type="file"] {
 /* Asegurar que los inputs estén ocultos pero funcionales */
 input[type="file"] {
     display: none;
+}
+
+/* Estilos para mensajes de bloqueo */
+.blocked-message {
+    margin: 10px 0;
+    padding: 0 15px;
+}
+
+.blocked-alert {
+    background: #fee;
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #721c24;
+    font-size: 14px;
+}
+
+.blocked-alert.you-blocked {
+    background: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.blocked-alert.they-blocked {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.blocked-alert.mutual-block {
+    background: #e2e3e5;
+    border-color: #d6d8db;
+    color: #383d41;
+}
+
+.blocked-alert i {
+    font-size: 16px;
+}
+
+/* Indicador de bloqueo en el header */
+.block-status-indicator {
+    margin-top: 5px;
+}
+
+.block-indicator {
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.block-indicator.you-blocked {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.block-indicator.they-blocked {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.block-indicator.mutual-block {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Usuarios bloqueados en la lista de nuevo chat */
+.user-chat-item.blocked-user {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.blocked-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Input deshabilitado por bloqueo */
+#newMessageInput:disabled {
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Estilos para las validaciones */
+.validation-message {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    font-size: 0.8rem;
+}
+
+.error-message {
+    color: #e74c3c;
+    font-size: 0.8rem;
+}
+
+.char-count {
+    color: #7f8c8d;
+    font-size: 0.8rem;
+}
+
+/* Estilos mejorados para el modal de configuración */
+.config-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    gap: 1rem;
+}
+
+.config-tab-nav {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 1rem;
+    background: #fafafa;
+    border-radius: 8px 8px 0 0;
+    padding: 0.5rem;
+}
+
+.config-tab-btn {
+    flex: 1;
+    padding: 1rem 0.8rem;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 6px;
+    margin: 0 2px;
+    font-weight: 500;
+    color: #666;
+}
+
+.config-tab-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.config-tab-btn.active {
+    border-bottom-color: #3498db;
+    color: #3498db;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.config-tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.config-tab-pane {
+    display: none;
+    padding: 1rem 0;
+}
+
+.config-tab-pane.active {
+    display: block;
+}
+
+/* Mejorar los títulos de las secciones */
+.config-tab-pane h4 {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f0f0f0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.config-tab-pane h4 i {
+    color: #3498db;
+}
+
+/* Mejorar las opciones de configuración */
+.config-option {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.3s ease;
+}
+
+.config-option:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.config-option label {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+/* Mejorar la disposición de los inputs */
+.config-action {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Para la sección de cambiar correo */
+#accountTab .config-action {
+    flex-direction: row;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+#accountTab .config-input {
+    flex: 1;
+    min-width: 250px;
+}
+
+/* Para la sección de contraseña - disposición vertical */
+#securityTab .config-action {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+#securityTab .config-input {
+    width: 100%;
+    max-width: 400px;
+}
+
+.config-input {
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 16px;
+    font-size: 0.95rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.config-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Mejorar botones */
+.btn-primary.btn-small {
+    padding: 0.8rem 1.2rem;
+    border-radius: 25px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.btn-primary.btn-small:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Para la sección de usuarios bloqueados */
+.blocked-users-list {
+    min-height: 200px;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 3rem;
+    color: #666;
+}
+
+.loading-state i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: #3498db;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .config-tab-nav {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .config-tab-btn {
+        text-align: left;
+        padding: 0.8rem;
+    }
+    
+    #accountTab .config-action {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #accountTab .config-input {
+        min-width: auto;
+    }
+    
+    .config-option {
+        padding: 1rem;
+    }
+}
+
+/* Espaciado adicional entre secciones */
+.config-tab-pane > *:not(h4) {
+    margin-top: 1rem;
+}
+
+/* Estilos para usuarios bloqueados */
+.blocked-user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.blocked-user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.blocked-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.blocked-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.blocked-user-details h5 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.blocked-user-details p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Estilos para el input de fecha de nacimiento */
+#regFechaNacimiento {
+    color: #333 !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid #e9ecef !important;
+    padding: 12px 15px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#regFechaNacimiento::placeholder {
+    color: #6c757d !important;
+    opacity: 0.8 !important;
+}
+
+#regFechaNacimiento:focus {
+    border-color: #3498db !important;
+    background-color: white !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2) !important;
+}
+
+/* Estilos para Flatpickr si lo estás usando */
+.flatpickr-input {
+    color: #333 !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.flatpickr-calendar {
+    background: white !important;
+    color: #333 !important;
+    border: 1px solid #e9ecef !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+.flatpickr-day {
+    color: #333 !important;
+}
+
+.flatpickr-day:hover {
+    background: #3498db !important;
+    color: white !important;
+}
+
+.flatpickr-day.selected {
+    background: #3498db !important;
+    color: white !important;
+    border-color: #3498db !important;
+}
+
+.flatpickr-month {
+    background: #f8f9fa !important;
+    color: #333 !important;
+    border-bottom: 1px solid #e9ecef !important;
+}
+
+.flatpickr-weekday {
+    color: #6c757d !important;
+    font-weight: 600 !important;
+}
+
+/* Si el problema persiste, agrega esto para forzar colores */
+input[type="date"] {
+    color-scheme: light !important;
+}
+
+/* Para navegadores Webkit (Chrome, Safari) */
+input[type="date"]::-webkit-datetime-edit {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-text {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-month-field {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-day-field {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-year-field {
+    color: #333 !important;
+}
+
+input[type="date"]::-webkit-inner-spin-button {
+    display: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.4) !important;
+    cursor: pointer;
+}
+
+/* Color del texto para mes y año en Flatpickr */
+.flatpickr-current-month {
+    color: #333 !important;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    color: #333 !important;
+    background-color: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+}
+
+.flatpickr-current-month .numInputWrapper {
+    color: #333 !important;
+}
+
+.flatpickr-current-month .numInputWrapper input {
+    color: #333 !important;
+    background-color: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+}
+
+.flatpickr-current-month .cur-month {
+    color: #333 !important;
+    font-weight: 600 !important;
+}
+
+.flatpickr-current-month .cur-year {
+    color: #333 !important;
+    font-weight: 600 !important;
+}
+
+/* Dropdown de meses */
+.flatpickr-monthDropdown-months {
+    color: #333 !important;
+    background-color: white !important;
+    font-size: 16px !important;
+    padding: 10px 15px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+}
+
+.flatpickr-monthDropdown-months option {
+    color: #333 !important;
+    background-color: white !important;
+    padding: 10px !important;
+}
+
+/* Input de año */
+.numInputWrapper input.cur-year[type="number"] {
+    color: #333 !important;
+    background-color: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 10px !important;
+    font-size: 16px !important;
+}
+
+/* Select de años */
+.flatpickr-yearDropdown {
+    color: #333 !important;
+    background-color: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 10px 15px !important;
+    font-size: 16px !important;
+}
+
+.flatpickr-yearDropdown option {
+    color: #333 !important;
+    background-color: white !important;
+    padding: 10px !important;
+}
+
+/* Para el modo monthSelect */
+.flatpickr-monthSelect-month {
+    color: #333 !important;
+    background-color: white !important;
+}
+
+.flatpickr-monthSelect-month:hover {
+    background-color: #3498db !important;
+    color: white !important;
+}
+
+/* Flechas de navegación */
+.flatpickr-prev-month,
+.flatpickr-next-month {
+    color: #333 !important;
+}
+
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover {
+    color: #3498db !important;
+}
+
+/* Header del calendario completo */
+.flatpickr-months {
+    color: #333 !important;
+}
+
+.flatpickr-month {
+    color: #333 !important;
+}
+
+/* Si usas la versión con spans en lugar de selects */
+.flatpickr-current-month span.cur-month {
+    color: #333 !important;
+}
+
+.flatpickr-current-month .cur-year {
+    color: #333 !important;
+}
+
+/* Forzar color en todos los elementos de texto del header */
+.flatpickr-calendar .flatpickr-current-month * {
+    color: #333 !important;
+}
+
+/* Estilos específicos para los dropdowns abiertos */
+.flatpickr-monthDropdown-months:focus {
+    color: #333 !important;
+    background-color: white !important;
+}
+
+.numInputWrapper input:focus {
+    color: #333 !important;
+    background-color: white !important;
+}
+
+/* Estilos para cuando no hay foto de perfil */
+.profile-avatar-large.no-photo::before {
+    content: '\f007'; /* Icono de usuario de FontAwesome */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 3rem;
+    color: #bdc3c7;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.profile-avatar-img[src=""],
+.profile-avatar-img:not([src]) {
+    display: none !important;
+}
+
+/* Asegurar que el contenedor del avatar tenga posición relativa */
+.profile-avatar-large {
+    position: relative;
+}
+
+/* Estilo para el avatar vacío en el sidebar */
+#sidebarAvatar:not(:has(img)) i {
+    font-size: 1.5rem;
+    color: #bdc3c7;
+}
+
+/* Cuando no hay imagen, mostrar el ícono por defecto */
+.profile-avatar-large:not(:has(img[src])) .btn-edit-avatar {
+    background: rgba(52, 152, 219, 0.9);
+}
+
+.profile-avatar-large:not(:has(img[src])) .btn-edit-avatar:hover {
+    background: rgba(41, 128, 185, 0.9);
 }
