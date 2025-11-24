@@ -80,6 +80,7 @@
         <button class="nav-item" onclick="goToNotifications()">
             <i class="fas fa-bell"></i>
             <span>Notificaciones</span>
+            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
         </button>
     </nav>
 </div>
@@ -416,6 +417,7 @@
 </div>
 
     <script src="../js/profile.js"></script>
+
     <script>
         console.log("🟡 Después de dashboard.js - currentUser:", window.currentUser);
         console.log("🟡 localStorage currentUser:", localStorage.getItem('currentUser'));
@@ -425,5 +427,6 @@
         console.log("🔵 Después de messages.js - currentUser:", window.currentUser);
     </script>
     <script src="../js/collections.js"></script>
+    
 </body>
 </html>
