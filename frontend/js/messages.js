@@ -1,8 +1,12 @@
-// frontend/js/messages.js
-console.log('📦 messages.js cargado');
+const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
 
-const MESSAGES_API = 'http://localhost:3001/api/messages';
-const USERS_API = 'http://localhost:3001/api/users';
+const MESSAGES_API = `${API_BASE_URL}/messages`;
+const USERS_API = `${API_BASE_URL}/users`;
+
+console.log('🌐 Messages API URL:', MESSAGES_API);
+console.log('🌐 Users API URL:', USERS_API);
 
 // Variables globales específicas de mensajes
 let currentConversacion = null;
@@ -20,6 +24,11 @@ function initializeMessages() {
     
     if (isMessagesInitialized) {
         console.log('⚠️ Mensajes ya inicializados, omitiendo...');
+        return;
+    }
+
+    // Verificar usuario
+    if (!verifyCurrentUser()) {
         return;
     }
     
@@ -700,10 +709,34 @@ function createUserChatItemHTML(user) {
 
 // ========== FUNCIONES RESTANTES (sin cambios) ==========
 async function startNewChat(user) {
+    console.log('🚀 === INICIANDO NUEVO CHAT DESDE FRONTEND ===');
+    console.log('👤 Usuario objetivo:', user);
+    console.log('👤 Usuario actual:', currentUserMessages);
+
     if (isStartingNewChat) {
         console.log('⏳ Ya se está iniciando un chat, omitiendo...');
         return;
     }
+
+    // 🔥 VALIDACIÓN CRÍTICA - Verificar que tenemos ambos IDs
+    if (!currentUserMessages || !currentUserMessages._id) {
+        console.error('❌ ERROR: currentUserMessages no está definido o no tiene _id');
+        showMessageToast('❌ Error: No hay usuario logueado', 'error');
+        return;
+    }
+
+    if (!user || !user._id) {
+        console.error('❌ ERROR: Usuario objetivo no tiene _id');
+        showMessageToast('❌ Error: Usuario inválido', 'error');
+        return;
+    }
+
+    console.log('🔍 IDs verificados:', {
+        usuario1Id: currentUserMessages._id,
+        usuario2Id: user._id,
+        tipo1: typeof currentUserMessages._id,
+        tipo2: typeof user._id
+    });
 
     const userElement = document.getElementById(`user-chat-${user._id}`);
     
@@ -716,35 +749,56 @@ async function startNewChat(user) {
             userElement.querySelector('.user-chat-action').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         }
 
-        console.log('🔄 Iniciando nuevo chat con:', user.nombre);
-        
+        // 🔥 PREPARAR DATOS DE FORMA EXPLÍCITA
+        const requestData = {
+            usuario1Id: String(currentUserMessages._id).trim(),
+            usuario2Id: String(user._id).trim()
+        };
+
+        console.log('📤 Enviando solicitud con datos:', requestData);
+        console.log('🔗 URL:', `${MESSAGES_API}/conversacion/nueva`);
+
         const response = await fetch(`${MESSAGES_API}/conversacion/nueva`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                usuario1Id: currentUserMessages._id,
-                usuario2Id: user._id
-            })
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData)
         });
+
+        console.log('📥 Estado de respuesta:', response.status, response.statusText);
         
-        const result = await response.json();
+        let result;
+        try {
+            result = await response.json();
+            console.log('📥 Respuesta del servidor:', result);
+        } catch (parseError) {
+            console.error('❌ Error parseando respuesta JSON:', parseError);
+            const textResponse = await response.text();
+            console.error('📥 Respuesta en texto:', textResponse);
+            throw new Error('Error en formato de respuesta del servidor');
+        }
         
         if (result.success) {
             console.log('✅ Conversación procesada:', result.data._id, result.message);
             closeNewChatModal();
             showMessageToast(result.message, 'success');
             
+            // Pequeño delay para asegurar que todo se actualice
             setTimeout(() => {
-                openConversacion(result.data);
-                setTimeout(() => loadConversaciones(), 1000);
+                if (result.data) {
+                    openConversacion(result.data);
+                }
+                setTimeout(() => loadConversaciones(), 500);
             }, 300);
         } else {
             console.error('❌ Error del servidor:', result.error);
             showMessageToast(`❌ ${result.error}`, 'error');
         }
     } catch (error) {
-        console.error('Error de red iniciando chat:', error);
-        showMessageToast('❌ Error de conexión', 'error');
+        console.error('❌ Error de red iniciando chat:', error);
+        showMessageToast('❌ Error de conexión al servidor: ' + error.message, 'error');
     } finally {
         isStartingNewChat = false;
         
@@ -756,6 +810,27 @@ async function startNewChat(user) {
             }, 1000);
         }
     }
+}
+
+function verifyCurrentUser() {
+    if (!currentUserMessages) {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+            currentUserMessages = JSON.parse(storedUser);
+            console.log('✅ Usuario recuperado de localStorage:', currentUserMessages);
+        } else {
+            console.error('❌ No hay usuario logueado');
+            showMessageToast('❌ Debes iniciar sesión para usar los mensajes', 'error');
+            return false;
+        }
+    }
+    
+    if (!currentUserMessages._id) {
+        console.error('❌ Usuario actual no tiene ID');
+        return false;
+    }
+    
+    return true;
 }
 
 async function marcarMensajesLeidos(conversacionId) {

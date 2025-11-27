@@ -6,6 +6,13 @@ let currentEditingCollectionId = null;
 let currentOpenCollectionMenu = null;
 let collectionMenuClickHandler = null;
 
+// AGREGAR ESTO AL PRINCIPIO:
+const API_URL_CO = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
+
+console.log('🌐 Collections API URL:', API_URL_CO);
+
 // ===== INICIALIZACIÓN =====
 function initializeCollections() {
     console.log('🔄 Inicializando sistema de colecciones...');
@@ -20,7 +27,7 @@ async function loadUserCollections() {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
         if (!currentUser) return;
 
-        const response = await fetch(`${API_URL}/collections/usuario/${currentUser._id}`);
+        const response = await fetch(`${API_URL_CO}/collections/usuario/${currentUser._id}`);
         const result = await response.json();
 
         if (result.success) {
@@ -387,7 +394,7 @@ function openCreateCollectionModal(collectionId = null) {
 // ===== CARGAR DATOS DE COLECCIÓN PARA EDITAR =====
 async function loadCollectionData(collectionId) {
     try {
-        const response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/${collectionId}`);
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}`);
         const result = await response.json();
         
         if (result.success) {
@@ -442,7 +449,7 @@ async function handleCreateOrUpdateCollection(event) {
         
         if (isEditing) {
             // Actualizar colección existente
-            response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/${currentEditingCollectionId}`, {
+            response = await fetch(`${API_URL_CO}/collections/${currentEditingCollectionId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -451,7 +458,7 @@ async function handleCreateOrUpdateCollection(event) {
             });
         } else {
             // Crear nueva colección
-            response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections`, {
+            response = await fetch(`${API_URL_CO}/collections`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -536,7 +543,7 @@ function confirmDeleteCollection(collectionId, collectionName) {
 
 async function deleteCollection(collectionId) {
     try {
-        const response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/${collectionId}`, {
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}`, {
             method: 'DELETE'
         });
         
@@ -693,7 +700,7 @@ async function loadUserPostsForSelection(collectionId) {
             return;
         }
 
-        const response = await fetch(`${API_URL}/posts/user/${currentUser._id}`);
+        const response = await fetch(`${API_URL_CO}/posts/user/${currentUser._id}`);
         const result = await response.json();
 
         console.log('📨 Respuesta posts:', result);
@@ -1269,7 +1276,7 @@ async function addSelectedPostsToCollection(collectionId) {
         addBtn.disabled = true;
         addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
         
-        const response = await fetch(`${API_URL}/collections/${collectionId}/posts`, {
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}/posts`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1308,7 +1315,7 @@ async function updateAllCollectionViews(collectionId) {
         console.log('🔄 Actualizando todas las vistas para colección:', collectionId);
         
         // 1. Recargar los datos de la colección desde el servidor
-        const response = await fetch(`${API_URL}/collections/${collectionId}`);
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}`);
         const result = await response.json();
         
         if (!result.success) {
@@ -1542,7 +1549,7 @@ async function createCollectionPost(collection) {
             tipoContenido: 'texto'
         };
         
-        await fetch(`${window.API_URL || 'http://localhost:3001/api'}/posts`, {
+        await fetch(`${API_URL_CO}/posts`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1565,7 +1572,7 @@ async function viewCollection(collectionId, event) {
     try {
         console.log('👀 Abriendo colección:', collectionId);
         
-        const response = await fetch(`${window.API_URL || 'http://localhost:3001/api'}/collections/${collectionId}`);
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}`);
         const result = await response.json();
         
         if (result.success) {
@@ -1696,7 +1703,7 @@ async function removePostFromCollection(collectionId, postId, event) {
         
         showCollectionToast('⏳ Eliminando post de la colección...', 'info');
         
-        const response = await fetch(`${API_URL}/collections/${collectionId}/posts/${postId}`, {
+        const response = await fetch(`${API_URL_CO}/collections/${collectionId}/posts/${postId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
@@ -2034,7 +2041,7 @@ async function removePostWithRetry(collectionId, postId, maxRetries = 2) {
         try {
             console.log(`🔄 Intento ${attempt} de eliminar post ${postId}`);
             
-            const response = await fetch(`${API_URL}/collections/${collectionId}/posts/${postId}`, {
+            const response = await fetch(`${API_URL_CO}/collections/${collectionId}/posts/${postId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'

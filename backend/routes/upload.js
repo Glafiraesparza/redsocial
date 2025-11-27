@@ -165,7 +165,7 @@ router.post('/image', upload.fields([
             mimetype: file.mimetype
         });
 
-        const imageUrl = `http://localhost:3001/uploads/images/posts/${file.filename}`;
+        const imageUrl = `/uploads/images/posts/${file.filename}`;
         console.log('✅ Imagen subida:', imageUrl);
 
         res.json({
@@ -200,7 +200,7 @@ router.post('/audio', upload.single('audio'), (req, res) => {
             });
         }
 
-        const audioUrl = `http://localhost:3001/uploads/audio/${req.file.filename}`;
+        const audioUrl = `/uploads/audio/${req.file.filename}`;
         console.log('✅ Audio subido:', audioUrl);
 
         res.json({
@@ -244,7 +244,7 @@ router.post('/video', upload.single('video'), (req, res) => {
             mimetype: req.file.mimetype
         });
 
-        const videoUrl = `http://localhost:3001/uploads/video/${req.file.filename}`;
+        const videoUrl = `/uploads/video/${req.file.filename}`;
         console.log('✅ Video subido:', videoUrl);
 
         res.json({
@@ -278,7 +278,7 @@ router.post('/profile-picture/:userId', upload.single('profilePicture'), async (
             });
         }
 
-        const imageUrl = `http://localhost:3001/uploads/images/profiles/${req.file.filename}`;
+        const imageUrl = `/uploads/images/profiles/${req.file.filename}`;
         
         const user = await User.findByIdAndUpdate(
             req.params.userId,
@@ -363,7 +363,7 @@ router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req,
             });
         }
 
-        const newCoverPhoto = `http://localhost:3001/uploads/images/covers/${req.file.filename}`;
+        const newCoverPhoto = `/uploads/images/covers/${req.file.filename}`;
         user.fotos_portada.push(newCoverPhoto);
         
         // Si es la primera foto, establecer como principal

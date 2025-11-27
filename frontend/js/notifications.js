@@ -1,16 +1,15 @@
-// frontend/js/notifications.js
-
 let currentNotifications = [];
 let unreadCount = 0;
 
 console.log('🔔 notifications.js cargado correctamente');
 
-// Verificar dependencias
-if (typeof API_URL === 'undefined') {
-    console.error('❌ API_URL no está definida');
-    // Definir una por defecto para testing
-    const API_URL = 'http://localhost:3001/api';
-}
+// DEFINIR API_URL_NOTIS CORRECTAMENTE
+const API_URL_NOTIS = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
+
+console.log('🌐 Notifications API URL:', API_URL_NOTIS);
+
 
 if (typeof currentUser === 'undefined') {
     console.warn('⚠️ currentUser no está definido, buscando en localStorage...');
@@ -54,7 +53,7 @@ async function loadNotifications() {
         showLoadingState();
         console.log('🔄 Cargando notificaciones para usuario:', currentUser._id);
         
-        const response = await fetch(`${API_URL}/notifications/${currentUser._id}`);
+        const response = await fetch(`${API_URL_NOTIS}/notifications/${currentUser._id}`);
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
@@ -189,7 +188,7 @@ async function markAsRead(notificationId, event = null) {
     if (event) event.stopPropagation();
     
     try {
-        const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+        const response = await fetch(`${API_URL_NOTIS}/notifications/${notificationId}/read`, {
             method: 'POST'
         });
         
@@ -216,7 +215,7 @@ async function markAsRead(notificationId, event = null) {
 // Marcar todas como leídas
 async function markAllAsRead() {
     try {
-        const response = await fetch(`${API_URL}/notifications/${currentUser._id}/read-all`, {
+        const response = await fetch(`${API_URL_NOTIS}/notifications/${currentUser._id}/read-all`, {
             method: 'POST'
         });
         
@@ -243,7 +242,7 @@ async function deleteNotification(notificationId, event) {
     }
     
     try {
-        const response = await fetch(`${API_URL}/notifications/${notificationId}`, {
+        const response = await fetch(`${API_URL_NOTIS}/notifications/${notificationId}`, {
             method: 'DELETE'
         });
         
@@ -281,7 +280,7 @@ async function clearAllNotifications() {
     }
     
     try {
-        const response = await fetch(`${API_URL}/notifications/${currentUser._id}/clear-all`, {
+        const response = await fetch(`${API_URL_NOTIS}/notifications/${currentUser._id}/clear-all`, {
             method: 'DELETE'
         });
         

@@ -1,5 +1,7 @@
 // frontend/js/dashboard.js
-const API_URL = 'http://localhost:3001/api';
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
 
 // Variables globales
 let currentUser = null;
@@ -62,7 +64,6 @@ function initializeDashboard() {
 
     setTimeout(() => {
         initializeMediaTypeButtons();
-        debugMediaContainers(); // Para verificar
     }, 500);
 }
 
@@ -5104,4 +5105,3 @@ async function navigateToUserProfile(userId) {
         window.location.href = 'profile.html';
     }
 }
-

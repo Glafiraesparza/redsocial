@@ -1,4 +1,8 @@
-const API_URL = 'http://localhost:3001/api';
+const API_URL_PROFILE = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
+
+console.log('🌐 Collections API URL:', API_URL_PROFILE);
 
 // Variables globales
 let currentUser = null;
@@ -85,7 +89,7 @@ async function checkIfUserIsBlocked(userId) {
 
         // Verificar si el otro usuario bloqueó al usuario actual (en el servidor)
         console.log(`🔍 Verificando en servidor si usuario ${userId} me bloqueó`);
-        const response = await fetch(`${API_URL}/users/${userId}/check-blocked`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${userId}/check-blocked`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -210,8 +214,8 @@ async function loadOtherUserProfile(userId) {
         
         // Cargar datos del perfil del otro usuario
         const [profileResponse, postsResponse] = await Promise.all([
-            fetch(`${API_URL}/profile/${userId}`),
-            fetch(`${API_URL}/posts/user/${userId}`)
+            fetch(`${API_URL_PROFILE}/profile/${userId}`),
+            fetch(`${API_URL_PROFILE}/posts/user/${userId}`)
         ]);
 
         const profileResult = await profileResponse.json();
@@ -384,7 +388,7 @@ async function toggleFollowProfile(userId) {
         
         console.log(`🔄 ${isFollowing ? 'Dejando de seguir' : 'Siguiendo'} usuario:`, userId);
         
-        const response = await fetch(`${API_URL}/users/${userId}/${endpoint}`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${userId}/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -812,7 +816,7 @@ async function loadBlockedUsers() {
 
         // Obtener información de cada usuario bloqueado
         const usersPromises = blockedUsersIds.map(userId => 
-            fetch(`${API_URL}/users/${userId}`).then(res => res.json())
+            fetch(`${API_URL_PROFILE}/users/${userId}`).then(res => res.json())
         );
 
         const usersResults = await Promise.all(usersPromises);
@@ -871,7 +875,7 @@ async function unblockUser(userId) {
         
         showToast('⏳ Desbloqueando usuario...', 'info');
         
-        const response = await fetch(`${API_URL}/users/${userId}/unblock`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${userId}/unblock`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -925,7 +929,7 @@ async function changeUsername() {
     try {
         showToast('⏳ Cambiando nombre de usuario...', 'info');
         
-        const response = await fetch(`${API_URL}/users/${currentUser._id}/username`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${currentUser._id}/username`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newUsername })
@@ -979,7 +983,7 @@ async function changeEmail() {
     try {
         showToast('⏳ Cambiando correo electrónico...', 'info');
         
-        const response = await fetch(`${API_URL}/users/${currentUser._id}/email`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${currentUser._id}/email`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newEmail })
@@ -1034,7 +1038,7 @@ async function changePassword() {
     try {
         showToast('⏳ Cambiando contraseña...', 'info');
         
-        const response = await fetch(`${API_URL}/users/${currentUser._id}/password`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${currentUser._id}/password`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -1218,7 +1222,7 @@ function makeFunctionsGlobal() {
         
         showToast('⏳ Bloqueando usuario...', 'info');
         
-        fetch(`${API_URL}/users/${userId}/block`, {
+        fetch(`${API_URL_PROFILE}/users/${userId}/block`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -1264,7 +1268,7 @@ function makeFunctionsGlobal() {
         
         showToast('⏳ Desbloqueando usuario...', 'info');
         
-        fetch(`${API_URL}/users/${userId}/unblock`, {
+        fetch(`${API_URL_PROFILE}/users/${userId}/unblock`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -1302,7 +1306,7 @@ function makeFunctionsGlobal() {
         
         showToast('⏳ Eliminando seguidor...', 'info');
         
-        fetch(`${API_URL}/users/${userId}/remove-follower`, {
+        fetch(`${API_URL_PROFILE}/users/${userId}/remove-follower`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -2127,7 +2131,7 @@ async function loadEditProfileForm() {
         if (!formContainer) return;
 
         // Obtener lista de intereses disponibles
-        const interesesResponse = await fetch(`${API_URL}/profile/intereses/lista`);
+        const interesesResponse = await fetch(`${API_URL_PROFILE}/profile/intereses/lista`);
         const interesesResult = await interesesResponse.json();
         const interesesDisponibles = interesesResult.success ? interesesResult.data : [];
 
@@ -2451,7 +2455,7 @@ async function uploadProfilePhoto() {
         const formData = new FormData();
         formData.append('profilePicture', file);
         
-        const response = await fetch(`${API_URL}/upload/profile-picture/${currentUser._id}`, {
+        const response = await fetch(`${API_URL_PROFILE}/upload/profile-picture/${currentUser._id}`, {
             method: 'POST',
             body: formData
         });
@@ -2517,7 +2521,7 @@ async function uploadCoverPhoto() {
         const formData = new FormData();
         formData.append('coverPicture', file);
         
-        const response = await fetch(`${API_URL}/upload/cover-picture/${currentUser._id}`, {
+        const response = await fetch(`${API_URL_PROFILE}/upload/cover-picture/${currentUser._id}`, {
             method: 'POST',
             body: formData
         });
@@ -2560,7 +2564,7 @@ async function confirmDeleteCoverPhoto(index) {
     try {
         showToast('⏳ Eliminando foto de portada...', 'info');
         
-        const response = await fetch(`${API_URL}/upload/cover-picture/${currentUser._id}/${index}`, {
+        const response = await fetch(`${API_URL_PROFILE}/upload/cover-picture/${currentUser._id}/${index}`, {
             method: 'DELETE'
         });
         
@@ -2619,8 +2623,8 @@ async function loadUserProfile() {
         
         // Cargar datos del perfil y publicaciones por separado para mejor control
         const [profileResponse, postsResponse] = await Promise.all([
-            fetch(`${API_URL}/profile/${currentUser._id}`),
-            fetch(`${API_URL}/posts/user/${currentUser._id}`) // Usar la ruta de posts del usuario
+            fetch(`${API_URL_PROFILE}/profile/${currentUser._id}`),
+            fetch(`${API_URL_PROFILE}/posts/user/${currentUser._id}`) // Usar la ruta de posts del usuario
         ]);
 
         const profileResult = await profileResponse.json();
@@ -2727,7 +2731,7 @@ function loadCurrentProfilePhoto() {
 async function loadExistingCoverPhotos() {
     try {
         console.log('🔄 Cargando fotos de portada existentes...');
-        const response = await fetch(`${API_URL}/profile/${currentUser._id}`);
+        const response = await fetch(`${API_URL_PROFILE}/profile/${currentUser._id}`);
         const result = await response.json();
         
         if (result.success) {
@@ -2789,7 +2793,7 @@ async function setMainCoverPhoto(index) {
     try {
         console.log(`⭐ Intentando establecer foto principal en índice: ${index}`);
         
-        const response = await fetch(`${API_URL}/upload/cover-picture/main/${currentUser._id}/${index}`, {
+        const response = await fetch(`${API_URL_PROFILE}/upload/cover-picture/main/${currentUser._id}/${index}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -2835,7 +2839,7 @@ async function setMainCoverPhoto(index) {
 async function deleteCoverPhoto(index) {
     try {
         // Obtener datos actuales para mostrar en la confirmación
-        const response = await fetch(`${API_URL}/profile/${currentUser._id}`);
+        const response = await fetch(`${API_URL_PROFILE}/profile/${currentUser._id}`);
         const result = await response.json();
         
         if (!result.success) {
@@ -2987,8 +2991,8 @@ async function loadFriendsSection(usuario) {
 
         // Cargar seguidores y seguidos
         const [followersResponse, followingResponse] = await Promise.all([
-            fetch(`${API_URL}/users/${usuario._id}/followers`),
-            fetch(`${API_URL}/users/${usuario._id}/following`)
+            fetch(`${API_URL_PROFILE}/users/${usuario._id}/followers`),
+            fetch(`${API_URL_PROFILE}/users/${usuario._id}/following`)
         ]);
 
         const followersResult = await followersResponse.json();
@@ -3129,7 +3133,7 @@ async function reorderCoverPhotos(fromIndex, toIndex) {
     try {
         showToast('⏳ Reordenando fotos...', 'info');
         
-        const response = await fetch(`${API_URL}/upload/cover-picture/reorder/${currentUser._id}`, {
+        const response = await fetch(`${API_URL_PROFILE}/upload/cover-picture/reorder/${currentUser._id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -3270,7 +3274,7 @@ async function toggleFollowFriend(userId, button) {
         const isFollowing = currentUser.seguidos?.includes(userId);
         const endpoint = isFollowing ? 'unfollow' : 'follow';
         
-        const response = await fetch(`${API_URL}/users/${userId}/${endpoint}`, {
+        const response = await fetch(`${API_URL_PROFILE}/users/${userId}/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentUserId: currentUser._id })
@@ -3316,7 +3320,7 @@ async function viewUserProfile(userId) {
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
         
         // Obtener datos del usuario
-        const userResponse = await fetch(`${API_URL}/users/${userId}`);
+        const userResponse = await fetch(`${API_URL_PROFILE}/users/${userId}`);
         const userResult = await userResponse.json();
         
         if (!userResult.success) {
@@ -3519,7 +3523,7 @@ async function loadAndDisplayOtherUserCollections(userId) {
     try {
         console.log('🔄 Solicitando colecciones públicas para usuario:', userId);
         
-        const response = await fetch(`${API_URL}/collections/user/${userId}/public`);
+        const response = await fetch(`${API_URL_PROFILE}/collections/user/${userId}/public`);
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
@@ -3801,7 +3805,7 @@ async function viewOtherUserCollection(collectionId) {
     try {
         console.log('🔍 Viendo colección de otro usuario:', collectionId);
         
-        const response = await fetch(`${API_URL}/collections/${collectionId}/public`);
+        const response = await fetch(`${API_URL_PROFILE}/collections/${collectionId}/public`);
         const result = await response.json();
         
         if (result.success) {
@@ -4037,7 +4041,7 @@ async function loadOtherUserCollectionsWithSameFormat(userId) {
     try {
         console.log('🔄 Cargando colecciones públicas del usuario:', userId);
         
-        const response = await fetch(`${API_URL}/collections/user/${userId}/public`);
+        const response = await fetch(`${API_URL_PROFILE}/collections/user/${userId}/public`);
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
@@ -4241,8 +4245,8 @@ function viewCollectionDetails(collectionId, isOwnProfile = true) {
 async function showCollectionModal(collectionId, isOwnProfile = true) {
     try {
         const endpoint = isOwnProfile ? 
-            `${API_URL}/collections/${collectionId}` :
-            `${API_URL}/collections/${collectionId}/public`;
+            `${API_URL_PROFILE}/collections/${collectionId}` :
+            `${API_URL_PROFILE}/collections/${collectionId}/public`;
             
         const response = await fetch(endpoint);
         const result = await response.json();
@@ -4454,7 +4458,7 @@ function initializeMediaPlayers() {
 // Función para recargar publicaciones del perfil
 async function loadProfilePosts() {
     try {
-        const response = await fetch(`${API_URL}/profile/${currentUser._id}`);
+        const response = await fetch(`${API_URL_PROFILE}/profile/${currentUser._id}`);
         const result = await response.json();
 
         if (result.success) {
@@ -4777,7 +4781,7 @@ function confirmDeletePost(postId) {
 // Función para eliminar el post
 async function deletePost(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -4909,7 +4913,7 @@ function closeDeleteModal() {
 // Función para eliminar el post
 async function deletePost(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -5454,7 +5458,7 @@ async function saveProfileChanges() {
     try {
         showToast('⏳ Guardando cambios...', 'info');
 
-        const response = await fetch(`${API_URL}/profile/${currentUser._id}`, {
+        const response = await fetch(`${API_URL_PROFILE}/profile/${currentUser._id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -5672,7 +5676,7 @@ async function updatePost(postId) {
             postData.duracion = post.duracion || 0;
         }
         
-        const response = await fetch(`${API_URL}/posts/${postId}`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(postData)
@@ -5704,7 +5708,7 @@ async function uploadMediaFile(file, fieldName) {
     
     console.log(`📤 Subiendo ${fieldName} a /upload/${endpoint}`);
     
-    const response = await fetch(`${API_URL}/upload/${endpoint}`, {
+    const response = await fetch(`${API_URL_PROFILE}/upload/${endpoint}`, {
         method: 'POST',
         body: formData
     });
@@ -5801,7 +5805,7 @@ async function uploadImageToServer(file) {
     const formData = new FormData();
     formData.append('image', file);
     
-    const response = await fetch(`${API_URL}/upload/image`, {
+    const response = await fetch(`${API_URL_PROFILE}/upload/image`, {
         method: 'POST',
         body: formData
     });
@@ -5920,7 +5924,7 @@ function formatDuracion(segundos) {
 // Función para manejar like en publicaciones
 async function handleLike(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}/like`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -5950,7 +5954,7 @@ async function handleLike(postId) {
 // Función para manejar share en publicaciones
 async function handleShare(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}/share`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -5982,7 +5986,7 @@ async function handleShare(postId) {
 // Función para ver publicación completa
 async function viewPost(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}`);
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}`);
         const result = await response.json();
         
         if (result.success) {
@@ -6297,7 +6301,7 @@ async function handleLikeModal(postId) {
     }
     
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}/like`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -6333,7 +6337,7 @@ async function handleLikeModal(postId) {
 // Función para manejar share en el modal - IDÉNTICA A DASHBOARD
 async function handleShareModal(postId) {
     try {
-        const response = await fetch(`${API_URL}/posts/${postId}/share`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser._id })
@@ -6416,7 +6420,7 @@ async function loadComentariosModal(postId) {
             </div>
         `;
 
-        const response = await fetch(`${API_URL}/posts/${postId}/comentarios`);
+        const response = await fetch(`${API_URL_PROFILE}/posts/${postId}/comentarios`);
         
         if (!response.ok) {
             throw new Error(`Error HTTP: ${response.status}`);
@@ -6536,7 +6540,7 @@ async function enviarComentarioModal() {
         
         console.log('📦 Request body (CORREGIDO) desde profile:', requestBody);
         
-        const response = await fetch(`${API_URL}/posts/${currentPostId}/comentarios`, {
+        const response = await fetch(`${API_URL_PROFILE}/posts/${currentPostId}/comentarios`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

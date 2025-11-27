@@ -4,6 +4,81 @@ const mongoose = require('mongoose'); // ← ¡AGREGA ESTA LÍNEA!
 const Notification = require('../models/Notification');
 const router = express.Router();
 
+// backend/routes/notifications.js - AGREGAR ESTA RUTA
+
+// RUTA RAÍZ - GET /api/notifications (sin userId)
+router.get('/', async (req, res) => {
+  try {
+    console.log('🔔 [NOTIFICATIONS] Ruta raíz - Obteniendo notificaciones...');
+    
+    // Obtener userId del query string o headers
+    const userId = req.query.userId || req.headers['user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere userId'
+      });
+    }
+
+    console.log('👤 UserID recibido en ruta raíz:', userId);
+
+    // Validar que userId es un ObjectId válido
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.error('❌ ID de usuario inválido:', userId);
+      return res.status(400).json({
+        success: false,
+        error: 'ID de usuario inválido'
+      });
+    }
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    console.log('📅 Consultando notificaciones desde:', thirtyDaysAgo);
+
+    const notifications = await Notification.find({ 
+      usuario: new mongoose.Types.ObjectId(userId),
+      fecha_creacion: { $gte: thirtyDaysAgo }
+    })
+      .populate('emisor', 'nombre username foto_perfil')
+      .populate('post', 'contenido imagen audio video tipoContenido')
+      .sort({ fecha_creacion: -1 })
+      .limit(50);
+
+    console.log(`📨 Notificaciones encontradas: ${notifications.length}`);
+
+    const total = await Notification.countDocuments({ 
+      usuario: new mongoose.Types.ObjectId(userId),
+      fecha_creacion: { $gte: thirtyDaysAgo }
+    });
+    
+    const noLeidas = await Notification.countDocuments({ 
+      usuario: new mongoose.Types.ObjectId(userId), 
+      leida: false,
+      fecha_creacion: { $gte: thirtyDaysAgo }
+    });
+
+    console.log(`📊 Total: ${total}, No leídas: ${noLeidas}`);
+
+    res.json({
+      success: true,
+      data: {
+        notifications,
+        total,
+        noLeidas
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo notificaciones (ruta raíz):', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // OBTENER notificaciones del usuario
 router.get('/:userId', async (req, res) => {
   try {

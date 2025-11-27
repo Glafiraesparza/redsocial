@@ -1,5 +1,9 @@
 // frontend/js/auth.js
-const API_URL = 'http://localhost:3001/api';
+const API_URL_AUTH = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001/api' 
+    : 'https://redsocial-cj60.onrender.com/api';
+
+console.log('🌐 API URL configurada:', API_URL_AUTH); 
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
@@ -415,7 +419,7 @@ async function handleRegister(e) {
     try {
         showToast('⏳ Creando cuenta...', 'info');
         
-        const response = await fetch(`${API_URL}/users`, {
+        const response = await fetch(`${API_URL_AUTH}/users`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -463,7 +467,7 @@ async function handleLogin(e) {
         showToast('⏳ Verificando credenciales...', 'info');
         
         // Usar el nuevo endpoint de login
-        const response = await fetch(`${API_URL}/users/login`, {
+        const response = await fetch(`${API_URL_AUTH}/users/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -5,7 +5,6 @@ const conversacionSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
-        // 🔥 REMOVER LA VALIDACIÓN QUE CAUSA PROBLEMAS
     }],
     ultimo_mensaje: {
         type: mongoose.Schema.Types.ObjectId,
@@ -21,36 +20,53 @@ const conversacionSchema = new mongoose.Schema({
     }
 });
 
-// Índice único para prevenir duplicados
+// 🔥 ÍNDICE MEJORADO - Solo hacer único cuando hay 2 participantes diferentes
 conversacionSchema.index({ 
     participantes: 1 
 }, { 
     unique: true,
+    partialFilterExpression: { 
+        $expr: { 
+            $and: [
+                { $eq: [{ $size: "$participantes" }, 2] },
+                { $ne: [{ $arrayElemAt: ["$participantes", 0] }, { $arrayElemAt: ["$participantes", 1] }] }
+            ]
+        }
+    },
     name: 'participantes_unique_idx'
 });
 
-// 🔥 MIDDLEWARE MEJORADO - Validación personalizada
+// MIDDLEWARE MEJORADO CON MÁS LOGS
 conversacionSchema.pre('save', function(next) {
+    console.log('🔍 [CONVERSACION] Validando conversación con participantes:', this.participantes);
+    console.log('🔍 [CONVERSACION] Número de participantes:', this.participantes ? this.participantes.length : 0);
+    
     // Validar que hay exactamente 2 participantes
     if (!this.participantes || this.participantes.length !== 2) {
+        console.error('❌ [CONVERSACION] Error: Debe haber exactamente 2 participantes');
         return next(new Error('Debe haber exactamente 2 participantes'));
     }
     
+    // Convertir a string para comparación
+    const participant1 = this.participantes[0].toString();
+    const participant2 = this.participantes[1].toString();
+    
+    console.log('🔍 [CONVERSACION] Participante 1:', participant1);
+    console.log('🔍 [CONVERSACION] Participante 2:', participant2);
+    
     // Validar que los participantes son diferentes
-    if (this.participantes[0].toString() === this.participantes[1].toString()) {
+    if (participant1 === participant2) {
+        console.error('❌ [CONVERSACION] Error: Los participantes deben ser diferentes');
         return next(new Error('Los participantes deben ser diferentes'));
     }
     
-    // Ordenar consistentemente
-    this.participantes.sort((a, b) => a.toString().localeCompare(b.toString()));
+    // 🔥 ORDENAR CONSISTENTEMENTE
+    this.participantes = [participant1, participant2].sort((a, b) => a.localeCompare(b));
+    
+    console.log('✅ [CONVERSACION] Participantes ordenados:', this.participantes);
+    
     this.fecha_actualizacion = Date.now();
     next();
 });
-
-// Método estático útil
-conversacionSchema.statics.findByUsers = function(userId1, userId2) {
-    const participantes = [userId1, userId2].sort((a, b) => a.toString().localeCompare(b.toString()));
-    return this.findOne({ participantes });
-};
 
 module.exports = mongoose.model('Conversacion', conversacionSchema);

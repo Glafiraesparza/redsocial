@@ -7,6 +7,46 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const router = express.Router();
 
+// AGREGAR ESTA RUTA - GET /api/messages/conversaciones (sin userId en params)
+router.get('/conversaciones', async (req, res) => {
+    try {
+        console.log('💬 [MESSAGES] Ruta conversaciones - Obteniendo conversaciones...');
+        
+        // Obtener userId del query string
+        const userId = req.query.userId;
+        
+        if (!userId) {
+            console.log('⚠️  No se proporcionó userId, devolviendo array vacío');
+            return res.json({
+                success: true,
+                data: []
+            });
+        }
+
+        console.log('👤 UserID recibido:', userId);
+
+        const conversaciones = await Conversacion.find({ 
+            participantes: userId 
+        })
+        .populate('participantes', 'nombre username foto_perfil')
+        .populate('ultimo_mensaje')
+        .sort({ fecha_actualizacion: -1 });
+
+        console.log(`📨 Conversaciones encontradas: ${conversaciones.length}`);
+
+        res.json({
+            success: true,
+            data: conversaciones
+        });
+    } catch (error) {
+        console.error('❌ Error obteniendo conversaciones:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // OBTENER todas las conversaciones del usuario
 router.get('/conversaciones/:userId', async (req, res) => {
     try {
@@ -67,49 +107,103 @@ router.get('/conversacion/:conversacionId/mensajes', async (req, res) => {
     }
 });
 
-// CREAR nueva conversación
+// CREAR nueva conversación - VERSIÓN MEJORADA
 router.post('/conversacion/nueva', async (req, res) => {
     try {
         const { usuario1Id, usuario2Id } = req.body;
 
         console.log('🚀 === NUEVA SOLICITUD DE CONVERSACIÓN ===');
-        console.log('Usuario 1:', usuario1Id);
-        console.log('Usuario 2:', usuario2Id);
+        console.log('📦 Body completo recibido:', JSON.stringify(req.body, null, 2));
+        console.log('👤 Usuario 1 ID:', usuario1Id);
+        console.log('👤 Usuario 2 ID:', usuario2Id);
+        console.log('🔍 Tipo de usuario1Id:', typeof usuario1Id);
+        console.log('🔍 Tipo de usuario2Id:', typeof usuario2Id);
 
-        // 🔥 VALIDACIÓN MEJORADA
-        if (!usuario1Id || !usuario2Id) {
+        // Validación EXTRA estricta
+        if (!req.body.usuario1Id || !req.body.usuario2Id) {
+            console.error('❌ FALTAN IDs EN EL BODY:', {
+                tieneUsuario1: !!req.body.usuario1Id,
+                tieneUsuario2: !!req.body.usuario2Id,
+                bodyCompleto: req.body
+            });
             return res.status(400).json({
                 success: false,
                 error: 'Se requieren ambos IDs de usuario'
             });
         }
 
+        // 🔥 VALIDACIONES MEJORADAS
+        if (!usuario1Id || !usuario2Id) {
+            console.error('❌ Faltan IDs de usuario:', { usuario1Id, usuario2Id });
+            return res.status(400).json({
+                success: false,
+                error: 'Se requieren ambos IDs de usuario'
+            });
+        }
+
+        // Validar que los IDs no sean null, undefined o vacíos
+        if (usuario1Id === 'null' || usuario1Id === 'undefined' || usuario1Id.trim() === '') {
+            console.error('❌ usuario1Id inválido:', usuario1Id);
+            return res.status(400).json({
+                success: false,
+                error: 'ID del primer usuario inválido'
+            });
+        }
+
+        if (usuario2Id === 'null' || usuario2Id === 'undefined' || usuario2Id.trim() === '') {
+            console.error('❌ usuario2Id inválido:', usuario2Id);
+            return res.status(400).json({
+                success: false,
+                error: 'ID del segundo usuario inválido'
+            });
+        }
+
         if (usuario1Id === usuario2Id) {
+            console.error('❌ Mismo usuario:', usuario1Id);
             return res.status(400).json({
                 success: false,
                 error: 'No puedes crear una conversación contigo mismo'
             });
         }
 
-        // ORDENAR participantes
-        const participantesOrdenados = [usuario1Id, usuario2Id].sort();
-        console.log('📋 Participantes ordenados:', participantesOrdenados);
-
-        // 🔥 VERIFICAR QUE LOS IDs SON VÁLIDOS
-        if (!mongoose.Types.ObjectId.isValid(usuario1Id) || !mongoose.Types.ObjectId.isValid(usuario2Id)) {
+        // 🔥 CONVERSIÓN SEGURA A ObjectId
+        let user1, user2;
+        try {
+            user1 = new mongoose.Types.ObjectId(usuario1Id);
+            user2 = new mongoose.Types.ObjectId(usuario2Id);
+            console.log('✅ ObjectIds creados:', { user1, user2 });
+        } catch (idError) {
+            console.error('❌ Error convirtiendo a ObjectId:', idError);
             return res.status(400).json({
                 success: false,
-                error: 'IDs de usuario no válidos'
+                error: 'IDs de usuario inválidos'
             });
         }
 
-        // Buscar conversación existente
-        let conversacion = await Conversacion.findOne({
-            participantes: participantesOrdenados
-        }).populate('participantes', 'nombre username foto_perfil')
-          .populate('ultimo_mensaje');
+        // ORDENAR participantes
+        const participantesOrdenados = [user1, user2].sort((a, b) => 
+            a.toString().localeCompare(b.toString())
+        );
 
-        console.log('🔍 Conversación encontrada:', conversacion ? 'SÍ' : 'NO');
+        console.log('📋 Participantes ordenados:', participantesOrdenados);
+
+        // 🔍 BÚSQUEDA ROBUSTA
+        console.log('🔍 Buscando conversación existente...');
+        let conversacion = await Conversacion.findOne({
+            $and: [
+                { participantes: { $size: 2 } },
+                { 
+                    $or: [
+                        { participantes: participantesOrdenados },
+                        { participantes: { $all: participantesOrdenados } }
+                    ]
+                }
+            ]
+        })
+        .populate('participantes', 'nombre username foto_perfil')
+        .populate('ultimo_mensaje');
+
+        console.log('🔍 Resultado búsqueda:', conversacion ? `Encontrada: ${conversacion._id}` : 'No encontrada');
 
         // Si existe, retornarla
         if (conversacion) {
@@ -117,47 +211,28 @@ router.post('/conversacion/nueva', async (req, res) => {
             return res.json({
                 success: true,
                 data: conversacion,
-                message: 'Conversación existente'
+                message: 'Conversación existente recuperada'
             });
         }
 
-        // Validar usuarios y seguimiento
-        console.log('🆕 Validando usuarios para nueva conversación...');
-        
+        // Validar que los usuarios existen
+        console.log('🔍 Validando existencia de usuarios...');
         const [usuario1, usuario2] = await Promise.all([
             User.findById(usuario1Id),
             User.findById(usuario2Id)
         ]);
 
         if (!usuario1 || !usuario2) {
+            console.error('❌ Usuarios no encontrados:', { usuario1: !!usuario1, usuario2: !!usuario2 });
             return res.status(404).json({
                 success: false,
                 error: 'Usuario no encontrado'
             });
         }
 
-        // Verificar seguimiento mutuo
-        const usuario1SigueA2 = usuario1.seguidos.includes(usuario2Id);
-        const usuario2SigueA1 = usuario2.seguidores.includes(usuario1Id);
-
-        console.log(`🔍 Seguimiento: ${usuario1.nombre} sigue a ${usuario2.nombre}:`, usuario1SigueA2);
-        console.log(`🔍 Seguimiento: ${usuario2.nombre} sigue a ${usuario1.nombre}:`, usuario2SigueA1);
-
-        if (!usuario1SigueA2 || !usuario2SigueA1) {
-            return res.status(403).json({
-                success: false,
-                error: 'Solo puedes chatear con usuarios que te siguen y tú sigues'
-            });
-        }
-
-        // 🔥 CREAR CONVERSACIÓN CON VALIDACIÓN EXPLÍCITA
         console.log('🆕 Creando NUEVA conversación...');
         
-        // Verificar explícitamente que tenemos 2 participantes válidos
-        if (participantesOrdenados.length !== 2) {
-            throw new Error('Array de participantes no tiene 2 elementos');
-        }
-
+        // CREAR CONVERSACIÓN
         try {
             conversacion = new Conversacion({
                 participantes: participantesOrdenados,
@@ -165,77 +240,50 @@ router.post('/conversacion/nueva', async (req, res) => {
                 fecha_actualizacion: new Date()
             });
 
-            // 🔥 VALIDAR ANTES DE GUARDAR
-            const validationError = conversacion.validateSync();
-            if (validationError) {
-                console.error('❌ Error de validación:', validationError);
-                throw validationError;
-            }
-
+            console.log('💾 Guardando conversación...');
             await conversacion.save();
             
-            // Populate después de guardar
             await conversacion.populate('participantes', 'nombre username foto_perfil');
 
-            console.log('✅ Nueva conversación creada:', conversacion._id);
-            console.log('📊 Participantes finales:', conversacion.participantes.map(p => p._id));
+            console.log('✅ Nueva conversación creada exitosamente:', conversacion._id);
 
-            res.json({
+            return res.json({
                 success: true,
                 data: conversacion,
-                message: 'Nueva conversación creada'
+                message: 'Nueva conversación creada exitosamente'
             });
 
-        } catch (error) {
-            // Manejar error de duplicado
-            if (error.code === 11000) {
-                console.log('🔄 Conversación creada simultáneamente, buscando...');
+        } catch (saveError) {
+            console.error('❌ Error guardando conversación:', saveError);
+            
+            // Si hay error de duplicado, buscar nuevamente
+            if (saveError.code === 11000) {
+                console.log('🔄 ERROR 11000 - Buscando conversación existente nuevamente...');
                 
                 const conversacionExistente = await Conversacion.findOne({
-                    participantes: participantesOrdenados
-                }).populate('participantes', 'nombre username foto_perfil')
-                  .populate('ultimo_mensaje');
+                    $and: [
+                        { participantes: { $size: 2 } },
+                        { participantes: { $all: participantesOrdenados } }
+                    ]
+                })
+                .populate('participantes', 'nombre username foto_perfil')
+                .populate('ultimo_mensaje');
                 
                 if (conversacionExistente) {
+                    console.log('✅ Conversación encontrada después del error 11000:', conversacionExistente._id);
                     return res.json({
                         success: true,
                         data: conversacionExistente,
-                        message: 'Conversación creada simultáneamente'
+                        message: 'Conversación recuperada después de error de duplicado'
                     });
                 }
             }
             
-            // 🔥 MANEJO ESPECÍFICO DE ERROR DE VALIDACIÓN
-            if (error.message.includes('Debe haber exactamente 2 participantes')) {
-                console.error('❌ Error de validación de participantes:', participantesOrdenados);
-                return res.status(400).json({
-                    success: false,
-                    error: 'Error en los datos de participantes: ' + error.message
-                });
-            }
-            
-            throw error;
+            throw saveError;
         }
 
     } catch (error) {
-        console.error('❌ Error creando conversación:', error);
-        
-        if (error.code === 11000) {
-            console.log('🔄 Error de duplicado, buscando conversación existente...');
-            
-            const participantesOrdenados = [req.body.usuario1Id, req.body.usuario2Id].sort();
-            const conversacionExistente = await Conversacion.findOne({
-                participantes: participantesOrdenados
-            }).populate('participantes', 'nombre username foto_perfil');
-            
-            if (conversacionExistente) {
-                return res.json({
-                    success: true,
-                    data: conversacionExistente,
-                    message: 'Conversación ya existente (recuperada)'
-                });
-            }
-        }
+        console.error('❌ Error general creando conversación:', error);
         
         res.status(500).json({
             success: false,
@@ -243,6 +291,7 @@ router.post('/conversacion/nueva', async (req, res) => {
         });
     }
 });
+
 // ENVIAR mensaje
 router.post('/mensaje/enviar', async (req, res) => {
     try {
@@ -347,8 +396,6 @@ router.post('/mensaje/enviar', async (req, res) => {
     }
 });
 
-// OBTENER usuarios disponibles para chat (seguimiento mutuo)
-// OBTENER usuarios disponibles para chat (seguimiento mutuo) - CORREGIDO
 router.get('/usuarios-disponibles/:userId', async (req, res) => {
     try {
         const { userId } = req.params;

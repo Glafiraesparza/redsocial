@@ -10,45 +10,65 @@ connectDB();
 
 const app = express();
 
-// Configuración CORS más permisiva
-app.use(cors());
-app.use(express.json());
+// Configuración CORS para acceso externo
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 
-// Servir archivos estáticos para TODOS los tipos de archivos
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Servir archivos estáticos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Ruta de prueba
-app.get('/', (req, res) => {
+// ================================================
+// SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
+// ================================================
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Ruta de prueba de API
+app.get('/api', (req, res) => {
     res.json({ 
         message: '🚀 API de Red Social Kion-D funcionando!',
         version: '1.0.0',
         database: 'MongoDB Local',
-        features: 'Texto, Imágenes, Audio y Video'
+        features: 'Texto, Imágenes, Audio y Video',
+        status: 'ONLINE'
     });
 });
 
-// Rutas
+// Rutas de API
 app.use('/api/users', require('./routes/users'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/upload', require('./routes/upload')); 
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/collections', require('./routes/collections'));
-app.use('/api/notifications', require('./routes/notifications')); // ← ¡AGREGA ESTA LÍNEA!
+app.use('/api/notifications', require('./routes/notifications'));
 
-// Manejo de errores 404
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Ruta no encontrada: ' + req.path
-    });
+// ================================================
+// MANEJO DE RUTAS DEL FRONTEND (SPA)
+// ================================================
+app.get('*', (req, res) => {
+    // Si es una ruta de API, devolver 404
+    if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+        return res.status(404).json({
+            success: false,
+            error: 'Ruta de API no encontrada: ' + req.path
+        });
+    }
+    
+    // Para cualquier otra ruta, servir el frontend (SPA)
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
-const PORT = 3001;
-app.listen(PORT, () => {
-    console.log(`🎯 Servidor ejecutándose en puerto ${PORT}`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`🗄️  Base de datos: MongoDB Local`);
-    console.log(`🎵 Serviendo: Imágenes, Audio y Video`);
-    console.log(`🔔 Notificaciones: ACTIVADAS`); // ← Mensaje de confirmación
+const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+    console.log(`🎯 Servidor ejecutándose en http://${HOST}:${PORT}`);
+    console.log(`📡 Frontend: http://localhost:${PORT}`);
+    console.log(`🔧 Backend API: http://localhost:${PORT}/api`);
+    console.log(`🌐 Acceso externo: HABILITADO`);
 });
