@@ -2376,10 +2376,10 @@ async function loadExplore() {
     exploreContent.innerHTML = `
         <div class="explore-search-container">
             <div class="search-box">
-                <i class="fas fa-search"></i>
+                <i class="fas fa-search search-icon"> </i>
                 <input type="text" id="exploreSearchInput" placeholder="Buscar publicaciones por palabras clave, hashtags (#musica, #arte)...">
                 <button id="searchButton" class="btn-primary">
-                    <i class="fas fa-search"></i> Buscar
+                    Buscar
                 </button>
                 <button id="clearSearch" class="btn-secondary" style="display: none;">
                     <i class="fas fa-times"></i> Limpiar
