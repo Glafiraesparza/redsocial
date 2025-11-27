@@ -4311,7 +4311,7 @@ async function handleCreatePost() {
             console.log(`📤 Subiendo archivo: ${mediaFile.name}`);
             showToast(`📤 Subiendo ${mediaType}...`, 'info');
             
-            const fieldName = mediaType === 'imagen' ? 'image' : mediaType;
+            const fieldName = mediaType;
             console.log(`📤 Usando fieldName: ${fieldName}`);
             
             try {

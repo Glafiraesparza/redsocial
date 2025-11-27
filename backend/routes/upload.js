@@ -1,4 +1,4 @@
-// backend/routes/upload.js - VERSIÓN SIMPLIFICADA
+// backend/routes/upload.js - VERSIÓN CLOUDINARY
 const express = require('express');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
@@ -13,38 +13,90 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// CONFIGURACIÓN MULTER SIMPLE (almacenamiento en memoria)
+// CONFIGURACIÓN MULTER (almacenamiento en memoria para Cloudinary)
 const storage = multer.memoryStorage();
+
+// FILTRO DE ARCHIVOS
+const fileFilter = (req, file, cb) => {
+  console.log(`🔍 Validando archivo: ${file.originalname} (${file.mimetype})`);
+  
+  if (file.mimetype.startsWith('image/') || 
+      file.mimetype.startsWith('audio/') || 
+      file.mimetype.startsWith('video/')) {
+    cb(null, true);
+  } else {
+    console.log('❌ Tipo de archivo rechazado:', file.mimetype);
+    cb(new Error('Tipo de archivo no soportado. Solo se permiten imágenes, audio y video.'), false);
+  }
+};
+
+// CONFIGURACIÓN MULTER
 const upload = multer({
   storage: storage,
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB máximo
     files: 1
   },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/') || 
-        file.mimetype.startsWith('audio/') || 
-        file.mimetype.startsWith('video/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Tipo de archivo no soportado'), false);
-    }
-  }
+  fileFilter: fileFilter
 });
 
+// Middleware de errores
+const handleUploadErrors = (err, req, res, next) => {
+  console.log('🚨 Error en upload:', err.message);
+  
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: 'El archivo es demasiado grande. Máximo 50MB.'
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        success: false,
+        error: 'Demasiados archivos. Solo se permite uno por vez.'
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        error: 'Campo de archivo no esperado.'
+      });
+    }
+  }
+  
+  if (err.message) {
+    return res.status(400).json({
+      success: false,
+      error: err.message
+    });
+  }
+  
+  console.error('❌ Error interno en upload:', err);
+  return res.status(500).json({
+    success: false,
+    error: 'Error interno del servidor al subir el archivo'
+  });
+};
+
 // Función para subir a Cloudinary
-const uploadToCloudinary = async (file, folder) => {
+const uploadToCloudinary = async (file, folder, resourceType = 'auto') => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
-        resource_type: 'auto',
+        resource_type: resourceType,
         quality: 'auto:good',
         format: file.mimetype.startsWith('image/') ? 'webp' : undefined
       },
       (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
+        if (error) {
+          console.error('❌ Error Cloudinary:', error);
+          reject(error);
+        } else {
+          console.log('✅ Cloudinary upload success:', result.secure_url);
+          resolve(result);
+        }
       }
     );
     
@@ -55,22 +107,43 @@ const uploadToCloudinary = async (file, folder) => {
 // ========== RUTAS DE UPLOAD ==========
 
 // SUBIR IMAGEN PARA POST
-// SUBIR IMAGEN PARA POST - ACEPTAR AMBOS CAMPOS
-router.post('/image', upload.single('imagen'), async (req, res) => {
+router.post('/image', upload.fields([
+  { name: 'imagen', maxCount: 1 },
+  { name: 'image', maxCount: 1 }
+]), async (req, res) => {
   try {
     console.log('📝 Subiendo imagen para post...');
     
-    if (!req.file) {
+    // Verificar qué campo se usó
+    let file = null;
+    let fieldUsed = '';
+    
+    if (req.files['imagen'] && req.files['imagen'][0]) {
+      file = req.files['imagen'][0];
+      fieldUsed = 'imagen';
+    } else if (req.files['image'] && req.files['image'][0]) {
+      file = req.files['image'][0];
+      fieldUsed = 'image';
+    }
+    
+    if (!file) {
+      console.log('❌ No se recibió archivo');
       return res.status(400).json({
         success: false,
-        error: 'No se proporcionó ninguna imagen. Use el campo "imagen".'
+        error: 'No se proporcionó ninguna imagen. Use el campo "imagen" o "image".'
       });
     }
+
+    console.log('✅ Archivo recibido en campo:', fieldUsed, {
+      originalname: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype
+    });
 
     // Subir a Cloudinary
-    const result = await uploadToCloudinary(req.file, 'red-social/posts');
-    
-    console.log('✅ Archivo subido a Cloudinary:', result.secure_url);
+    const result = await uploadToCloudinary(file, 'red-social/posts', 'image');
+
+    console.log('✅ Imagen subida a Cloudinary:', result.secure_url);
 
     res.json({
       success: true,
@@ -78,42 +151,8 @@ router.post('/image', upload.single('imagen'), async (req, res) => {
         url: result.secure_url,
         filename: result.public_id,
         tipo: 'imagen',
-        size: result.bytes
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error en upload de imagen:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error interno al subir la imagen'
-    });
-  }
-});
-
-// RUTA ALTERNATIVA PARA 'image' (si tu frontend usa ese campo)
-router.post('/image-alt', upload.single('image'), async (req, res) => {
-  try {
-    console.log('📝 Subiendo imagen (campo alternativo)...');
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se proporcionó ninguna imagen. Use el campo "image".'
-      });
-    }
-
-    const result = await uploadToCloudinary(req.file, 'red-social/posts');
-    
-    console.log('✅ Archivo subido a Cloudinary:', result.secure_url);
-
-    res.json({
-      success: true,
-      data: {
-        url: result.secure_url,
-        filename: result.public_id,
-        tipo: 'imagen',
-        size: result.bytes
+        size: result.bytes,
+        fieldUsed: fieldUsed
       }
     });
 
@@ -138,7 +177,15 @@ router.post('/audio', upload.single('audio'), async (req, res) => {
       });
     }
 
-    const result = await uploadToCloudinary(req.file, 'red-social/audio');
+    console.log('✅ Archivo de audio recibido:', {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Subir a Cloudinary
+    const result = await uploadToCloudinary(req.file, 'red-social/audio', 'video');
+
     console.log('✅ Audio subido a Cloudinary:', result.secure_url);
 
     res.json({
@@ -166,13 +213,23 @@ router.post('/video', upload.single('video'), async (req, res) => {
     console.log('🎬 Subiendo video...');
     
     if (!req.file) {
+      console.log('❌ No se recibió archivo de video');
       return res.status(400).json({
         success: false,
         error: 'No se proporcionó ningún archivo de video'
       });
     }
 
-    const result = await uploadToCloudinary(req.file, 'red-social/video');
+    console.log('✅ Archivo de video recibido:', {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Subir a Cloudinary
+    const result = await uploadToCloudinary(req.file, 'red-social/video', 'video');
+
     console.log('✅ Video subido a Cloudinary:', result.secure_url);
 
     res.json({
@@ -206,8 +263,15 @@ router.post('/profile-picture/:userId', upload.single('profilePicture'), async (
       });
     }
 
-    const result = await uploadToCloudinary(req.file, 'red-social/profiles');
+    console.log('✅ Archivo de perfil recibido:', {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
 
+    // Subir a Cloudinary
+    const result = await uploadToCloudinary(req.file, 'red-social/profiles', 'image');
+    
     const user = await User.findByIdAndUpdate(
       req.params.userId,
       { 
@@ -256,7 +320,15 @@ router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req,
       });
     }
 
-    const result = await uploadToCloudinary(req.file, 'red-social/covers');
+    console.log('✅ Archivo de portada recibido:', {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Subir a Cloudinary
+    const result = await uploadToCloudinary(req.file, 'red-social/covers', 'image');
+    
     const user = await User.findById(req.params.userId);
     
     if (!user) {
@@ -304,104 +376,149 @@ router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req,
   }
 });
 
-
 // ELIMINAR FOTO DE PORTADA
 router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.userId);
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                error: 'Usuario no encontrado'
-            });
-        }
-
-        const photoIndex = parseInt(req.params.photoIndex);
-        if (photoIndex < 0 || photoIndex >= user.fotos_portada.length) {
-            return res.status(400).json({
-                success: false,
-                error: 'Índice de foto inválido'
-            });
-        }
-
-        // 🔥 OPCIONAL: Eliminar de Cloudinary (descomenta si quieres)
-        /*
-        const photoToDelete = user.fotos_portada[photoIndex];
-        try {
-            // Extraer public_id de la URL de Cloudinary
-            const urlParts = photoToDelete.split('/');
-            const publicIdWithExtension = urlParts[urlParts.length - 1];
-            const publicId = publicIdWithExtension.split('.')[0];
-            
-            await cloudinary.uploader.destroy(publicId);
-            console.log('✅ Foto eliminada de Cloudinary:', publicId);
-        } catch (cloudinaryError) {
-            console.log('⚠️ No se pudo eliminar de Cloudinary:', cloudinaryError.message);
-        }
-        */
-
-        const photoToDelete = user.fotos_portada[photoIndex];
-        
-        // Eliminar de la lista
-        user.fotos_portada.splice(photoIndex, 1);
-
-        // Actualizar foto principal si era la que se eliminó
-        if (user.foto_portada === photoToDelete) {
-            user.foto_portada = user.fotos_portada.length > 0 ? user.fotos_portada[0] : '';
-        }
-
-        await user.save();
-
-        res.json({
-            success: true,
-            message: 'Foto de portada eliminada exitosamente',
-            coverPhotos: user.fotos_portada
-        });
-
-    } catch (error) {
-        console.error('❌ Error eliminando foto de portada:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Error interno del servidor'
-        });
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
     }
+
+    const photoIndex = parseInt(req.params.photoIndex);
+    if (photoIndex < 0 || photoIndex >= user.fotos_portada.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Índice de foto inválido'
+      });
+    }
+
+    const photoToDelete = user.fotos_portada[photoIndex];
+    
+    // Eliminar de Cloudinary
+    try {
+      const publicId = photoToDelete.split('/').pop().split('.')[0];
+      await cloudinary.uploader.destroy(publicId);
+      console.log('✅ Foto eliminada de Cloudinary:', publicId);
+    } catch (cloudinaryError) {
+      console.log('⚠️ No se pudo eliminar de Cloudinary:', cloudinaryError.message);
+    }
+
+    // Eliminar de la lista
+    user.fotos_portada.splice(photoIndex, 1);
+
+    // Actualizar foto principal si era la que se eliminó
+    if (user.foto_portada === photoToDelete) {
+      user.foto_portada = user.fotos_portada.length > 0 ? user.fotos_portada[0] : '';
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Foto de portada eliminada exitosamente',
+      coverPhotos: user.fotos_portada
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando foto de portada:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
 });
 
 // ESTABLECER FOTO DE PORTADA PRINCIPAL
 router.put('/cover-picture/main/:userId/:photoIndex', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.userId);
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                error: 'Usuario no encontrado'
-            });
-        }
-
-        const photoIndex = parseInt(req.params.photoIndex);
-        if (photoIndex < 0 || photoIndex >= user.fotos_portada.length) {
-            return res.status(400).json({
-                success: false,
-                error: 'Índice de foto inválido'
-            });
-        }
-
-        user.foto_portada = user.fotos_portada[photoIndex];
-        await user.save();
-
-        res.json({
-            success: true,
-            message: 'Foto de portada principal actualizada',
-            mainCoverPhoto: user.foto_portada
-        });
-
-    } catch (error) {
-        console.error('❌ Error actualizando foto de portada principal:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Error interno del servidor'
-        });
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
     }
+
+    const photoIndex = parseInt(req.params.photoIndex);
+    if (photoIndex < 0 || photoIndex >= user.fotos_portada.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Índice de foto inválido'
+      });
+    }
+
+    user.foto_portada = user.fotos_portada[photoIndex];
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Foto de portada principal actualizada',
+      mainCoverPhoto: user.foto_portada
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando foto de portada principal:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
 });
+
+// REORDENAR FOTOS DE PORTADA
+router.put('/cover-picture/reorder/:userId', async (req, res) => {
+  try {
+    const { fromIndex, toIndex } = req.body;
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    if (!user.fotos_portada || user.fotos_portada.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay fotos de portada para reordenar'
+      });
+    }
+
+    // Validar índices
+    if (fromIndex < 0 || fromIndex >= user.fotos_portada.length || 
+        toIndex < 0 || toIndex >= user.fotos_portada.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Índices inválidos'
+      });
+    }
+
+    // Reordenar array
+    const [movedItem] = user.fotos_portada.splice(fromIndex, 1);
+    user.fotos_portada.splice(toIndex, 0, movedItem);
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Fotos reordenadas exitosamente',
+      coverPhotos: user.fotos_portada
+    });
+
+  } catch (error) {
+    console.error('Error reordenando fotos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Aplicar middleware de errores
+router.use(handleUploadErrors);
 
 module.exports = router;
