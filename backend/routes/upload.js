@@ -55,6 +55,7 @@ const uploadToCloudinary = async (file, folder) => {
 // ========== RUTAS DE UPLOAD ==========
 
 // SUBIR IMAGEN PARA POST
+// SUBIR IMAGEN PARA POST - ACEPTAR AMBOS CAMPOS
 router.post('/image', upload.single('imagen'), async (req, res) => {
   try {
     console.log('📝 Subiendo imagen para post...');
@@ -62,7 +63,43 @@ router.post('/image', upload.single('imagen'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'No se proporcionó ninguna imagen'
+        error: 'No se proporcionó ninguna imagen. Use el campo "imagen".'
+      });
+    }
+
+    // Subir a Cloudinary
+    const result = await uploadToCloudinary(req.file, 'red-social/posts');
+    
+    console.log('✅ Archivo subido a Cloudinary:', result.secure_url);
+
+    res.json({
+      success: true,
+      data: {
+        url: result.secure_url,
+        filename: result.public_id,
+        tipo: 'imagen',
+        size: result.bytes
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en upload de imagen:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno al subir la imagen'
+    });
+  }
+});
+
+// RUTA ALTERNATIVA PARA 'image' (si tu frontend usa ese campo)
+router.post('/image-alt', upload.single('image'), async (req, res) => {
+  try {
+    console.log('📝 Subiendo imagen (campo alternativo)...');
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se proporcionó ninguna imagen. Use el campo "image".'
       });
     }
 
