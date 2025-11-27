@@ -1,8 +1,7 @@
-// backend/routes/upload.js - VERSIÓN CORREGIDA PARA CLOUDINARY v2.8.0
+// backend/routes/upload.js - VERSIÓN SIMPLIFICADA
 const express = require('express');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -14,98 +13,49 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// CONFIGURACIÓN MULTER CON CLOUDINARY - VERSIÓN CORREGIDA
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'red-social/posts', // Folder por defecto
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'mp3', 'wav'],
-    resource_type: 'auto',
-    transformation: [
-      { quality: 'auto:good' },
-      { format: 'webp' } // Para imágenes
-    ]
-  }
-});
-
-// FILTRO DE ARCHIVOS
-const fileFilter = (req, file, cb) => {
-  console.log(`🔍 Validando archivo: ${file.originalname} (${file.mimetype})`);
-  
-  if (file.mimetype.startsWith('image/') || 
-      file.mimetype.startsWith('audio/') || 
-      file.mimetype.startsWith('video/')) {
-    cb(null, true);
-  } else {
-    console.log('❌ Tipo de archivo rechazado:', file.mimetype);
-    cb(new Error('Tipo de archivo no soportado. Solo se permiten imágenes, audio y video.'), false);
-  }
-};
-
-// CONFIGURACIÓN MULTER
+// CONFIGURACIÓN MULTER SIMPLE (almacenamiento en memoria)
+const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB máximo
     files: 1
   },
-  fileFilter: fileFilter
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || 
+        file.mimetype.startsWith('audio/') || 
+        file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no soportado'), false);
+    }
+  }
 });
 
-// Middleware para determinar folder dinámico
-const setUploadFolder = (req, res, next) => {
-  // Determinar folder basado en la ruta
-  if (req.route.path.includes('profile-picture')) {
-    req.uploadFolder = 'red-social/profiles';
-  } else if (req.route.path.includes('cover-picture')) {
-    req.uploadFolder = 'red-social/covers';
-  } else if (req.route.path.includes('/audio')) {
-    req.uploadFolder = 'red-social/audio';
-  } else if (req.route.path.includes('/video')) {
-    req.uploadFolder = 'red-social/video';
-  } else {
-    req.uploadFolder = 'red-social/posts';
-  }
-  next();
-};
-
-// Middleware de errores
-const handleUploadErrors = (err, req, res, next) => {
-  console.log('🚨 Error en upload:', err.message);
-  
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        success: false,
-        error: 'El archivo es demasiado grande. Máximo 50MB.'
-      });
-    }
-    if (err.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({
-        success: false,
-        error: 'Demasiados archivos. Solo se permite uno por vez.'
-      });
-    }
-  }
-  
-  if (err.message) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
-  }
-  
-  console.error('❌ Error interno en upload:', err);
-  return res.status(500).json({
-    success: false,
-    error: 'Error interno del servidor al subir el archivo'
+// Función para subir a Cloudinary
+const uploadToCloudinary = async (file, folder) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: 'auto',
+        quality: 'auto:good',
+        format: file.mimetype.startsWith('image/') ? 'webp' : undefined
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    
+    uploadStream.end(file.buffer);
   });
 };
 
-// ========== RUTAS DE UPLOAD ACTUALIZADAS ==========
+// ========== RUTAS DE UPLOAD ==========
 
 // SUBIR IMAGEN PARA POST
-router.post('/image', setUploadFolder, upload.single('imagen'), (req, res) => {
+router.post('/image', upload.single('imagen'), async (req, res) => {
   try {
     console.log('📝 Subiendo imagen para post...');
     
@@ -116,20 +66,17 @@ router.post('/image', setUploadFolder, upload.single('imagen'), (req, res) => {
       });
     }
 
-    console.log('✅ Archivo subido a Cloudinary:', {
-      originalname: req.file.originalname,
-      url: req.file.path,
-      size: req.file.size,
-      folder: req.uploadFolder
-    });
+    const result = await uploadToCloudinary(req.file, 'red-social/posts');
+    
+    console.log('✅ Archivo subido a Cloudinary:', result.secure_url);
 
     res.json({
       success: true,
       data: {
-        url: req.file.path, // URL de Cloudinary
-        filename: req.file.filename,
+        url: result.secure_url,
+        filename: result.public_id,
         tipo: 'imagen',
-        size: req.file.size
+        size: result.bytes
       }
     });
 
@@ -143,7 +90,7 @@ router.post('/image', setUploadFolder, upload.single('imagen'), (req, res) => {
 });
 
 // SUBIR AUDIO
-router.post('/audio', setUploadFolder, upload.single('audio'), (req, res) => {
+router.post('/audio', upload.single('audio'), async (req, res) => {
   try {
     console.log('🎵 Subiendo audio...');
     
@@ -154,15 +101,16 @@ router.post('/audio', setUploadFolder, upload.single('audio'), (req, res) => {
       });
     }
 
-    console.log('✅ Audio subido a Cloudinary:', req.file.path);
+    const result = await uploadToCloudinary(req.file, 'red-social/audio');
+    console.log('✅ Audio subido a Cloudinary:', result.secure_url);
 
     res.json({
       success: true,
       data: {
-        url: req.file.path,
-        filename: req.file.filename,
+        url: result.secure_url,
+        filename: result.public_id,
         tipo: 'audio',
-        size: req.file.size
+        size: result.bytes
       }
     });
 
@@ -176,7 +124,7 @@ router.post('/audio', setUploadFolder, upload.single('audio'), (req, res) => {
 });
 
 // SUBIR VIDEO
-router.post('/video', setUploadFolder, upload.single('video'), (req, res) => {
+router.post('/video', upload.single('video'), async (req, res) => {
   try {
     console.log('🎬 Subiendo video...');
     
@@ -187,15 +135,16 @@ router.post('/video', setUploadFolder, upload.single('video'), (req, res) => {
       });
     }
 
-    console.log('✅ Video subido a Cloudinary:', req.file.path);
+    const result = await uploadToCloudinary(req.file, 'red-social/video');
+    console.log('✅ Video subido a Cloudinary:', result.secure_url);
 
     res.json({
       success: true,
       data: {
-        url: req.file.path,
-        filename: req.file.filename,
+        url: result.secure_url,
+        filename: result.public_id,
         tipo: 'video',
-        size: req.file.size
+        size: result.bytes
       }
     });
 
@@ -209,7 +158,7 @@ router.post('/video', setUploadFolder, upload.single('video'), (req, res) => {
 });
 
 // SUBIR FOTO DE PERFIL
-router.post('/profile-picture/:userId', setUploadFolder, upload.single('profilePicture'), async (req, res) => {
+router.post('/profile-picture/:userId', upload.single('profilePicture'), async (req, res) => {
   try {
     console.log('📸 Subiendo foto de perfil...');
     
@@ -220,10 +169,12 @@ router.post('/profile-picture/:userId', setUploadFolder, upload.single('profileP
       });
     }
 
+    const result = await uploadToCloudinary(req.file, 'red-social/profiles');
+
     const user = await User.findByIdAndUpdate(
       req.params.userId,
       { 
-        foto_perfil: req.file.path,
+        foto_perfil: result.secure_url,
         $inc: { __v: 1 }
       },
       { 
@@ -244,7 +195,7 @@ router.post('/profile-picture/:userId', setUploadFolder, upload.single('profileP
     res.json({
       success: true,
       message: 'Foto de perfil actualizada exitosamente',
-      imageUrl: req.file.path
+      imageUrl: result.secure_url
     });
 
   } catch (error) {
@@ -257,7 +208,7 @@ router.post('/profile-picture/:userId', setUploadFolder, upload.single('profileP
 });
 
 // SUBIR FOTO DE PORTADA
-router.post('/cover-picture/:userId', setUploadFolder, upload.single('coverPicture'), async (req, res) => {
+router.post('/cover-picture/:userId', upload.single('coverPicture'), async (req, res) => {
   try {
     console.log('🏞️ Subiendo foto de portada...');
     
@@ -268,7 +219,9 @@ router.post('/cover-picture/:userId', setUploadFolder, upload.single('coverPictu
       });
     }
 
+    const result = await uploadToCloudinary(req.file, 'red-social/covers');
     const user = await User.findById(req.params.userId);
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -287,7 +240,7 @@ router.post('/cover-picture/:userId', setUploadFolder, upload.single('coverPictu
       });
     }
 
-    const newCoverPhoto = req.file.path;
+    const newCoverPhoto = result.secure_url;
     user.fotos_portada.push(newCoverPhoto);
     
     if (user.fotos_portada.length === 1) {
@@ -314,56 +267,6 @@ router.post('/cover-picture/:userId', setUploadFolder, upload.single('coverPictu
   }
 });
 
-
-// REORDENAR FOTOS DE PORTADA
-router.put('/cover-picture/reorder/:userId', async (req, res) => {
-    try {
-        const { fromIndex, toIndex } = req.body;
-        const user = await User.findById(req.params.userId);
-        
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                error: 'Usuario no encontrado'
-            });
-        }
-
-        if (!user.fotos_portada || user.fotos_portada.length === 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'No hay fotos de portada para reordenar'
-            });
-        }
-
-        // Validar índices
-        if (fromIndex < 0 || fromIndex >= user.fotos_portada.length || 
-            toIndex < 0 || toIndex >= user.fotos_portada.length) {
-            return res.status(400).json({
-                success: false,
-                error: 'Índices inválidos'
-            });
-        }
-
-        // Reordenar array
-        const [movedItem] = user.fotos_portada.splice(fromIndex, 1);
-        user.fotos_portada.splice(toIndex, 0, movedItem);
-
-        await user.save();
-
-        res.json({
-            success: true,
-            message: 'Fotos reordenadas exitosamente',
-            coverPhotos: user.fotos_portada
-        });
-
-    } catch (error) {
-        console.error('Error reordenando fotos:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Error interno del servidor'
-        });
-    }
-});
 
 // ELIMINAR FOTO DE PORTADA
 router.delete('/cover-picture/:userId/:photoIndex', async (req, res) => {
