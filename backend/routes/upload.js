@@ -79,22 +79,37 @@ const handleUploadErrors = (err, req, res, next) => {
   });
 };
 
-// Función para subir a Cloudinary
+// Función para subir a Cloudinary MEJORADA
 const uploadToCloudinary = async (file, folder, resourceType = 'auto') => {
   return new Promise((resolve, reject) => {
+    console.log(`☁️ Intentando subir a Cloudinary:`);
+    console.log(`   - Archivo: ${file.originalname}`);
+    console.log(`   - Tipo MIME: ${file.mimetype}`);
+    console.log(`   - Carpeta: ${folder}`);
+    console.log(`   - Resource Type: ${resourceType}`);
+    console.log(`   - Tamaño: ${file.size} bytes`);
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
         resource_type: resourceType,
         quality: 'auto:good',
+        // Para audio/video, no aplicar formato webp
         format: file.mimetype.startsWith('image/') ? 'webp' : undefined
       },
       (error, result) => {
         if (error) {
-          console.error('❌ Error Cloudinary:', error);
+          console.error('❌ Error detallado de Cloudinary:');
+          console.error('   - Mensaje:', error.message);
+          console.error('   - HTTP Status:', error.http_code);
+          console.error('   - Name:', error.name);
           reject(error);
         } else {
-          console.log('✅ Cloudinary upload success:', result.secure_url);
+          console.log('✅ Éxito en Cloudinary:');
+          console.log('   - URL:', result.secure_url);
+          console.log('   - Public ID:', result.public_id);
+          console.log('   - Resource Type:', result.resource_type);
+          console.log('   - Tamaño:', result.bytes, 'bytes');
           resolve(result);
         }
       }
@@ -182,16 +197,9 @@ async function handleImageUpload(req, res) {
   }
 }
 
-// Las rutas para audio y video se mantienen igual...
-router.post('/audio', upload.single('audio'), async (req, res) => {
-  // código existente...
-});
 
-router.post('/video', upload.single('video'), async (req, res) => {
-  // código existente...
-});
 
-// SUBIR AUDIO
+// SUBIR AUDIO - VERSIÓN MEJORADA
 router.post('/audio', upload.single('audio'), async (req, res) => {
   try {
     console.log('🎵 Subiendo audio...');
@@ -206,13 +214,14 @@ router.post('/audio', upload.single('audio'), async (req, res) => {
     console.log('✅ Archivo de audio recibido:', {
       originalname: req.file.originalname,
       size: req.file.size,
-      mimetype: req.file.mimetype
+      mimetype: req.file.mimetype,
+      fieldname: req.file.fieldname
     });
 
-    // Subir a Cloudinary
+    // Para audio, usar 'auto' o 'video' - Cloudinary trata audio como video
     const result = await uploadToCloudinary(req.file, 'red-social/audio', 'video');
 
-    console.log('✅ Audio subido a Cloudinary:', result.secure_url);
+    console.log('✅ Audio subido exitosamente a Cloudinary');
 
     res.json({
       success: true,
@@ -220,20 +229,34 @@ router.post('/audio', upload.single('audio'), async (req, res) => {
         url: result.secure_url,
         filename: result.public_id,
         tipo: 'audio',
-        size: result.bytes
+        size: result.bytes,
+        resource_type: result.resource_type,
+        duration: result.duration || 0 // Cloudinary puede extraer duración
       }
     });
 
   } catch (error) {
-    console.error('❌ Error en upload de audio:', error);
+    console.error('❌ Error detallado en upload de audio:');
+    console.error('   - Error:', error.message);
+    console.error('   - Stack:', error.stack);
+    
+    // Error más específico
+    let errorMessage = 'Error interno al subir el audio';
+    if (error.message.includes('File size too large')) {
+      errorMessage = 'El archivo de audio es demasiado grande';
+    } else if (error.message.includes('format')) {
+      errorMessage = 'Formato de audio no soportado';
+    }
+
     res.status(500).json({
       success: false,
-      error: 'Error interno al subir el audio'
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-// SUBIR VIDEO
+// SUBIR VIDEO - VERSIÓN MEJORADA
 router.post('/video', upload.single('video'), async (req, res) => {
   try {
     console.log('🎬 Subiendo video...');
@@ -253,10 +276,10 @@ router.post('/video', upload.single('video'), async (req, res) => {
       mimetype: req.file.mimetype
     });
 
-    // Subir a Cloudinary
+    // Para video, usar 'video'
     const result = await uploadToCloudinary(req.file, 'red-social/video', 'video');
 
-    console.log('✅ Video subido a Cloudinary:', result.secure_url);
+    console.log('✅ Video subido exitosamente a Cloudinary');
 
     res.json({
       success: true,
@@ -264,15 +287,29 @@ router.post('/video', upload.single('video'), async (req, res) => {
         url: result.secure_url,
         filename: result.public_id,
         tipo: 'video',
-        size: result.bytes
+        size: result.bytes,
+        resource_type: result.resource_type,
+        duration: result.duration || 0,
+        format: result.format
       }
     });
 
   } catch (error) {
-    console.error('❌ Error en upload de video:', error);
+    console.error('❌ Error detallado en upload de video:');
+    console.error('   - Error:', error.message);
+    console.error('   - Stack:', error.stack);
+    
+    let errorMessage = 'Error interno al subir el video';
+    if (error.message.includes('File size too large')) {
+      errorMessage = 'El archivo de video es demasiado grande';
+    } else if (error.message.includes('format')) {
+      errorMessage = 'Formato de video no soportado';
+    }
+
     res.status(500).json({
       success: false,
-      error: 'Error interno al subir el video'
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -540,6 +577,46 @@ router.put('/cover-picture/reorder/:userId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Ruta de prueba para Cloudinary
+router.get('/test-cloudinary', async (req, res) => {
+  try {
+    console.log('🧪 Probando configuración de Cloudinary...');
+    
+    // Verificar que las credenciales estén configuradas
+    const hasCredentials = process.env.CLOUDINARY_CLOUD_NAME && 
+                          process.env.CLOUDINARY_API_KEY && 
+                          process.env.CLOUDINARY_API_SECRET;
+    
+    console.log('🔑 Credenciales Cloudinary:', hasCredentials ? '✅ Configuradas' : '❌ Faltantes');
+    
+    if (!hasCredentials) {
+      return res.json({
+        success: false,
+        error: 'Credenciales de Cloudinary no configuradas'
+      });
+    }
+
+    // Intentar una operación simple de Cloudinary
+    const result = await cloudinary.api.ping();
+    
+    console.log('✅ Cloudinary responde correctamente');
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary configurado correctamente',
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      response: result
+    });
+    
+  } catch (error) {
+    console.error('❌ Error probando Cloudinary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error conectando con Cloudinary: ' + error.message
     });
   }
 });
