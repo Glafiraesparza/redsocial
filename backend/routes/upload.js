@@ -106,13 +106,30 @@ const uploadToCloudinary = async (file, folder, resourceType = 'auto') => {
 
 // ========== RUTAS DE UPLOAD ==========
 
-// SUBIR IMAGEN PARA POST
+// backend/routes/upload.js
+
+// ========== RUTAS DE UPLOAD ==========
+
+// SUBIR IMAGEN - RUTA EN INGLÉS (original)
 router.post('/image', upload.fields([
   { name: 'imagen', maxCount: 1 },
   { name: 'image', maxCount: 1 }
 ]), async (req, res) => {
+  await handleImageUpload(req, res);
+});
+
+// SUBIR IMAGEN - RUTA EN ESPAÑOL (nueva)
+router.post('/imagen', upload.fields([
+  { name: 'imagen', maxCount: 1 },
+  { name: 'image', maxCount: 1 }
+]), async (req, res) => {
+  await handleImageUpload(req, res);
+});
+
+// Función común para manejar upload de imágenes
+async function handleImageUpload(req, res) {
   try {
-    console.log('📝 Subiendo imagen para post...');
+    console.log('📝 Subiendo imagen...');
     
     // Verificar qué campo se usó
     let file = null;
@@ -163,6 +180,15 @@ router.post('/image', upload.fields([
       error: 'Error interno al subir la imagen'
     });
   }
+}
+
+// Las rutas para audio y video se mantienen igual...
+router.post('/audio', upload.single('audio'), async (req, res) => {
+  // código existente...
+});
+
+router.post('/video', upload.single('video'), async (req, res) => {
+  // código existente...
 });
 
 // SUBIR AUDIO
