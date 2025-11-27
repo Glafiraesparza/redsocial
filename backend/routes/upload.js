@@ -366,3 +366,5 @@ router.put('/cover-picture/main/:userId/:photoIndex', async (req, res) => {
         });
     }
 });
+
+module.exports = router;
