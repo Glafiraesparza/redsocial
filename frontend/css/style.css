@@ -12,18 +12,7 @@ body {
     color: #333;
 }
 
-/* Navbar mejorado */
-.navbar {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    color: #2c3e50;
-    padding: 1rem 0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    position: sticky;
-    top: 0;
-    z-index: 9999;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
+
 
 .btn-media-label {
     display: inline-flex;
@@ -56,37 +45,8 @@ body {
     font-size: 16px;
 }
 
-.nav-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
-}
 
-.nav-logo {
-    display: flex;
-    align-items: center;
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #667eea;
-    transition: all 0.3s ease;
-}
 
-.nav-logo:hover {
-    transform: scale(1.05);
-    color: #764ba2;
-}
-
-.nav-logo i {
-    margin-right: 10px;
-    font-size: 2rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
 
 /* Navbar Styles */
         .navbar {
@@ -1481,10 +1441,6 @@ body.modal-open {
 }
 
 @media (max-width: 768px) {
-    .nav-container {
-        flex-direction: column;
-        gap: 1rem;
-    }
     
     .form-actions {
         flex-direction: column;
@@ -4045,7 +4001,7 @@ input[type="date"] {
     }
     
     .stat-item {
-        font-size: 0.8rem;
+        font-size: 0.3rem;
     }
 }
 
@@ -4474,7 +4430,7 @@ input[type="date"] {
 
 /* Botón de Cerrar Sesión Mejorado */
 #logoutBtn {
-    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
     padding: 8px 20px;
@@ -4566,7 +4522,7 @@ input[type="date"] {
     box-shadow: 0 6px 20px rgba(46, 204, 113, 0.6);
 } */
 
-/* Responsive para botones */
+/* Responsive para botones y navbar */
 @media (max-width: 768px) {
     #submitPost {
         padding: 8px 20px;
@@ -4578,13 +4534,26 @@ input[type="date"] {
         font-size: 0.85rem;
     }
     
+    /* Reorganización del navbar para móviles */
+    .nav-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    
+    .nav-logo {
+        order: 1;
+        padding-left: 2%;
+    }
+    
     .nav-user {
-        gap: 1rem;
+        order: 2;
+        margin-left: 0; /* Quitamos el margin-left ya que usamos space-between */
     }
     
     #userGreeting {
-        font-size: 0.85rem;
-        padding: 6px 12px;
+        display: none;
     }
 }
 
@@ -4605,13 +4574,39 @@ input[type="date"] {
         justify-content: center;
     }
     
+    /* Navbar para móviles muy pequeños */
+    .navbar {
+        padding: 0.5rem 1rem;
+    }
+    
+    .nav-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
     .nav-user {
-        flex-direction: column;
-        gap: 0.8rem;
+        gap: 0.3rem;
     }
     
     #userGreeting {
-        display: none; /* Ocultar saludo en móviles muy pequeños */
+        display: none;
+    }
+    
+    /* Ajustar tamaño del logo en móviles */
+    .logo-img {
+        max-height: 30px; /* Ajusta según necesites */
+        width: auto;
+    }
+    
+    #logoutBtn {
+        padding: 5px 12px;
+        font-size: 0.8rem;
+    }
+    
+    /* Opcional: ajustar las órbitas del logo si son muy grandes */
+    .logo-orbits {
+        transform: scale(0.8);
     }
 }
 
@@ -6285,86 +6280,157 @@ input[type="date"] {
     font-style: italic;
 }
 
-/* Responsive */
-@media (max-width: 968px) {
+/* Responsive mejorado para perfil - Stats y avatar ajustados */
+@media (max-width: 1432px) {
+    .cover-photo-section {
+        height: 240px;
+        min-height: 240px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .cover-photo-placeholder,
+    .cover-photo {
+        height: 100% !important;
+        min-height: 100% !important;
+        object-fit: cover;
+        width: 100%;
+    }
+}
+
+@media (max-width: 1400px) {
     .profile-info-section {
         padding: 0 1.5rem 1.5rem;
+    }
+
+
+    .profile-stats-overview {
+        justify-content: center;
+        gap: 2.5rem;
+        display: flex;
+        text-align: center;
+        gap: 3rem;
+        flex-wrap: wrap;
+    }
+
+    .stat-item strong {
+        font-size: 1.6rem;
+    }
+
+    .profile-actions{
+        align-items: center;
+        gap: 2rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        color: #6c757d;
+    }
+
+    .profile-avatar-img {
+        border: none;
     }
     
     .info {
         grid-template-columns: 1fr;
-        gap: 1.5rem;
+        gap: 1.2rem;
         text-align: center;
     }
     
     .profile-avatar-container {
-        margin-top: -60px;
+        margin-top: -70px;
         order: 1;
+        position: relative;
+        z-index: 2;
     }
     
     .profile-avatar-large {
         margin: 0 auto;
         width: 140px;
         height: 140px;
+        border: 3px solid white; /* Borde más delgado */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        background: white;
     }
     
     .profile-main-info {
         order: 2;
         padding-bottom: 0;
+        margin-top: 0.5rem;
     }
     
     .profile-main-info h1 {
-        font-size: 2.2rem;
-        margin-bottom: 0.5rem;
+        font-size: 2rem;
+        margin-bottom: 0.3rem;
+        line-height: 1.2;
     }
     
     .profile-username {
         font-size: 1.1rem;
         margin-bottom: 1rem;
+        color: #666;
     }
     
     .profile-bio {
-        font-size: 1rem;
-        margin: 0 auto 1.5rem;
+        font-size: 0.95rem;
+        margin: 0 auto 1.2rem;
         max-width: 90%;
+        line-height: 1.5;
     }
     
     .configstats {
         order: 3;
         margin-left: 0;
-        padding-bottom: 1rem;
+        padding: 1.2rem 0 1rem;
         width: 100%;
+        border-top: 1px solid #f0f0f0;
     }
     
     .profile-stats-overview {
         justify-content: center;
-        gap: 2.5rem;
+        gap: 2rem;
+        flex-wrap: wrap;
+        margin: 0 auto;
+        max-width: 400px;
     }
-    
-    .stat-item strong {
-        font-size: 1.8rem;
-    }
-    
-    .stat-item span {
-        font-size: 0.85rem;
-    }
-    
+
+  
     .profile-nav {
         overflow-x: auto;
-        padding: 0 1rem;
+        padding: 0 0.5rem;
         margin-top: 1rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    
+    .profile-nav::-webkit-scrollbar {
+        display: none;
     }
     
     .profile-nav-item {
-        padding: 1rem 1.2rem;
+        padding: 0.9rem 1rem;
         white-space: nowrap;
         font-size: 0.9rem;
+        flex-shrink: 0;
     }
+}
+
+@media (max-width: 834px) {
+    .cover-photo-section {
+        height: 220px;
+        min-height: 220px;
+    }
+    
+
 }
 
 @media (max-width: 768px) {
     .cover-photo-section {
-        height: 220px;
+        height: 200px;
+        min-height: 200px;
     }
     
     .profile-info-section {
@@ -6374,10 +6440,15 @@ input[type="date"] {
     .profile-avatar-large {
         width: 120px;
         height: 120px;
+        border-width: 3px !important; /* Mantener borde delgado */
+    }
+    
+    .profile-avatar-container {
+        margin-top: -60px;
     }
     
     .profile-main-info h1 {
-        font-size: 1.8rem;
+        font-size: 1.7rem;
     }
     
     .profile-username {
@@ -6385,39 +6456,59 @@ input[type="date"] {
     }
     
     .profile-bio {
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         max-width: 95%;
         line-height: 1.4;
+        margin-bottom: 1rem;
     }
     
-    .profile-stats-overview {
-        gap: 2rem;
-    }
+   
     
-    .stat-item strong {
-        font-size: 1.6rem;
-    }
-    
-    .stat-item span {
+    .btn-edit-avatar {
+        width: 32px !important;
+        height: 32px !important;
+        bottom: 6px;
+        right: 6px;
         font-size: 0.8rem;
     }
     
-    .btn-edit-avatar {
-        width: 36px !important;
-        height: 36px !important;
-        bottom: 8px;
-        right: 8px;
-    }
+
 }
 
-@media (max-width: 480px) {
+@media (max-width: 667px) {
     .cover-photo-section {
         height: 180px;
+        min-height: 180px;
+    }
+    
+    .profile-avatar-large {
+        width: 110px;
+        height: 110px;
+        border-width: 2.5p !important; /* Borde aún más delgado */
+    }
+    
+    .profile-avatar-container {
+        margin-top: -55px;
+    }
+    
+
+    
+}
+
+@media (max-width: 600px) {
+    .cover-photo-section {
+        height: 170px;
+        min-height: 170px;
     }
     
     .profile-avatar-large {
         width: 100px;
         height: 100px;
+        border-width: 2.5px;
+    }
+    
+    .profile-avatar-container {
+        margin-top: -50px;
     }
     
     .profile-main-info h1 {
@@ -6425,30 +6516,101 @@ input[type="date"] {
     }
     
     .profile-bio {
-        font-size: 0.9rem;
-        margin-bottom: 1rem;
+        font-size: 0.85rem;
+        margin-bottom: 0.8rem;
     }
     
-    .profile-stats-overview {
-        gap: 1.5rem;
+}
+
+@media (max-width: 480px) {
+    .cover-photo-section {
+        height: 160px;
+        min-height: 160px;
     }
     
-    .stat-item strong {
+    .profile-info-section {
+        padding: 0 0.8rem 0.8rem;
+    }
+    
+    .profile-avatar-large {
+        width: 90px;
+        height: 90px;
+        border-width: 2px !important; /* Borde muy delgado en móviles */
+    }
+    
+    .profile-avatar-container {
+        margin-top: -45px;
+    }
+    
+    .profile-main-info h1 {
         font-size: 1.4rem;
+        margin-bottom: 0.2rem;
     }
     
-    .stat-item span {
-        font-size: 0.75rem;
+    .profile-username {
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
     }
     
-    .configstats {
-        padding-bottom: 0.5rem;
+    .profile-bio {
+        font-size: 0.8rem;
+        margin-bottom: 0.8rem;
+        line-height: 1.4;
+        max-width: 100%;
     }
     
-    .profile-nav-item {
-        padding: 0.8rem 1rem;
+  
+    .info {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 375px) { /* iPhone SE y pantallas muy pequeñas */
+    .cover-photo-section {
+        height: 150px;
+        min-height: 150px;
+    }
+    
+    .profile-info-section {
+        padding: 0 0.5rem 0.5rem;
+    }
+    
+    .profile-avatar-large {
+        width: 85px;
+        height: 85px;
+        border-width: 2px !important;
+    }
+    
+    .profile-avatar-container {
+        margin-top: -42px;
+    }
+    
+    .profile-main-info h1 {
+        font-size: 1.3rem;
+    }
+    
+    .profile-username {
         font-size: 0.85rem;
     }
+    
+    .profile-bio {
+        font-size: 0.78rem;
+        margin-bottom: 0.6rem;
+    }
+    
+
+    
+
+}
+
+/* Asegurar que la portada nunca tenga espacios */
+.cover-photo-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.cover-photo-placeholder,
+.cover-photo {
+    background: transparent !important;
 }
 
 /* ===== ESTILOS PARA CARRUSEL DE PORTADA Y SUBIDA DE FOTOS ===== */
@@ -6954,12 +7116,16 @@ input[type="date"] {
 
 @media (max-width: 768px) {
     .cover-photo-container {
-        height: 250px;
+        height: 200px;
     }
     
     .carousel-control {
         width: 35px;
         height: 35px;
+    }
+
+    .carousel-indicator {
+        display: none;
     }
     
     .cover-actions {
@@ -6987,7 +7153,7 @@ input[type="date"] {
 
 @media (max-width: 480px) {
     .cover-photo-container {
-        height: 200px;
+        height: 200px !important;
     }
     
     .profile-avatar-large {
@@ -9769,7 +9935,7 @@ body.modal-open {
     color: #7f8c8d;
 }
 
-/* Responsive Messages */
+/* Responsive Messages - Mejorado */
 @media (max-width: 1200px) {
     .conversations-sidebar {
         width: 320px;
@@ -9777,6 +9943,12 @@ body.modal-open {
     
     .message-content {
         max-width: 75%;
+        min-width: 120px; /* Evitar mensajes demasiado estrechos */
+    }
+    
+    .message-text {
+        line-height: 1.4;
+        word-wrap: break-word;
     }
 }
 
@@ -9814,6 +9986,16 @@ body.modal-open {
     
     .message-content {
         max-width: 80%;
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Mejorar espaciado entre mensajes */
+    .message {
+        margin-bottom: 1rem;
+    }
+    
+    .message:last-child {
+        margin-bottom: 0.5rem;
     }
 }
 
@@ -9821,7 +10003,8 @@ body.modal-open {
     .messages-container {
         flex-direction: column;
         height: 85vh;
-        border-radius: 8px;
+        border-radius: 12px;
+        overflow: hidden;
     }
     
     .conversations-sidebar {
@@ -9829,10 +10012,12 @@ body.modal-open {
         height: 45%;
         border-right: none;
         border-bottom: 1px solid #e1e8ed;
+        min-height: 250px;
     }
     
     .conversations-header {
         padding: 1rem 1.25rem;
+        background: #f8f9fa;
     }
     
     .conversations-search {
@@ -9842,10 +10027,13 @@ body.modal-open {
     .chat-area {
         height: 55%;
         flex: none;
+        min-height: 300px;
     }
     
     .chat-header {
         padding: 1rem 1.25rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e1e8ed;
     }
     
     .chat-user-avatar {
@@ -9858,27 +10046,65 @@ body.modal-open {
     }
     
     .messages-area {
-        padding: 0.875rem;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
     }
     
     .message-input-area {
         padding: 1.25rem;
+        background: #f8f9fa;
+        border-top: 1px solid #e1e8ed;
     }
     
     .message-content {
         max-width: 85%;
-        padding: 0.625rem 0.875rem;
+        padding: 0.75rem 1rem;
+        border-radius: 18px;
+        line-height: 1.4;
+    }
+    
+    /* Mensajes del usuario actual (derecha) */
+    .message.own .message-content {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        margin-left: auto;
+        border-bottom-right-radius: 6px;
+    }
+    
+    /* Mensajes de otros (izquierda) */
+    .message:not(.own) .message-content {
+        background: #f1f3f5;
+        color: #333;
+        border-bottom-left-radius: 6px;
     }
     
     .message-avatar {
-        width: 28px;
-        height: 28px;
-        margin-top: 25px;
+        width: 32px;
+        height: 32px;
+        align-self: flex-start;
+        margin-top: 4px;
     }
     
     .btn-send-message {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
+    
+    /* Mejorar scroll de mensajes */
+    .messages-area {
+        scroll-behavior: smooth;
+        overflow-y: auto;
+    }
+    
+    .messages-area::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .messages-area::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 2px;
     }
 }
 
@@ -9886,28 +10112,34 @@ body.modal-open {
     .messages-container {
         height: 90vh;
         margin: 0.5rem;
-        border-radius: 6px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
     
     .conversations-sidebar {
         height: 40%;
+        min-height: 200px;
     }
     
     .conversations-header {
         padding: 0.875rem 1rem;
-        flex-direction: column;
-        gap: 0.75rem;
-        align-items: stretch;
+        flex-direction: row; /* Mantener en fila */
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
     }
     
     .conversations-header h3 {
-        text-align: center;
+        text-align: left;
         font-size: 1.1rem;
+        margin: 0;
     }
     
     .btn-new-chat {
         justify-content: center;
-        padding: 10px;
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        white-space: nowrap;
     }
     
     .conversations-search {
@@ -9915,38 +10147,54 @@ body.modal-open {
     }
     
     .conversations-search input {
-        padding: 0.625rem 0.875rem 0.625rem 2.25rem;
+        padding: 0.625rem 0.875rem 0.625rem 2.5rem;
         font-size: 0.85rem;
+        border-radius: 20px;
     }
     
     .conversations-search .fa-search {
-        left: 1.5rem;
+        left: 1.25rem;
     }
     
     .conversacion-item {
         padding: 0.75rem 1rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .conversacion-item:hover {
+        background: #f8f9fa;
     }
     
     .conversacion-avatar {
-        width: 40px;
-        height: 40px;
+        width: 42px;
+        height: 42px;
         margin-right: 0.75rem;
+        flex-shrink: 0;
     }
     
     .conversacion-header h4 {
         font-size: 0.95rem;
+        margin-bottom: 0.25rem;
     }
     
     .conversacion-time {
         font-size: 0.75rem;
+        color: #666;
     }
     
     .last-message {
         font-size: 0.85rem;
+        color: #666;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
     
     .chat-area {
         height: 60%;
+        min-height: 250px;
     }
     
     .chat-header {
@@ -9954,107 +10202,159 @@ body.modal-open {
     }
     
     .chat-user-avatar {
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
         margin-right: 0.75rem;
+        flex-shrink: 0;
     }
     
     .chat-user-details h4 {
         font-size: 0.95rem;
+        margin-bottom: 0.1rem;
     }
     
     .chat-user-details p {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
+        color: #666;
     }
     
     .messages-area {
         padding: 0.75rem;
+        gap: 0.75rem;
     }
     
     .message {
-        margin-bottom: 0.875rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .message.own {
+        justify-content: flex-end;
+    }
+    
+    .message.own .message-content {
+        order: -1;
+        margin-right: 0;
     }
     
     .message-content {
-        max-width: 90%;
-        padding: 0.5rem 0.75rem;
+        max-width: 85%;
+        padding: 0.75rem 1rem;
+        border-radius: 18px;
+        word-wrap: break-word;
+        min-width: 60px;
     }
     
     .message-text {
         font-size: 0.9rem;
+        line-height: 1.4;
+        margin-bottom: 0.25rem;
     }
     
     .message-time {
         font-size: 0.7rem;
+        opacity: 0.8;
+        text-align: right;
+        margin-top: 0.25rem;
     }
     
     .message-input-area {
         padding: 1rem;
+        background: #f8f9fa;
     }
     
     .message-input-container {
-        gap: 0.5rem;
+        gap: 0.75rem;
+        align-items: flex-end;
     }
     
     .message-input-container textarea {
-        padding: 0.625rem 0.875rem;
-        font-size: 0.85rem;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        border-radius: 20px;
+        resize: none;
+        min-height: 44px;
+        max-height: 120px;
     }
     
     .message-input-actions {
         gap: 0.5rem;
+        flex-shrink: 0;
     }
     
     .message-avatar {
-        width: 24px;
-        height: 24px;
-        margin-top: 20px;
-        margin-right: 6px;
-        margin-left: 6px;
+        width: 28px;
+        height: 28px;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+    
+    .message.own .message-avatar {
+        order: 1;
     }
     
     #charCounter {
         font-size: 0.75rem;
         min-width: 40px;
+        text-align: center;
     }
     
     .btn-send-message {
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        flex-shrink: 0;
     }
     
     .btn-send-message i {
-        font-size: 0.9rem;
+        font-size: 1rem;
+    }
+    
+    .btn-send-message:hover {
+        transform: scale(1.05);
     }
 }
 
 @media (max-width: 380px) {
+    .messages-container {
+        margin: 0.25rem;
+        height: 92vh;
+    }
+    
     .conversacion-header {
-        flex-direction: column;
+        flex-direction: row;
+        justify-content: space-between;
         align-items: flex-start;
-        gap: 0.25rem;
+        gap: 0.5rem;
     }
     
     .conversacion-time {
-        align-self: flex-end;
+        align-self: flex-start;
+        flex-shrink: 0;
     }
     
     .message-content {
-        max-width: 95%;
+        max-width: 90%;
+        padding: 0.625rem 0.875rem;
     }
     
     .message-input-container {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
     
     .message-input-actions {
-        width: 100%;
-        justify-content: space-between;
-        margin-top: 0.5rem;
+        width: auto;
+        justify-content: flex-end;
+        margin-top: 0;
     }
     
     .users-list-chat {
-        max-height: 300px;
+        max-height: 280px;
     }
     
     .user-chat-item {
@@ -10062,11 +10362,43 @@ body.modal-open {
     }
     
     .user-chat-avatar {
-        width: 45px;
-        height: 45px;
+        width: 42px;
+        height: 42px;
         margin-right: 0.875rem;
     }
+    
+    /* Mejorar contraste y legibilidad */
+    .message-text {
+        font-size: 0.88rem;
+    }
+    
+    .last-message {
+        font-size: 0.82rem;
+    }
 }
+
+/* Estados de carga y vacío */
+.messages-area:empty::before {
+    content: "No hay mensajes aún";
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 2rem;
+    display: block;
+}
+
+/* Mejorar feedback táctil */
+.conversacion-item,
+.user-chat-item {
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+}
+
+.conversacion-item:active,
+.user-chat-item:active {
+    background-color: #e9ecef;
+}
+
 /* Estilos para elementos clickeables en posts y usuarios */
 .post-avatar, 
 .post-user-info h4, 
@@ -13482,7 +13814,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     transform: scale(1.1);
 }
 
-/* ===== DISEÑO RESPONSIVO PARA MÓVILES ===== */
+/* ===== DISEÑO RESPONSIVO PARA MÓVILES Y TABLETS ===== */
+
+/* Tablets pequeñas y móviles grandes (768px o menos) */
 @media (max-width: 768px) {
     .dashboard-container {
         grid-template-columns: 1fr;
@@ -13490,7 +13824,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
     
     .dashboard-sidebar {
-        display: none; /* Oculta el sidebar completo en móviles */
+        display: none; /* Oculta el sidebar completo */
     }
     
     /* Menú inferior móvil */
@@ -13544,28 +13878,116 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         background: rgba(255, 255, 255, 0.15);
     }
     
-    /* Ajustes para el contenido principal en móviles */
+    /* Ajustes para el contenido principal */
     .dashboard-main {
         padding: 1rem;
         margin-bottom: 0;
     }
     
-    /* Ajustes para la navbar en móviles */
+    /* Ajustes para la navbar */
     .navbar {
         padding: 0 1rem;
     }
-    
-    .nav-user {
-        gap: 0.5rem;
+
+    .nav-container {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
     }
-    
+
+    .nav-user {
+        margin-left: 0 !important;
+    }
+
     .nav-user span {
         font-size: 0.9rem;
     }
-    
+
     .btn-small {
         padding: 0.4rem 0.8rem;
         font-size: 0.8rem;
+    }
+}
+
+/* Tablets medianas (769px a 960px) */
+@media (min-width: 769px) and (max-width: 960px) {
+    .mobile-bottom-nav {
+        display: none; /* Oculta el menú móvil en tablets */
+    }
+    
+    /* Ajustes específicos para tablets medianas */
+    .dashboard-container {
+        grid-template-columns: 250px 1fr;
+        gap: 1.2rem;
+    }
+    
+    .dashboard-sidebar {
+        display: block; /* Muestra el sidebar en tablets */
+    }
+    
+    .dashboard-main {
+        padding: 1.2rem;
+    }
+    
+    /* Navbar para tablets - logo a la izquierda, logout a la derecha */
+    .nav-container {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+    }
+    
+    /* Ajustar tamaño de elementos en tablets medianas */
+    .logo-img {
+        max-height: 32px;
+    }
+    
+    #logoutBtn {
+        padding: 0.5rem 0.9rem;
+        font-size: 0.83rem;
+    }
+    
+    /* Opcional: ajustar el sidebar para tablets más pequeñas */
+    .dashboard-sidebar {
+        padding: 1rem 0.8rem;
+    }
+}
+
+/* Tablets grandes y pantallas pequeñas (961px a 1024px) */
+@media (min-width: 961px) and (max-width: 1024px) {
+    .mobile-bottom-nav {
+        display: none;
+    }
+    
+    .dashboard-container {
+        grid-template-columns: 280px 1fr;
+        gap: 1.5rem;
+    }
+    
+    .dashboard-sidebar {
+        display: block;
+    }
+    
+    .dashboard-main {
+        padding: 1.5rem;
+    }
+    
+    .nav-container {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+    }
+    
+    /* Tamaños un poco más grandes para tablets grandes */
+    .logo-img {
+        max-height: 35px;
+    }
+    
+    #logoutBtn {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
     }
 }
 
@@ -13590,11 +14012,34 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .dashboard-container {
         padding-bottom: 65px;
     }
+    
+    /* Ajustes adicionales para móviles muy pequeños */
+    .navbar {
+        padding: 0.5rem 1rem;
+    }
+    
+    .logo-img {
+        max-height: 28px;
+    }
+    
+    #logoutBtn {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+    }
+    
+    .dashboard-main {
+        padding: 0.8rem;
+    }
 }
 
-/* Para pantallas grandes (sidebar normal) */
-@media (min-width: 769px) {
+/* Para pantallas grandes (más de 1024px) */
+@media (min-width: 1025px) {
     .mobile-bottom-nav {
-        display: none; /* Oculta el menú móvil en desktop */
+        display: none;
+    }
+    
+    .dashboard-container {
+        grid-template-columns: 300px 1fr;
+        gap: 2rem;
     }
 }

@@ -242,9 +242,9 @@ function validateUsername() {
     if (username.length > 0 && username.length < 3) {
         isValid = false;
         errorMessage = 'El nombre de usuario debe tener al menos 3 caracteres';
-    } else if (username.length > 20) {
+    } else if (username.length > 15) {
         isValid = false;
-        errorMessage = 'El nombre de usuario no puede tener más de 20 caracteres';
+        errorMessage = 'El nombre de usuario no puede tener más de 15 caracteres';
     }
     // Validar caracteres inválidos
     else if (invalidChars.test(username)) {
@@ -284,9 +284,9 @@ function validateNombre() {
         errorMessage = 'El nombre completo no puede estar vacío';
     }
     // Validar longitud máxima
-    else if (nombre.length > 40) {
+    else if (nombre.length > 15) {
         isValid = false;
-        errorMessage = 'El nombre completo no puede tener más de 40 caracteres';
+        errorMessage = 'El nombre completo no puede tener más de 15 caracteres';
     }
     // Validar que tenga al menos nombre y apellido (opcional pero recomendado)
     else if (nombre.split(' ').length < 2) {
@@ -358,8 +358,8 @@ async function handleRegister(e) {
     };
     
     // Validaciones de longitud específicas
-    if (userData.username.length < 3 || userData.username.length > 20) {
-        showToast('❌ El nombre de usuario debe tener entre 3 y 20 caracteres', 'error');
+    if (userData.username.length < 3 || userData.username.length > 15) {
+        showToast('❌ El nombre de usuario debe tener entre 3 y 15 caracteres', 'error');
         return;
     }
     
@@ -368,8 +368,8 @@ async function handleRegister(e) {
         return;
     }
     
-    if (userData.nombre.length > 40) {
-        showToast('❌ El nombre completo no puede tener más de 40 caracteres', 'error');
+    if (userData.nombre.length > 15) {
+        showToast('❌ El nombre completo no puede tener más de 15 caracteres', 'error');
         return;
     }
     

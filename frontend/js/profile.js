@@ -664,7 +664,7 @@ function initializeConfigModalEvents() {
                     this.style.borderColor = '#e74c3c';
                     const message = document.createElement('div');
                     message.className = 'input-message error';
-                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Solo letras, números y _ (3-20 caracteres)';
+                    message.innerHTML = '<i class="fas fa-exclamation-circle"></i> Solo letras, números y _ (3-15 caracteres)';
                     this.parentElement.appendChild(message);
                 } else {
                     this.style.borderColor = '#27ae60';
@@ -920,9 +920,9 @@ async function changeUsername() {
     }
     
     // Validar formato del username
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
     if (!usernameRegex.test(newUsername)) {
-        showToast('❌ El nombre de usuario solo puede contener letras, números y guiones bajos (3-20 caracteres)', 'error');
+        showToast('❌ El nombre de usuario solo puede contener letras, números y guiones bajos (3-15 caracteres)', 'error');
         return;
     }
     
@@ -2151,12 +2151,12 @@ async function loadEditProfileForm() {
                             name="nombre" 
                             value="${user.nombre || ''}" 
                             required
-                            maxlength="40"
+                            maxlength="15"
                             oninput="validateNombre()"
                         >
                         <div class="validation-message" id="nombreValidation">
                             <span id="nombreError" class="error-message"></span>
-                            <span class="char-count">${user.nombre?.length || 0}/40</span>
+                            <span class="char-count">${user.nombre?.length || 0}/15</span>
                         </div>
                     </div>
 
@@ -2166,11 +2166,11 @@ async function loadEditProfileForm() {
                             id="editBiografia" 
                             name="biografia" 
                             placeholder="Cuéntanos sobre ti..." 
-                            maxlength="500"
+                            maxlength="40"
                             rows="3"
                         >${user.biografia || ''}</textarea>
                         <div class="char-count">
-                            <span id="bioCharCount">${user.biografia?.length || 0}/500</span>
+                            <span id="bioCharCount">${user.biografia?.length || 0}/40</span>
                         </div>
                     </div>
                 </div>
@@ -2187,7 +2187,7 @@ async function loadEditProfileForm() {
                             name="ubicacion" 
                             value="${user.ubicacion || ''}" 
                             placeholder="Ciudad, País"
-                            maxlength="100"
+                            maxlength="15"
                         >
                     </div>
 
@@ -2296,12 +2296,12 @@ function validateNombre() {
     if (!nombreInput || !nombreError) return true;
     
     const nombre = nombreInput.value.trim();
-    const isValid = nombre.length > 0 && nombre.length <= 40;
+    const isValid = nombre.length > 0 && nombre.length <= 15;
     
     // Actualizar contador
     if (charCount) {
-        charCount.textContent = `${nombre.length}/40`;
-        charCount.style.color = nombre.length > 35 ? '#e74c3c' : nombre.length > 30 ? '#f39c12' : '#7f8c8d';
+        charCount.textContent = `${nombre.length}/15`;
+        charCount.style.color = nombre.length > 10 ? '#e74c3c' : nombre.length > 13 ? '#f39c12' : '#7f8c8d';
     }
     
     // Validar y mostrar errores
@@ -2309,8 +2309,8 @@ function validateNombre() {
         nombreError.textContent = 'El nombre no puede estar vacío';
         nombreInput.style.borderColor = '#e74c3c';
         return false;
-    } else if (nombre.length > 40) {
-        nombreError.textContent = 'El nombre no puede tener más de 40 caracteres';
+    } else if (nombre.length > 15) {
+        nombreError.textContent = 'El nombre no puede tener más de 15 caracteres';
         nombreInput.style.borderColor = '#e74c3c';
         return false;
     } else {
@@ -5320,8 +5320,8 @@ function initializeEditFormEvents() {
     if (bioTextarea && bioCharCount) {
         bioTextarea.addEventListener('input', function() {
             const length = this.value.length;
-            bioCharCount.textContent = `${length}/500`;
-            bioCharCount.style.color = length > 450 ? '#e74c3c' : length > 400 ? '#f39c12' : '#7f8c8d';
+            bioCharCount.textContent = `${length}/40`;
+            bioCharCount.style.color = length > 35 ? '#e74c3c' : length > 38 ? '#f39c12' : '#7f8c8d';
         });
     }
 
@@ -5523,8 +5523,8 @@ function initializeEditModalEvents(postId) {
     if (editContent && editCharCount) {
         editContent.addEventListener('input', function() {
             const length = this.value.length;
-            editCharCount.textContent = `${length}/1000`;
-            editCharCount.style.color = length > 900 ? '#e74c3c' : length > 700 ? '#f39c12' : '#7f8c8d';
+            editCharCount.textContent = `${length}/500`;
+            editCharCount.style.color = length > 300 ? '#e74c3c' : length > 400 ? '#f39c12' : '#7f8c8d';
         });
         
         // Atajos de teclado

@@ -845,8 +845,8 @@ function initializeEditModalEvents(postId) {
     if (editContent && editCharCount) {
         editContent.addEventListener('input', function() {
             const length = this.value.length;
-            editCharCount.textContent = `${length}/1000`;
-            editCharCount.style.color = length > 900 ? '#e74c3c' : length > 700 ? '#f39c12' : '#7f8c8d';
+            editCharCount.textContent = `${length}/500`;
+            editCharCount.style.color = length > 300 ? '#e74c3c' : length > 400 ? '#f39c12' : '#7f8c8d';
         });
         
         // Atajos de teclado
