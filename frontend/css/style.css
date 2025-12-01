@@ -14045,64 +14045,197 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 }
 
+/* ESTILOS BASE PARA EL LOGO */
+.nav-logo1 {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    height: 60px;
+}
+
+.logo-container1 {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.logo-img1 {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    transition: all 0.5s ease;
+    position: relative;
+    z-index: 2;
+}
+
+.logo-orbits {
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 60px;
+    height: 60px;
+    z-index: 1;
+}
+
+.orbit {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    transition: all 0.5s ease;
+}
+
+.orbit-1 {
+    width: 40px;
+    height: 40px;
+    top: 10px;
+    left: 10px;
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.orbit-2 {
+    width: 50px;
+    height: 50px;
+    top: 5px;
+    left: 5px;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.orbit-3 {
+    width: 60px;
+    height: 60px;
+    top: 0;
+    left: 0;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: white;
+    border-radius: 50%;
+    opacity: 0;
+    transition: all 0.5s ease;
+}
+
+/* Hover Effects */
+.nav-logo1:hover .logo-img1 {
+    transform: scale(1.2);
+    filter: brightness(1.2) drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
+}
+
+.nav-logo1:hover .orbit-1 {
+    transform: rotate(180deg);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.nav-logo1:hover .orbit-2 {
+    transform: rotate(-120deg);
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.nav-logo1:hover .orbit-3 {
+    transform: rotate(90deg);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.nav-logo1:hover .particle {
+    opacity: 1;
+}
+
+.particle-1 {
+    top: 5px;
+    left: 30px;
+    transition-delay: 0.1s;
+}
+
+.particle-2 {
+    top: 30px;
+    left: 55px;
+    transition-delay: 0.2s;
+}
+
+.particle-3 {
+    top: 55px;
+    left: 30px;
+    transition-delay: 0.3s;
+}
+
+.particle-4 {
+    top: 30px;
+    left: 5px;
+    transition-delay: 0.4s;
+}
+
+/* MEDIA QUERIES - Solo ajustes de tamaño y posición */
 @media (max-width: 768px) {
-    
     .nav-logo1 {
         display: flex;
         justify-content: center;
         align-items: center;
         width: 100%;
-        margin: 0 auto;
+        height: 50px; /* Ajusta altura para móvil */
     }
     
     .logo-container1 {
-        display: flex;
         justify-content: center;
-        align-items: center;
-        position: relative;
+        width: auto;
     }
     
     .logo-img1 {
-        max-height: 35px;
-        width: auto;
-        z-index: 2;
-        position: relative;
+        width: 120px; /* Más pequeño para móvil */
+        height: 120px;
     }
     
-    /* Ajusta las órbitas para móviles si es necesario */
     .logo-orbits {
+        left: 50%; /* Centra las órbitas */
+        transform: translate(-50%, -50%);
         width: 50px;
         height: 50px;
     }
     
-    .orbit-1 { width: 35px; height: 35px; }
-    .orbit-2 { width: 45px; height: 45px; }
-    .orbit-3 { width: 55px; height: 55px; }
+    .orbit-1 {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .orbit-2 {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .orbit-3 {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .particle {
+        width: 5px;
+        height: 5px;
+    }
 }
 
+/* Resto de media queries para ajustar tamaños */
 @media (min-width: 769px) and (max-width: 960px) {
-    
     .logo-img1 {
-        max-height: 40px;
+        width: 130px;
+        height: 130px;
     }
-    
 }
 
-/* Tabletas grandes y pantallas pequeñas (961px a 1024px) */
 @media (min-width: 961px) and (max-width: 1024px) {
-
-    
     .logo-img1 {
-        max-height: 45px;
+        width: 140px;
+        height: 140px;
     }
 }
 
-/* Para pantallas muy pequeñas (menos de 480px) */
 @media (max-width: 480px) {
-
-    
     .logo-img1 {
-        max-height: 30px;
+        width: 100px;
+        height: 100px;
     }
     
     .logo-orbits {
@@ -14110,16 +14243,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         height: 45px;
     }
     
-    .orbit-1 { width: 30px; height: 30px; }
-    .orbit-2 { width: 40px; height: 40px; }
-    .orbit-3 { width: 50px; height: 50px; }
+    .orbit-1 {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .orbit-2 {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .orbit-3 {
+        width: 50px;
+        height: 50px;
+    }
 }
 
-/* Para pantallas grandes (más de 1024px) */
 @media (min-width: 1025px) {
-
-    
     .logo-img1 {
-        max-height: 50px;
+        width: 150px; /* Tamaño original */
+        height: 150px;
     }
 }
