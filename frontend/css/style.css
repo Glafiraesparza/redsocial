@@ -6320,6 +6320,7 @@ input[type="date"] {
     .profile-actions{
         align-items: center;
         gap: 2rem;
+        justify-content: center;
     }
 
     .stat-item {
@@ -14041,5 +14042,84 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .dashboard-container {
         grid-template-columns: 300px 1fr;
         gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    
+    .nav-logo1 {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin: 0 auto;
+    }
+    
+    .logo-container1 {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+    }
+    
+    .logo-img1 {
+        max-height: 35px;
+        width: auto;
+        z-index: 2;
+        position: relative;
+    }
+    
+    /* Ajusta las órbitas para móviles si es necesario */
+    .logo-orbits {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .orbit-1 { width: 35px; height: 35px; }
+    .orbit-2 { width: 45px; height: 45px; }
+    .orbit-3 { width: 55px; height: 55px; }
+}
+
+@media (min-width: 769px) and (max-width: 960px) {
+    
+    .logo-img1 {
+        max-height: 40px;
+    }
+    
+}
+
+/* Tabletas grandes y pantallas pequeñas (961px a 1024px) */
+@media (min-width: 961px) and (max-width: 1024px) {
+
+    
+    .logo-img1 {
+        max-height: 45px;
+    }
+}
+
+/* Para pantallas muy pequeñas (menos de 480px) */
+@media (max-width: 480px) {
+
+    
+    .logo-img1 {
+        max-height: 30px;
+    }
+    
+    .logo-orbits {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .orbit-1 { width: 30px; height: 30px; }
+    .orbit-2 { width: 40px; height: 40px; }
+    .orbit-3 { width: 50px; height: 50px; }
+}
+
+/* Para pantallas grandes (más de 1024px) */
+@media (min-width: 1025px) {
+
+    
+    .logo-img1 {
+        max-height: 50px;
     }
 }
