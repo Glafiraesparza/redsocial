@@ -2166,11 +2166,11 @@ async function loadEditProfileForm() {
                             id="editBiografia" 
                             name="biografia" 
                             placeholder="Cuéntanos sobre ti..." 
-                            maxlength="40"
+                            maxlength="30"
                             rows="3"
                         >${user.biografia || ''}</textarea>
                         <div class="char-count">
-                            <span id="bioCharCount">${user.biografia?.length || 0}/40</span>
+                            <span id="bioCharCount">${user.biografia?.length || 0}/30</span>
                         </div>
                     </div>
                 </div>
@@ -5320,8 +5320,8 @@ function initializeEditFormEvents() {
     if (bioTextarea && bioCharCount) {
         bioTextarea.addEventListener('input', function() {
             const length = this.value.length;
-            bioCharCount.textContent = `${length}/40`;
-            bioCharCount.style.color = length > 35 ? '#e74c3c' : length > 38 ? '#f39c12' : '#7f8c8d';
+            bioCharCount.textContent = `${length}/30`;
+            bioCharCount.style.color = length > 25 ? '#e74c3c' : length > 28 ? '#f39c12' : '#7f8c8d';
         });
     }
 
